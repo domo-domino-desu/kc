@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Navigation tabs -->
+  <string name="tab_creators">创作者</string>
+  <string name="tab_works">作品</string>
+  <string name="tab_dm">DM</string>
+  <string name="tab_more">更多</string>
+  <!-- Search modes -->
+  <string name="search_mode_posts">Posts</string>
+  <string name="search_mode_artists">Artists</string>
+  <string name="search_mode_dms">DMs</string>
+  <!-- Search hints -->
+  <string name="search_hint">搜索关键词…</string>
+  <string name="search_creators_hint">搜索创作者…</string>
+  <string name="search_works_hint">搜索作品…</string>
+  <string name="search_dms_hint">搜索 DMs…</string>
+  <string name="search_dms_prompt">输入关键词搜索 DMs</string>
+  <string name="search_action">搜索</string>
+  <!-- Filters / sort -->
+  <string name="filter_service">平台</string>
+  <string name="filter_all">全部</string>
+  <string name="filter_sort">排序</string>
+  <string name="filter_order">顺序</string>
+  <string name="sort_popularity">热度</string>
+  <string name="sort_date_indexed">收录时间</string>
+  <string name="sort_date_updated">更新时间</string>
+  <string name="sort_alphabetical">字母顺序</string>
+  <string name="sort_service_name">平台</string>
+  <string name="order_desc">降序</string>
+  <string name="order_asc">升序</string>
+  <!-- Date range labels -->
+  <string name="date_start">起始</string>
+  <string name="date_end">结束</string>
+  <!-- Popular period labels -->
+  <string name="period_day">日</string>
+  <string name="period_week">周</string>
+  <string name="period_month">月</string>
+  <!-- Popular shift buttons -->
+  <string name="shift_prev_day">上一日</string>
+  <string name="shift_prev_week">上一周</string>
+  <string name="shift_prev_month">上一月</string>
+  <string name="shift_next_day">下一日</string>
+  <string name="shift_next_week">下一周</string>
+  <string name="shift_next_month">下一月</string>
+  <!-- Recent screen tabs -->
+  <string name="recent_tab_posts">Posts</string>
+  <string name="recent_tab_artists">Artists</string>
+  <string name="recent_tab_dms">DMs</string>
+  <string name="recent_tab_popular">热门</string>
+  <!-- Works screen sub-tabs -->
+  <string name="works_tab_popular">热门</string>
+  <string name="works_tab_search">搜索</string>
+  <string name="works_tab_tags">标签</string>
+  <!-- More screen -->
+  <string name="section_account">账户</string>
+  <string name="section_settings">设置</string>
+  <string name="platform_logged_in">%1$s · 已登录</string>
+  <string name="platform_login">登录 %1$s</string>
+  <string name="favorites">收藏</string>
+  <string name="logout">退出登录</string>
+  <string name="mirror_dialog_title">%1$s 镜像</string>
+  <string name="mirror_kemono">Kemono 镜像</string>
+  <string name="mirror_coomer">Coomer 镜像</string>
+  <string name="section_platform">平台</string>
+  <string name="platform_label">当前平台</string>
+  <string name="shortcut_pin_kemono">添加 Kemono 到主屏幕</string>
+  <string name="shortcut_pin_coomer">添加 Coomer 到主屏幕</string>
+  <string name="grid_cell_width">网格列宽</string>
+  <string name="theme_mode">主题模式</string>
+  <string name="theme_mode_system">跟随系统</string>
+  <string name="theme_mode_light">浅色</string>
+  <string name="theme_mode_dark">深色</string>
+  <string name="download_save_path">保存路径</string>
+  <string name="download_save_path_not_configured">未配置</string>
+  <string name="choose_save_path">选择保存路径</string>
+  <string name="save">保存</string>
+  <string name="cancel">取消</string>
+  <string name="favorites_requires_login">请先登录 %1$s</string>
+  <string name="language_label">语言</string>
+  <string name="language_system">跟随系统</string>
+  <string name="language_en">English</string>
+  <string name="language_zh">简体中文</string>
+  <string name="about">关于</string>
+  <!-- Login screen -->
+  <string name="login_title">登录</string>
+  <string name="login_username">用户名</string>
+  <string name="login_password">密码</string>
+  <string name="back">返回</string>
+  <!-- Favorites screen -->
+  <string name="favorites_tab_creators">创作者</string>
+  <string name="favorites_tab_posts">帖子</string>
+  <!-- Creator screen -->
+  <string name="creator_tab_posts">Posts</string>
+  <string name="creator_tab_announcements">Announcements</string>
+  <string name="creator_tab_tags">Tags</string>
+  <string name="creator_tab_discord_channels">频道</string>
+  <string name="no_discord_channels">暂无频道</string>
+  <string name="no_announcements">（无 Announcements）</string>
+  <string name="no_tags">（无 Tags）</string>
+  <string name="add_favorite">收藏</string>
+  <string name="remove_favorite">取消收藏</string>
+  <string name="linked_accounts">关联账号 (%1$d)</string>
+  <string name="similar_accounts">相似账号 (%1$d)</string>
+  <!-- Post screen -->
+  <string name="favorite_label">收藏</string>
+  <string name="comments_count">评论 (%1$d)</string>
+  <string name="no_comments">暂无评论</string>
+  <!-- Tags screen -->
+  <string name="filter_tags_hint">筛选标签…</string>
+  <!-- Image viewer -->
+  <string name="close">关闭</string>
+  <!-- Share button -->
+  <string name="copy_link">复制链接</string>
+  <string name="link_copied">链接已复制</string>
+  <!-- About screen -->
+  <string name="about_libraries_metadata_source">许可证与依赖元数据来源：AboutLibraries</string>
+  <string name="about_description">Kemono/Coomer 第三方客户端</string>
+  <string name="about_project_address">GitHub</string>
+  <string name="about_project_address_url">https://github.com/domo-domino-desu/kc</string>
+  <string name="about_libraries">开源库使用情况</string>
+  <string name="about_version">版本号</string>
+  <string name="about_version_copied">版本号已复制</string>
+  <string name="about_license">LICENSE</string>
+  <string name="about_export_logs">导出日志</string>
+  <string name="about_export_logs_success">日志已导出：%1$s</string>
+  <string name="about_export_logs_failed">导出日志失败：%1$s</string>
+  <string name="about_thanks">感谢</string>
+  <string name="about_acknowledgements_kemonos">Kemonos</string>
+  <string name="about_acknowledgements_kemonos_repo">Helandy/Kemonos</string>
+  <string name="about_acknowledgements_anthropic_claude">Anthropic Claude</string>
+  <string name="about_acknowledgements_openai_codex">OpenAI Codex</string>
+</resources>

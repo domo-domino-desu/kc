@@ -1,0 +1,22 @@
+[global]
+excludes = ["shared/src/commonTest/resources/fixture/*.html"]
+
+[formatter.kotlin]
+command = "ktfmt"
+includes = ["*.kt", "*.kts"]
+
+[formatter.web]
+command = "prettier"
+options = ["--write"]
+includes = ["*.html", "*.json"]
+
+[formatter.xml]
+command = "bash"
+options = [
+  "-euo",
+  "pipefail",
+  "-c",
+  "for f in \"$@\"; do xmllint --format --output \"$f\" \"$f\"; done",
+  "--",
+]
+includes = ["*.xml"]

@@ -1,0 +1,9 @@
+pre-commit:
+  commands:
+    version_code:
+      run: awk -F= 'BEGIN{OFS=FS}/^APP_VERSION_CODE=/{++$2}1' gradle.properties > gradle.properties.tmp && mv gradle.properties.tmp gradle.properties
+    treefmt:
+      run: git diff --cached --name-only --diff-filter=d | xargs treefmt
+      stage_fixed: true
+    local_pre_commit:
+      run: if [ -f .githooks/pre-commit ]; then bash .githooks/pre-commit; fi

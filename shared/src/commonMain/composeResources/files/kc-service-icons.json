@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "platforms": {
+    "kemono": [
+      "patreon",
+      "fanbox",
+      "discord",
+      "fantia",
+      "afdian",
+      "boosty",
+      "dlsite",
+      "gumroad",
+      "subscribestar"
+    ],
+    "coomer": ["onlyfans", "fansly", "candfans"]
+  },
+  "services": {
+    "patreon": {
+      "label": "Patreon",
+      "icon": "mdi:patreon"
+    },
+    "fanbox": {
+      "label": "Pixiv Fanbox",
+      "icon": "simple-icons:pixiv"
+    },
+    "discord": {
+      "label": "Discord",
+      "icon": "fa6-brands:discord"
+    },
+    "fantia": {
+      "label": "Fantia",
+      "icon": "service:fantia"
+    },
+    "afdian": {
+      "label": "Afdian",
+      "icon": "simple-icons:afdian"
+    },
+    "boosty": {
+      "label": "Boosty",
+      "icon": "simple-icons:boosty"
+    },
+    "gumroad": {
+      "label": "Gumroad",
+      "icon": "simple-icons:gumroad"
+    },
+    "subscribestar": {
+      "label": "SubscribeStar",
+      "icon": "lucide:section"
+    },
+    "dlsite": {
+      "label": "DLsite",
+      "icon": "service:dlsite"
+    },
+    "onlyfans": {
+      "label": "OnlyFans",
+      "icon": "simple-icons:onlyfans"
+    },
+    "fansly": {
+      "label": "Fansly",
+      "icon": "arcticons:fansly"
+    },
+    "candfans": {
+      "label": "CandFans",
+      "icon": "material-symbols:lock-open-outline-rounded"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <shortcut android:shortcutId="open_kemono" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/shortcut_kemono_short" android:shortcutLongLabel="@string/shortcut_kemono_long">
+    <intent android:action="android.intent.action.MAIN" android:targetPackage="ddd.kc" android:targetClass="ddd.kc.android.MainActivity">
+      <extra android:name="extra_platform" android:value="KEMONO"/>
+    </intent>
+    <categories android:name="android.shortcut.conversation"/>
+  </shortcut>
+  <shortcut android:shortcutId="open_coomer" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/shortcut_coomer_short" android:shortcutLongLabel="@string/shortcut_coomer_long">
+    <intent android:action="android.intent.action.MAIN" android:targetPackage="ddd.kc" android:targetClass="ddd.kc.android.MainActivity">
+      <extra android:name="extra_platform" android:value="COOMER"/>
+    </intent>
+    <categories android:name="android.shortcut.conversation"/>
+  </shortcut>
+</shortcuts>
