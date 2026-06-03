@@ -1,0 +1,133 @@
+name: Android Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Android build environment
+        uses: ./.github/actions/setup-android-build
+
+      - name: Generate SymbolCraft icons
+        run: ./gradlew --stacktrace :shared:generateSymbolCraftIcons
+
+      - name: Verify tag matches app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          app_version="$(awk -F= '/^APP_VERSION_NAME=/{print $2; exit}' gradle.properties)"
+          if [[ -z "${app_version}" ]]; then
+            echo "APP_VERSION_NAME not found in gradle.properties" >&2
+            exit 1
+          fi
+
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [[ "${tag_version}" != "${app_version}" ]]; then
+            echo "Tag version (${tag_version}) does not match APP_VERSION_NAME (${app_version})" >&2
+            exit 1
+          fi
+
+      - name: Build Android release artifacts
+        run: ./gradlew --stacktrace :androidApp:assembleRelease :androidApp:bundleRelease
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-artifacts
+          path: |
+            androidApp/build/outputs/apk/release/*.apk
+            androidApp/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: Build tag release commit summary
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: tag_release_notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_tag="${GITHUB_REF_NAME}"
+          previous_tag="$(git describe --tags --match 'v*' --abbrev=0 "${GITHUB_SHA}^" 2>/dev/null || true)"
+          notes_file="${RUNNER_TEMP}/tag-release-notes.md"
+
+          if [[ -n "${previous_tag}" ]]; then
+            {
+              echo "## Commits Since ${previous_tag}"
+              echo
+              git log "${previous_tag}..${GITHUB_SHA}" --max-count=30 --pretty=format:'- %s'
+            } > "${notes_file}"
+          else
+            {
+              echo "## Commits Since Repository Start"
+              echo
+              echo "_No earlier tag was found; showing the latest 30 commit messages._"
+              echo
+              git log "${GITHUB_SHA}" --max-count=30 --pretty=format:'- %s'
+            } > "${notes_file}"
+          fi
+
+          if ! grep -q '^- ' "${notes_file}"; then
+            echo "- No commit messages found for this release." >> "${notes_file}"
+          fi
+
+          {
+            echo "body_file=${notes_file}"
+            echo "current_tag=${current_tag}"
+            echo "previous_tag=${previous_tag}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Publish pre-release for push
+        if: github.ref == 'refs/heads/main'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: pre-main
+          name: Pre Release (main)
+          body: |
+            Automated pre-release build from main.
+            Commit: ${{ github.sha }}
+          prerelease: true
+          allowUpdates: true
+          removeArtifacts: true
+          replacesArtifacts: true
+          commit: ${{ github.sha }}
+          artifacts: |
+            androidApp/build/outputs/apk/release/*.apk
+            androidApp/build/outputs/bundle/release/*.aab
+
+      - name: Publish versioned release for tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          bodyFile: ${{ steps.tag_release_notes.outputs.body_file }}
+          generateReleaseNotes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: |
+            androidApp/build/outputs/apk/release/*.apk
+            androidApp/build/outputs/bundle/release/*.aab
