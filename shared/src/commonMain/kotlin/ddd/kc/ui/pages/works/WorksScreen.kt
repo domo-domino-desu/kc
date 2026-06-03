@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -118,7 +119,7 @@ class WorksScreen(private val repeatSelectionToken: Int = 0) : Screen {
             stringResource(Res.string.works_tab_search),
             stringResource(Res.string.works_tab_tags),
         )
-    Scaffold { paddingValues ->
+    Scaffold(contentWindowInsets = WindowInsets(0.dp)) { paddingValues ->
       Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         ButtonGroup(
             overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },

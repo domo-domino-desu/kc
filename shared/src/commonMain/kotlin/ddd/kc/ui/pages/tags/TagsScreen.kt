@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -95,7 +96,7 @@ class TagsScreen(private val repeatSelectionToken: Int = 0) : Screen {
     val tagWindows =
         remember(state.filteredTags) { state.filteredTags.chunked(TAG_RENDER_WINDOW_SIZE) }
 
-    Scaffold { paddingValues ->
+    Scaffold(contentWindowInsets = WindowInsets(0.dp)) { paddingValues ->
       LazyColumn(
           state = listState,
           modifier = Modifier.fillMaxSize().padding(paddingValues),
