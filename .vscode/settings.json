@@ -9,6 +9,6 @@
     "**/*.olean": true
   },
   "hide-files.files": [],
-  "svg.preview.background": "editor",
+  "svg.preview.background": "white",
   "conventionalCommits.scopes": ["ci"]
 }
