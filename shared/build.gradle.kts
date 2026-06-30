@@ -62,11 +62,13 @@ kotlin {
         implementation(libs.aboutlibraries.core)
         implementation(libs.coil.compose)
         implementation(libs.coil.network.ktor3)
+        implementation(libs.composemediaplayer)
         implementation(libs.compose.components.resources)
         implementation(libs.compose.foundation)
         implementation(libs.compose.material3)
         implementation(libs.compose.runtime)
         implementation(libs.compose.ui)
+        implementation(libs.compose.ui.backhandler)
         implementation(libs.datastore.preferences.core)
         implementation(libs.htmlconverter.compose)
         implementation(libs.kermit)
@@ -97,7 +99,6 @@ kotlin {
         implementation(libs.ktor.client.okhttp)
         implementation(libs.slf4j.simple)
         implementation(libs.materialyou)
-        implementation(libs.vlcj)
       }
     }
 
@@ -174,6 +175,10 @@ symbolCraft {
       "explore",
       "favorite",
       "filter_alt",
+      "forward_10",
+      "forward_30",
+      "fullscreen",
+      "fullscreen_exit",
       "home",
       "image",
       "keyboard_arrow_left",
@@ -186,7 +191,11 @@ symbolCraft {
       "open_in_new",
       "output_circle",
       "person",
+      "pause",
+      "play_arrow",
       "refresh",
+      "replay_10",
+      "replay_30",
       "receipt_long",
       "search",
       "settings",

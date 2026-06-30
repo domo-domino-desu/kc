@@ -222,12 +222,21 @@ class PostRouteScreen(
             },
             onImageClick = { imageIndex ->
               val images = post.imageFiles()
-              val urls = images.mapNotNull { it.fullUrl(cdnUrl) }
-              val thumbs = images.mapNotNull { it.thumbnailUrl(cdnUrl) }
+              val viewableImages =
+                  images.mapNotNull { file ->
+                    file.fullUrl(cdnUrl)?.let { fullUrl ->
+                      fullUrl to file.thumbnailUrl(cdnUrl).orEmpty()
+                    }
+                  }
+              val urls = viewableImages.map { it.first }
+              val thumbs = viewableImages.map { it.second }
+              val startIndex = images.take(imageIndex).count { !it.fullUrl(cdnUrl).isNullOrBlank() }
               log.i {
-                "打开图片 -> 点击Post图片(platform=${platform.name},service=${post.service},creator=${post.user},post=${post.id},index=$imageIndex,count=${urls.size})"
+                "打开图片 -> 点击Post图片(platform=${platform.name},service=${post.service},creator=${post.user},post=${post.id},index=$startIndex,count=${urls.size})"
               }
-              navigator.push(ImageViewerScreen(urls, thumbs, imageIndex))
+              if (urls.isNotEmpty() && startIndex in urls.indices) {
+                navigator.push(ImageViewerScreen(urls, thumbs, startIndex))
+              }
             },
             isAttachmentDownloading = { file ->
               file.fullUrl(cdnUrl)?.let { downloadingUrls[it] == true } == true
@@ -896,8 +905,19 @@ private fun PostAttachmentImage(
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(14.dp),
     onClick: () -> Unit,
 ) {
-  val url = thumbnailUrl ?: fullUrl ?: return
-  val aspectRatio = aspectRatioCache[url]
+  val hasDistinctFullUrl = !fullUrl.isNullOrBlank() && fullUrl != thumbnailUrl
+  var showFullImage by remember(thumbnailUrl, fullUrl) { mutableStateOf(!hasDistinctFullUrl) }
+  var fullImageLoaded by remember(thumbnailUrl, fullUrl) { mutableStateOf(!hasDistinctFullUrl) }
+  val url = if (showFullImage) fullUrl ?: thumbnailUrl else thumbnailUrl ?: fullUrl
+  if (url.isNullOrBlank()) return
+  val aspectRatio = aspectRatioCache[url] ?: thumbnailUrl?.let { aspectRatioCache[it] }
+  val clickAction = {
+    if (hasDistinctFullUrl && !fullImageLoaded) {
+      showFullImage = true
+    } else {
+      onClick()
+    }
+  }
   SubcomposeAsyncImage(
       model = url,
       contentDescription = contentDescription,
@@ -907,13 +927,20 @@ private fun PostAttachmentImage(
               .fillMaxWidth()
               .aspectRatio(aspectRatio ?: 1f)
               .clip(shape)
-              .clickable(onClick = onClick),
+              .clickable(onClick = clickAction),
       onSuccess = { state ->
         val size = state.painter.intrinsicSize
         if (
             size.width > 0f && size.height > 0f && size.width.isFinite() && size.height.isFinite()
         ) {
           aspectRatioCache[url] = size.width / size.height
+        }
+        fullImageLoaded = !hasDistinctFullUrl || url == fullUrl
+      },
+      onError = {
+        if (url == fullUrl && hasDistinctFullUrl) {
+          showFullImage = false
+          fullImageLoaded = false
         }
       },
       loading = { SkeletonBlock(modifier = Modifier.fillMaxSize()) },

@@ -26,7 +26,7 @@ voyager = "1.1.0-beta03"
 zoomimage = "1.4.0"
 symbolcraft = "0.3.4"
 materialyou = "0.2.9"
-vlcj = "4.8.3"
+composemediaplayer = "0.10.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
@@ -41,8 +41,9 @@ compose-components-resources = { module = "org.jetbrains.compose.components:comp
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-ui-backhandler = { module = "org.jetbrains.compose.ui:ui-backhandler", version.ref = "compose-multiplatform" }
 materialyou = { module = "dev.zwander:materialyou", version.ref = "materialyou" }
-vlcj = { module = "uk.co.caprica:vlcj", version.ref = "vlcj" }
+composemediaplayer = { module = "io.github.kdroidfilter:composemediaplayer", version.ref = "composemediaplayer" }
 htmlconverter-compose = { module = "be.digitalia.compose.htmlconverter:htmlconverter", version.ref = "htmlconverter-compose" }
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }

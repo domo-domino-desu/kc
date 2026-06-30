@@ -8,17 +8,20 @@ import ddd.kc.data.model.Platform
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.Tag
 import ddd.kc.data.network.KcApiClient
+import ddd.kc.data.network.toQueryError
 import ddd.kc.data.store.CacheNamespace
 import ddd.kc.data.store.rawBodyQueryStore
 import ddd.kc.util.logging.KcLog
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private val log = KcLog.withTag("CreatorRepository")
+private const val CREATORS_CACHE_KEY = "pawchive:creators:v1"
 
 private data class CreatorScopedKey(val service: String, val creatorId: String)
 
@@ -32,17 +35,6 @@ class CreatorRepository(
 ) {
   private val dao
     get() = db.cacheDao()
-
-  private val creatorsStore by lazy {
-    rawBodyQueryStore<Unit, List<Creator>>(
-        cacheDao = dao,
-        namespace = CacheNamespace.Creators,
-        fetcherName = "pawchive-creators",
-        cacheKey = { "pawchive:creators:v1" },
-        fetch = { api.fetchCreatorsBody() },
-        parse = { _, body -> api.parseCreators(body) },
-    )
-  }
 
   private val announcementsStore by lazy {
     rawBodyQueryStore<CreatorScopedKey, List<Announcement>>(
@@ -116,8 +108,64 @@ class CreatorRepository(
     )
   }
 
-  fun observeCreators(forceRefresh: Boolean = false): Flow<QueryState<List<Creator>>> =
-      creatorsStore.query(Unit, forceRefresh = forceRefresh)
+  fun observeCreators(forceRefresh: Boolean = false): Flow<QueryState<List<Creator>>> = flow {
+    val now = currentTimeMs()
+    val cached =
+        withContext(ioContext) {
+          dao.readChunkedListCache<Creator>(
+              json = json,
+              key = CREATORS_CACHE_KEY,
+              ttlMs = CacheNamespace.Creators.ttlMillis,
+              nowMs = now,
+          )
+        }
+
+    if (cached != null) {
+      emit(
+          QueryState(
+              data = cached.items,
+              isRefreshing = forceRefresh || cached.isStale,
+              isFromCache = true,
+              isStale = cached.isStale,
+              lastUpdatedAtMillis = cached.cachedAtMs,
+          )
+      )
+      if (!forceRefresh && !cached.isStale) return@flow
+    } else {
+      emit(QueryState(isLoading = true, isStale = true))
+    }
+
+    val refreshed = runCatching {
+      withContext(ioContext) {
+        val creators = api.parseCreators(api.fetchCreatorsBody())
+        val cachedAtMs = currentTimeMs()
+        dao.writeChunkedList(json, CREATORS_CACHE_KEY, creators, cachedAtMs)
+        creators to cachedAtMs
+      }
+    }
+    refreshed
+        .onSuccess { (creators, cachedAtMs) ->
+          emit(
+              QueryState(
+                  data = creators,
+                  isFromCache = false,
+                  isStale = false,
+                  lastUpdatedAtMillis = cachedAtMs,
+              )
+          )
+        }
+        .onFailure { error ->
+          emit(
+              QueryState(
+                  data = cached?.items,
+                  isFromCache = cached != null,
+                  isStale = cached?.isStale ?: true,
+                  error = error.toQueryError(),
+                  lastUpdatedAtMillis = cached?.cachedAtMs,
+              )
+          )
+        }
+  }
 
   suspend fun getAllCreators(platform: Platform, forceRefresh: Boolean): List<Creator> =
       observeCreators(forceRefresh).awaitData()

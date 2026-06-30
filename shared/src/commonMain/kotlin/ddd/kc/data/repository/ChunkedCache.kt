@@ -16,14 +16,31 @@ internal data class ChunkedListCacheMeta(
     val itemCount: Int,
 )
 
+internal data class ChunkedListCache<T>(
+    val items: List<T>,
+    val cachedAtMs: Long,
+    val isStale: Boolean,
+)
+
 internal suspend inline fun <reified T> CacheDao.readChunkedList(
     json: Json,
     key: String,
     ttlMs: Long,
     nowMs: Long,
 ): List<T>? {
+  val cache = readChunkedListCache<T>(json, key, ttlMs, nowMs) ?: return null
+  if (cache.isStale) return null
+  return cache.items
+}
+
+internal suspend inline fun <reified T> CacheDao.readChunkedListCache(
+    json: Json,
+    key: String,
+    ttlMs: Long,
+    nowMs: Long,
+): ChunkedListCache<T>? {
   val metaEntity = findByKey(metaKey(key)) ?: return null
-  if (nowMs - metaEntity.cachedAtMs > ttlMs) return null
+  val isStale = nowMs - metaEntity.cachedAtMs > ttlMs
 
   val meta = json.decodeFromString<ChunkedListCacheMeta>(metaEntity.dataJson)
   if (meta.version != CHUNKED_CACHE_VERSION) return null
@@ -33,7 +50,7 @@ internal suspend inline fun <reified T> CacheDao.readChunkedList(
     val chunk = findByKey(chunkKey(key, index)) ?: return null
     items += json.decodeFromString<List<T>>(chunk.dataJson)
   }
-  return items
+  return ChunkedListCache(items, metaEntity.cachedAtMs, isStale)
 }
 
 internal suspend inline fun <reified T> CacheDao.writeChunkedList(
