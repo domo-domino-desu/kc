@@ -45,7 +45,7 @@ import kc.shared.generated.resources.favorites_tab_posts
 import org.jetbrains.compose.resources.stringResource
 
 class FavoritesScreen(
-    private val platform: Platform = Platform.KEMONO,
+    private val platform: Platform = Platform.PAWCHIVE,
     private val routeKey: String = nextRouteInstanceKey("favorites"),
 ) : Screen {
   override val key: String = routeKey

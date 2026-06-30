@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="app_name">KC</string>
-  <string name="shortcut_kemono_short">Kemono</string>
-  <string name="shortcut_kemono_long">Open Kemono</string>
-  <string name="shortcut_coomer_short">Coomer</string>
-  <string name="shortcut_coomer_long">Open Coomer</string>
-  <string name="shortcut_pin_kemono">Add Kemono to Home</string>
-  <string name="shortcut_pin_coomer">Add Coomer to Home</string>
+  <string name="shortcut_pawchive_short">Pawchive</string>
+  <string name="shortcut_pawchive_long">Open Pawchive</string>
 </resources>

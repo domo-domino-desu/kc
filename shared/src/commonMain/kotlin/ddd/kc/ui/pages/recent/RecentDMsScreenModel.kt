@@ -5,6 +5,7 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.Platform
 import ddd.kc.data.repository.CreatorRepository
+import ddd.kc.data.repository.awaitData
 import ddd.kc.ui.state.PaginationReducer
 import ddd.kc.ui.state.PaginationSnapshot
 import ddd.kc.util.logging.KcLog
@@ -18,7 +19,7 @@ class RecentDMsScreenModel(
 
   private val log = KcLog.withTag("RecentDMsScreenModel")
   private val reducer = PaginationReducer<DM, String> { it.hash ?: it.content.orEmpty() }
-  private var platform = Platform.KEMONO
+  private var platform = Platform.PAWCHIVE
 
   fun load(platform: Platform, forceRefresh: Boolean = false) {
     val platformChanged = this.platform != platform
@@ -41,7 +42,7 @@ class RecentDMsScreenModel(
   }
 
   private suspend fun fetch(offset: Int, forceRefresh: Boolean, firstPage: Boolean) {
-    runCatching { creatorRepo.getRecentDMs(platform, offset) }
+    runCatching { creatorRepo.observeDms(offset = offset, forceRefresh = forceRefresh).awaitData() }
         .onSuccess { dms ->
           val hasMore = dms.size >= PAGE_SIZE
           val nextOffset = offset + dms.size

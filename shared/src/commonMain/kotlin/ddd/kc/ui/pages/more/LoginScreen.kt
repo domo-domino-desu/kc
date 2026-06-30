@@ -43,7 +43,7 @@ import kc.shared.generated.resources.login_username
 import org.jetbrains.compose.resources.stringResource
 
 class LoginScreen(
-    private val platform: Platform = Platform.KEMONO,
+    private val platform: Platform = Platform.PAWCHIVE,
     private val routeKey: String = nextRouteInstanceKey("login"),
 ) : Screen {
   override val key: String = routeKey

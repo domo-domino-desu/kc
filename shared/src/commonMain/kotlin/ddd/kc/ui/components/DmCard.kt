@@ -44,12 +44,12 @@ fun DmCard(
     translationState: ContentTranslationState? = null,
     onTranslate: (() -> Unit)? = null,
 ) {
-  val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
+  val baseUrl = LocalAppSettings.current.baseUrl(platform)
   val userId = dm.user.orEmpty()
   val service = dm.service.orEmpty()
   val displayName = dm.artist?.name?.takeIf { it.isNotBlank() } ?: userId.ifBlank { "Unknown" }
   val avatarUrl =
-      if (service.isNotBlank() && userId.isNotBlank()) "$cdnUrl/icons/$service/$userId" else null
+      if (service.isNotBlank() && userId.isNotBlank()) "$baseUrl/icons/$service/$userId" else null
   Surface(
       shape = RoundedCornerShape(8.dp),
       border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),

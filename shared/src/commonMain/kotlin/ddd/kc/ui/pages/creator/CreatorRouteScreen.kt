@@ -72,6 +72,7 @@ import ddd.kc.data.model.Creator
 import ddd.kc.data.model.DiscordChannel
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.bannerUrl
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
@@ -213,8 +214,10 @@ private fun CreatorDetailPage(
     onCreatorListOpen: (String, List<Creator>, Boolean) -> Unit,
     onDiscordChannelClick: (List<DiscordChannel>, Int) -> Unit,
 ) {
-  val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
-  val cellWidth = LocalAppSettings.current.cellMinWidthDp()
+  val appSettings = LocalAppSettings.current
+  val cdnUrl = appSettings.cdnUrl(platform)
+  val baseUrl = appSettings.baseUrl(platform)
+  val cellWidth = appSettings.cellMinWidthDp()
   val isDiscord = creator.service == "discord"
   var selectedTab by remember(creator.id) { mutableIntStateOf(0) }
   val posts = screenModel.getCreatorPosts(creator)
@@ -269,7 +272,7 @@ private fun CreatorDetailPage(
           Column {
             // Banner
             NetworkImage(
-                url = "$cdnUrl/banners/${creator.service}/${creator.id}",
+                url = creator.bannerUrl(baseUrl),
                 modifier = Modifier.fillMaxWidth().height(100.dp),
                 contentScale = ContentScale.Crop,
             )
@@ -281,7 +284,7 @@ private fun CreatorDetailPage(
               // Avatar
               Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                 NetworkImage(
-                    url = creator.thumbnailUrl(cdnUrl),
+                    url = creator.thumbnailUrl(baseUrl),
                     modifier = Modifier.size(54.dp).clip(CircleShape),
                 )
               }

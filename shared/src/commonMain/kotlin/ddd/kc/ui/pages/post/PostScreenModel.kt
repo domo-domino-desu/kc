@@ -199,6 +199,8 @@ class PostScreenModel(
   fun getComments(post: Post): List<Comment> =
       mutableState.value.postComments[post.id] ?: emptyList()
 
+  suspend fun downloadFile(url: String): ByteArray = postRepo.downloadFile(url)
+
   fun loadCreatorInfo(post: Post) {
     val key = "${post.service}:${post.creatorId}"
     if (mutableState.value.postCreators.containsKey(key)) return

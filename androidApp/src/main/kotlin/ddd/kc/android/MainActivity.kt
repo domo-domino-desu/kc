@@ -20,7 +20,7 @@ import okio.Path.Companion.toPath
 import org.koin.android.ext.android.inject
 
 private const val coilDiskCacheMaxBytes = 1024L * 1024L * 1024L
-private val supportedKcHosts = setOf("kemono.cr", "www.kemono.cr", "coomer.st", "www.coomer.st")
+private val supportedKcHosts = setOf("pawchive.st", "www.pawchive.st")
 
 class MainActivity : ComponentActivity() {
   private val externalKcLinkEvents = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 1)

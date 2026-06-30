@@ -19,14 +19,10 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="https" android:host="kemono.cr" android:pathPattern="/.*/user/.*"/>
-        <data android:scheme="https" android:host="www.kemono.cr" android:pathPattern="/.*/user/.*"/>
-        <data android:scheme="http" android:host="kemono.cr" android:pathPattern="/.*/user/.*"/>
-        <data android:scheme="http" android:host="www.kemono.cr" android:pathPattern="/.*/user/.*"/>
-        <data android:scheme="https" android:host="coomer.st" android:pathPattern="/.*/user/.*"/>
-        <data android:scheme="https" android:host="www.coomer.st" android:pathPattern="/.*/user/.*"/>
-        <data android:scheme="http" android:host="coomer.st" android:pathPattern="/.*/user/.*"/>
-        <data android:scheme="http" android:host="www.coomer.st" android:pathPattern="/.*/user/.*"/>
+        <data android:scheme="https" android:host="pawchive.st" android:pathPattern="/.*/user/.*"/>
+        <data android:scheme="https" android:host="www.pawchive.st" android:pathPattern="/.*/user/.*"/>
+        <data android:scheme="http" android:host="pawchive.st" android:pathPattern="/.*/user/.*"/>
+        <data android:scheme="http" android:host="www.pawchive.st" android:pathPattern="/.*/user/.*"/>
       </intent-filter>
     </activity>
   </application>

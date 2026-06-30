@@ -5,34 +5,46 @@ import eu.anifantakis.lib.ksafe.KSafe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-private const val KEMONO_SESSION_KEY = "kemono_session"
-private const val COOMER_SESSION_KEY = "coomer_session"
+private const val PAWCHIVE_SESSION_KEY = "pawchive_session"
 
 class KcSessionStore(private val vault: KSafe) {
   private val _loggedInPlatforms =
       MutableStateFlow(
-          Platform.entries.filter { vault.getDirect(it.sessionKey(), "").isNotBlank() }.toSet()
+          if (vault.getDirect(PAWCHIVE_SESSION_KEY, "").isNotBlank()) setOf(Platform.PAWCHIVE)
+          else emptySet()
       )
   val loggedInPlatforms: StateFlow<Set<Platform>> = _loggedInPlatforms
 
   fun getSession(platform: Platform): String? =
-      vault.getDirect(platform.sessionKey(), "").takeIf { it.isNotBlank() }
+      vault.getDirect(PAWCHIVE_SESSION_KEY, "").takeIf { it.isNotBlank() }
 
   fun hasSession(platform: Platform): Boolean = getSession(platform) != null
 
   fun saveSession(platform: Platform, session: String) {
-    vault.putDirect(platform.sessionKey(), session)
-    _loggedInPlatforms.value = _loggedInPlatforms.value + platform
+    val normalized = normalizeSession(session)
+    if (normalized.isBlank()) {
+      clearSession(platform)
+      return
+    }
+    vault.putDirect(PAWCHIVE_SESSION_KEY, normalized)
+    _loggedInPlatforms.value = setOf(Platform.PAWCHIVE)
   }
 
   fun clearSession(platform: Platform) {
-    vault.deleteDirect(platform.sessionKey())
-    _loggedInPlatforms.value = _loggedInPlatforms.value - platform
+    vault.deleteDirect(PAWCHIVE_SESSION_KEY)
+    _loggedInPlatforms.value = emptySet()
   }
 
-  private fun Platform.sessionKey(): String =
-      when (this) {
-        Platform.KEMONO -> KEMONO_SESSION_KEY
-        Platform.COOMER -> COOMER_SESSION_KEY
-      }
+  fun cookieHeader(platform: Platform = Platform.PAWCHIVE): String {
+    val session = getSession(platform) ?: throw AuthRequiredException()
+    return "session=$session"
+  }
+
+  private fun normalizeSession(raw: String): String =
+      raw.trim()
+          .split(';')
+          .firstOrNull { it.trim().startsWith("session=") }
+          ?.substringAfter("session=")
+          ?.trim()
+          ?.takeIf { it.isNotBlank() } ?: raw.trim().removePrefix("session=").trim()
 }

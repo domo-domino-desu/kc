@@ -12,22 +12,18 @@ import ddd.kc.data.translation.TranslationProvider
 import ddd.kc.data.translation.TranslationTargetLanguage
 import ddd.kc.i18n.AppLanguage
 import ddd.kc.ui.theme.ThemeMode
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 class AppSettings(private val dataStore: DataStore<Preferences>) {
 
   companion object {
-    private val KEMONO_BASE_URL = stringPreferencesKey("kemono_base_url")
-    private val COOMER_BASE_URL = stringPreferencesKey("coomer_base_url")
     private val CELL_MIN_WIDTH_DP = intPreferencesKey("cell_min_width_dp")
     private val DOWNLOAD_SAVE_PATH = stringPreferencesKey("download_save_path")
     private val THEME_MODE = stringPreferencesKey("theme_mode")
     private val UI_LANGUAGE = stringPreferencesKey("ui_language")
-    private val ACTIVE_PLATFORM = stringPreferencesKey("active_platform")
     private val TRANSLATION_PROVIDER = stringPreferencesKey("translation_provider")
     private val TRANSLATION_TARGET_LANG = stringPreferencesKey("translation_target_lang")
     private val TRANSLATION_CHUNK_WORD_LIMIT = intPreferencesKey("translation_chunk_word_limit")
@@ -40,38 +36,16 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
     const val CELL_MIN_WIDTH_DEFAULT = 200
     const val CELL_MIN_WIDTH_MIN = 120
     const val CELL_MIN_WIDTH_MAX = 400
-
-    val KEMONO_PRESET_DOMAINS =
-        listOf("https://kemono.cr", "https://kemono.su", "https://kemono.party")
-    val COOMER_PRESET_DOMAINS =
-        listOf(
-            "https://coomer.st",
-            "https://coomer.cr",
-            "https://coomer.su",
-            "https://coomer.party",
-        )
   }
 
-  private val _baseUrls =
-      mutableMapOf(
-          Platform.KEMONO to Platform.KEMONO.defaultBaseUrl,
-          Platform.COOMER to Platform.COOMER.defaultBaseUrl,
-      )
-  private val _activePlatform = MutableStateFlow(Platform.KEMONO)
-  val activePlatformFlow: StateFlow<Platform> = _activePlatform.asStateFlow()
+  val activePlatformFlow: StateFlow<Platform> =
+      kotlinx.coroutines.flow.MutableStateFlow(Platform.PAWCHIVE)
 
-  fun activePlatform(): Platform = _activePlatform.value
+  fun activePlatform(): Platform = Platform.PAWCHIVE
 
-  fun setActivePlatform(platform: Platform) {
-    _activePlatform.value = platform
-    // fire-and-forget persistence via a non-suspend wrapper isn't possible here;
-    // callers that need persistence should use setActivePlatformPersisted
-  }
+  fun setActivePlatform(platform: Platform) {}
 
-  suspend fun setActivePlatformPersisted(platform: Platform) {
-    _activePlatform.value = platform
-    dataStore.edit { it[ACTIVE_PLATFORM] = platform.name }
-  }
+  suspend fun setActivePlatformPersisted(platform: Platform) {}
 
   private var _cellMinWidthDp: Int = CELL_MIN_WIDTH_DEFAULT
   private var _downloadSavePath: String = ""
@@ -81,15 +55,10 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
 
   suspend fun init() {
     val prefs = dataStore.data.first()
-    prefs[KEMONO_BASE_URL]?.let { _baseUrls[Platform.KEMONO] = it }
-    prefs[COOMER_BASE_URL]?.let { _baseUrls[Platform.COOMER] = it }
     prefs[CELL_MIN_WIDTH_DP]?.let { _cellMinWidthDp = it }
     prefs[DOWNLOAD_SAVE_PATH]?.let { _downloadSavePath = it.trim() }
     prefs[THEME_MODE]?.let { _themeMode = ThemeMode.fromPersistedValue(it) ?: ThemeMode.SYSTEM }
     prefs[UI_LANGUAGE]?.let { _language = AppLanguage.fromPersistedValue(it) }
-    prefs[ACTIVE_PLATFORM]?.let { name ->
-      Platform.entries.firstOrNull { it.name == name }?.let { _activePlatform.value = it }
-    }
     _translationSettings =
         TranslationSettings(
             provider = TranslationProvider.fromPersistedValue(prefs[TRANSLATION_PROVIDER]),
@@ -112,28 +81,14 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
         )
   }
 
-  fun baseUrl(platform: Platform): String = _baseUrls[platform] ?: platform.defaultBaseUrl
+  fun baseUrl(platform: Platform = Platform.PAWCHIVE): String = Platform.PAWCHIVE.defaultBaseUrl
 
-  fun cdnUrl(platform: Platform): String = baseUrl(platform).replace("://", "://img.")
+  fun cdnUrl(platform: Platform = Platform.PAWCHIVE): String =
+      baseUrl(platform).replace("://", "://img.")
 
-  suspend fun setBaseUrl(platform: Platform, url: String) {
-    val normalized = url.trimEnd('/')
-    _baseUrls[platform] = normalized
-    dataStore.edit { prefs ->
-      when (platform) {
-        Platform.KEMONO -> prefs[KEMONO_BASE_URL] = normalized
-        Platform.COOMER -> prefs[COOMER_BASE_URL] = normalized
-      }
-    }
-  }
+  suspend fun setBaseUrl(platform: Platform, url: String) {}
 
-  fun baseUrlFlow(platform: Platform) =
-      dataStore.data.map { prefs ->
-        when (platform) {
-          Platform.KEMONO -> prefs[KEMONO_BASE_URL] ?: Platform.KEMONO.defaultBaseUrl
-          Platform.COOMER -> prefs[COOMER_BASE_URL] ?: Platform.COOMER.defaultBaseUrl
-        }.also { _baseUrls[platform] = it }
-      }
+  fun baseUrlFlow(platform: Platform) = flowOf(Platform.PAWCHIVE.defaultBaseUrl)
 
   fun cellMinWidthDp(): Int = _cellMinWidthDp
 

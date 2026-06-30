@@ -73,6 +73,9 @@
   <string name="download_save_path">保存路径</string>
   <string name="download_save_path_not_configured">未配置</string>
   <string name="choose_save_path">选择保存路径</string>
+  <string name="download_save_path_required">保存路径未配置</string>
+  <string name="download_saved">已保存：%1$s</string>
+  <string name="download_failed">下载失败：%1$s</string>
   <string name="save">保存</string>
   <string name="cancel">取消</string>
   <string name="favorites_requires_login">请先登录 %1$s</string>
@@ -114,7 +117,7 @@
   <string name="link_copied">链接已复制</string>
   <!-- About screen -->
   <string name="about_libraries_metadata_source">许可证与依赖元数据来源：AboutLibraries</string>
-  <string name="about_description">Kemono/Coomer 第三方客户端</string>
+  <string name="about_description">Pawchive 第三方客户端</string>
   <string name="about_project_address">GitHub</string>
   <string name="about_project_address_url">https://github.com/domo-domino-desu/kc</string>
   <string name="about_libraries">开源库使用情况</string>

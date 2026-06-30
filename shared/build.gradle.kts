@@ -94,10 +94,10 @@ kotlin {
 
     val desktopMain by getting {
       dependencies {
-        implementation(libs.coil.gif)
         implementation(libs.ktor.client.okhttp)
         implementation(libs.slf4j.simple)
         implementation(libs.materialyou)
+        implementation(libs.vlcj)
       }
     }
 

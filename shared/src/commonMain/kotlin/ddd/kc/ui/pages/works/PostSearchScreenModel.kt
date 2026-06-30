@@ -4,6 +4,7 @@ import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.QueryState
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.util.logging.KcLog
 import kotlinx.coroutines.CancellationException
@@ -15,16 +16,23 @@ private val log = KcLog.withTag("PostSearchScreenModel")
 
 data class PostSearchState(
     val query: String = "",
+    val result: QueryState<List<Post>> = QueryState(isLoading = true),
     val posts: List<Post> = emptyList(),
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null,
-)
+    val isLoadingMore: Boolean = false,
+    val appendErrorMessage: String? = null,
+) {
+  val isLoading: Boolean
+    get() = result.isLoading
+
+  val errorMessage: String?
+    get() = result.error?.message
+}
 
 class PostSearchScreenModel(
     private val postRepo: PostRepository,
 ) : StateScreenModel<PostSearchState>(PostSearchState()) {
   private var searchJob: Job? = null
-  private var platform = Platform.KEMONO
+  private var platform = Platform.PAWCHIVE
 
   fun init(platform: Platform) {
     val platformChanged = this.platform != platform
@@ -66,34 +74,61 @@ class PostSearchScreenModel(
   }
 
   private fun loadDefault(forceRefresh: Boolean = false) {
-    mutableState.value = mutableState.value.copy(isLoading = true, errorMessage = null)
+    mutableState.value =
+        mutableState.value.copy(
+            result =
+                mutableState.value.result.copy(
+                    isLoading = mutableState.value.posts.isEmpty(),
+                    isRefreshing = mutableState.value.posts.isNotEmpty(),
+                    error = null,
+                )
+        )
     screenModelScope.launch {
-      runCatching { postRepo.getPopularPosts(platform, forceRefresh) }
-          .onSuccess {
-            log.i { "作品搜索默认Popular -> 成功(count=${it.size})" }
-            mutableState.value = mutableState.value.copy(posts = it, isLoading = false)
-          }
-          .onFailure {
-            log.e(it) { "作品搜索默认Popular -> 失败" }
+      postRepo
+          .observePopularPostsPage(
+              date = null,
+              period = "day",
+              offset = 0,
+              forceRefresh = forceRefresh,
+          )
+          .collect { next ->
+            val posts = next.data?.posts ?: mutableState.value.posts
+            log.i { "作品搜索默认Popular -> 状态(count=${posts.size})" }
             mutableState.value =
-                mutableState.value.copy(isLoading = false, errorMessage = it.message)
+                mutableState.value.copy(
+                    result =
+                        QueryState(
+                            data = posts,
+                            isLoading = next.isLoading,
+                            isRefreshing = next.isRefreshing,
+                            isFromCache = next.isFromCache,
+                            isStale = next.isStale,
+                            error = next.error,
+                            lastUpdatedAtMillis = next.lastUpdatedAtMillis,
+                        ),
+                    posts = posts,
+                )
           }
     }
   }
 
   private fun search(query: String) {
-    mutableState.value = mutableState.value.copy(isLoading = true, errorMessage = null)
+    mutableState.value =
+        mutableState.value.copy(
+            result =
+                mutableState.value.result.copy(
+                    isLoading = mutableState.value.posts.isEmpty(),
+                    isRefreshing = mutableState.value.posts.isNotEmpty(),
+                    error = null,
+                )
+        )
     screenModelScope.launch {
-      runCatching { postRepo.searchPosts(platform, query, 0, null, null) }
-          .onSuccess {
-            log.i { "作品搜索 -> 成功(queryLength=${query.length},count=${it.size})" }
-            mutableState.value = mutableState.value.copy(posts = it, isLoading = false)
-          }
-          .onFailure {
-            if (it is CancellationException) return@launch
-            log.e(it) { "作品搜索 -> 失败" }
-            mutableState.value =
-                mutableState.value.copy(isLoading = false, errorMessage = it.message)
+      postRepo
+          .observePostSearch(query, offset = 0, tag = null, service = null, forceRefresh = true)
+          .collect { next ->
+            val posts = next.data ?: mutableState.value.posts
+            log.i { "作品搜索 -> 状态(queryLength=${query.length},count=${posts.size})" }
+            mutableState.value = mutableState.value.copy(result = next, posts = posts)
           }
     }
   }

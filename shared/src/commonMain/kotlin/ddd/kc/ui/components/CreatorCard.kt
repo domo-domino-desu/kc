@@ -28,7 +28,7 @@ fun CreatorCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-  val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
+  val baseUrl = LocalAppSettings.current.baseUrl(platform)
   Row(
       modifier =
           modifier
@@ -38,7 +38,7 @@ fun CreatorCard(
       verticalAlignment = Alignment.CenterVertically,
   ) {
     NetworkImage(
-        url = creator.thumbnailUrl(cdnUrl),
+        url = creator.thumbnailUrl(baseUrl),
         modifier = Modifier.size(48.dp).clip(CircleShape),
     )
     Spacer(modifier = Modifier.width(12.dp))

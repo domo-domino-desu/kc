@@ -28,6 +28,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -77,6 +78,7 @@ import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.fullUrl
 import ddd.kc.data.model.imageFiles
 import ddd.kc.data.model.isImage
+import ddd.kc.data.model.isVideo
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.AttachFileW400Outlined
@@ -90,8 +92,14 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.LinkW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
+import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.NetworkImage
+import ddd.kc.ui.components.PlatformVideoPlayer
 import ddd.kc.ui.components.SkeletonBlock
+import ddd.kc.ui.components.platform.PlatformBinaryFileDestination
+import ddd.kc.ui.components.platform.PlatformBinaryFileWriteRequest
+import ddd.kc.ui.components.platform.PlatformBinaryFileWriteResult
+import ddd.kc.ui.components.platform.rememberPlatformBinaryFileWriter
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.imageviewer.ImageViewerScreen
@@ -104,6 +112,9 @@ import ddd.kc.util.logging.summarizePost
 import ddd.kc.util.logging.summarizePostFiles
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.comments_count
+import kc.shared.generated.resources.download_failed
+import kc.shared.generated.resources.download_save_path_required
+import kc.shared.generated.resources.download_saved
 import kc.shared.generated.resources.no_comments
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -168,8 +179,18 @@ class PostRouteScreen(
               }
             }
     ) {
-      val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
+      val appSettings = LocalAppSettings.current
+      val cdnUrl = appSettings.cdnUrl(platform)
+      val baseUrl = appSettings.baseUrl(platform)
+      val downloadSavePath by
+          appSettings.downloadSavePathFlow().collectAsState(appSettings.downloadSavePath())
+      val writeBinaryFile = rememberPlatformBinaryFileWriter()
+      val showToast = LocalShowToast.current
+      val savePathRequiredMessage = stringResource(Res.string.download_save_path_required)
+      val downloadSavedMessage = stringResource(Res.string.download_saved)
+      val downloadFailedMessage = stringResource(Res.string.download_failed)
       val scope = rememberCoroutineScope()
+      val downloadingUrls = remember { mutableStateMapOf<String, Boolean>() }
       // Tracks each page's LazyListState for scroll-to-top
       val pageListStates = remember { mutableStateOf<Map<Int, LazyListState>>(emptyMap()) }
 
@@ -181,6 +202,7 @@ class PostRouteScreen(
             post = post,
             platform = platform,
             cdnUrl = cdnUrl,
+            baseUrl = baseUrl,
             listState = listState,
             isFavorite = post.id in state.favoritePostIds,
             favoriteErrorMessage = state.favoriteErrorMessage,
@@ -207,6 +229,55 @@ class PostRouteScreen(
               }
               navigator.push(ImageViewerScreen(urls, thumbs, imageIndex))
             },
+            isAttachmentDownloading = { file ->
+              file.fullUrl(cdnUrl)?.let { downloadingUrls[it] == true } == true
+            },
+            onAttachmentDownload = download@{ file ->
+                  val url = file.fullUrl(cdnUrl)
+                  if (url == null) {
+                    showToast(downloadFailedMessage.format("Missing file URL"))
+                    return@download
+                  }
+                  val savePath = downloadSavePath.trim()
+                  if (savePath.isBlank()) {
+                    showToast(savePathRequiredMessage)
+                    return@download
+                  }
+                  if (downloadingUrls[url] == true) return@download
+                  scope.launch {
+                    downloadingUrls[url] = true
+                    try {
+                      val bytes = screenModel.downloadFile(url)
+                      val fileName = file.downloadFileName()
+                      when (
+                          val result =
+                              writeBinaryFile(
+                                  PlatformBinaryFileWriteRequest(
+                                      destination =
+                                          PlatformBinaryFileDestination.Directory(savePath),
+                                      fileName = fileName,
+                                      bytes = bytes,
+                                      mimeType = fileName.guessMimeType(),
+                                  )
+                              )
+                      ) {
+                        is PlatformBinaryFileWriteResult.Saved ->
+                            showToast(downloadSavedMessage.format(result.savedPath))
+                        is PlatformBinaryFileWriteResult.Failure ->
+                            showToast(downloadFailedMessage.format(result.message))
+                      }
+                    } catch (error: Throwable) {
+                      log.e(error) { "下载附件 -> 失败(urlLength=${url.length})" }
+                      showToast(
+                          downloadFailedMessage.format(
+                              error.message ?: error::class.simpleName ?: "Unknown error"
+                          )
+                      )
+                    } finally {
+                      downloadingUrls.remove(url)
+                    }
+                  }
+                },
         )
         LaunchedEffect(post.id) {
           screenModel.loadFavoriteStatus(post)
@@ -224,6 +295,7 @@ private fun PostDetailPage(
     post: Post,
     platform: Platform,
     cdnUrl: String,
+    baseUrl: String,
     listState: LazyListState,
     isFavorite: Boolean,
     favoriteErrorMessage: String?,
@@ -237,6 +309,8 @@ private fun PostDetailPage(
     onArtistClick: () -> Unit,
     onScrollToTop: () -> Unit,
     onImageClick: (Int) -> Unit,
+    isAttachmentDownloading: (PostFile) -> Boolean,
+    onAttachmentDownload: (PostFile) -> Unit,
 ) {
   val cardBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
   val cardShape = RoundedCornerShape(14.dp)
@@ -268,7 +342,8 @@ private fun PostDetailPage(
       },
   ) { paddingValues ->
     val imageFiles = remember(post) { post.imageFiles() }
-    val otherFiles = remember(post) { post.allFiles().filter { !it.isImage() } }
+    val videoFiles = remember(post) { post.allFiles().filter { it.isVideo() } }
+    val otherFiles = remember(post) { post.allFiles().filter { !it.isImage() && !it.isVideo() } }
     val commentsItemIndex =
         remember(
             post.title,
@@ -285,6 +360,7 @@ private fun PostDetailPage(
           index += 1 // tags / skeleton placeholder
           if (!post.content.isNullOrBlank()) index += 1
           index += imageFiles.size
+          index += videoFiles.size
           if (otherFiles.isNotEmpty()) index += 1
           val embed = post.embed
           if (embed != null && !embed.url.isNullOrBlank()) index += 1
@@ -318,7 +394,7 @@ private fun PostDetailPage(
         ) {
           if (creator != null) {
             NetworkImage(
-                url = creator.thumbnailUrl(cdnUrl),
+                url = creator.thumbnailUrl(baseUrl),
                 modifier = Modifier.size(36.dp).clip(CircleShape),
                 contentScale = ContentScale.Crop,
             )
@@ -465,6 +541,19 @@ private fun PostDetailPage(
         )
       }
 
+      // ── Videos ───────────────────────────────────────────────────
+      itemsIndexed(videoFiles, key = { idx, _ -> "video-$idx" }) { _, file ->
+        PostAttachmentVideo(
+            file = file,
+            url = file.fullUrl(cdnUrl),
+            isDownloading = isAttachmentDownloading(file),
+            onDownload = { onAttachmentDownload(file) },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            shape = cardShape,
+            border = cardBorder,
+        )
+      }
+
       // ── Non-image attachments (in card) ───────────────────────────
       if (otherFiles.isNotEmpty()) {
         item {
@@ -474,7 +563,13 @@ private fun PostDetailPage(
               modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
           ) {
             Column(modifier = Modifier.padding(vertical = 4.dp)) {
-              otherFiles.forEach { file -> AttachmentRow(file = file, cdnUrl = cdnUrl) }
+              otherFiles.forEach { file ->
+                AttachmentRow(
+                    file = file,
+                    isDownloading = isAttachmentDownloading(file),
+                    onDownload = { onAttachmentDownload(file) },
+                )
+              }
             }
           }
         }
@@ -633,18 +728,25 @@ private fun PostTagsSkeleton() {
 }
 
 @Composable
-private fun AttachmentRow(file: PostFile, cdnUrl: String) {
+private fun AttachmentRow(file: PostFile, isDownloading: Boolean, onDownload: () -> Unit) {
   val displayName = file.name ?: file.path?.substringAfterLast('/') ?: "attachment"
   Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+      modifier =
+          Modifier.fillMaxWidth()
+              .then(if (!isDownloading) Modifier.clickable(onClick = onDownload) else Modifier)
+              .padding(horizontal = 14.dp, vertical = 8.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    Icon(
-        imageVector = Icons.DownloadW400Outlined,
-        contentDescription = null,
-        modifier = Modifier.size(20.dp),
-        tint = MaterialTheme.colorScheme.primary,
-    )
+    if (isDownloading) {
+      CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+    } else {
+      Icon(
+          imageVector = Icons.DownloadW400Outlined,
+          contentDescription = null,
+          modifier = Modifier.size(20.dp),
+          tint = MaterialTheme.colorScheme.primary,
+      )
+    }
     Spacer(Modifier.width(10.dp))
     Text(
         text = displayName,
@@ -653,6 +755,83 @@ private fun AttachmentRow(file: PostFile, cdnUrl: String) {
     )
   }
 }
+
+@Composable
+private fun PostAttachmentVideo(
+    file: PostFile,
+    url: String?,
+    isDownloading: Boolean,
+    onDownload: () -> Unit,
+    modifier: Modifier,
+    shape: RoundedCornerShape,
+    border: BorderStroke,
+) {
+  Surface(shape = shape, border = border, modifier = modifier.fillMaxWidth()) {
+    Column {
+      Box(
+          modifier =
+              Modifier.fillMaxWidth()
+                  .aspectRatio(16f / 9f)
+                  .background(androidx.compose.ui.graphics.Color.Black),
+          contentAlignment = Alignment.Center,
+      ) {
+        if (!url.isNullOrBlank()) {
+          PlatformVideoPlayer(url = url, modifier = Modifier.fillMaxSize())
+        } else {
+          Text(
+              text = file.name ?: "video",
+              style = MaterialTheme.typography.bodySmall,
+              color = androidx.compose.ui.graphics.Color.White,
+          )
+        }
+      }
+      AttachmentRow(file = file, isDownloading = isDownloading, onDownload = onDownload)
+    }
+  }
+}
+
+private fun PostFile.downloadFileName(): String =
+    (name ?: path?.substringAfterLast('/') ?: "attachment").sanitizeFileName().ifBlank {
+      "attachment"
+    }
+
+private fun String.sanitizeFileName(): String =
+    trim()
+        .map { char ->
+          when {
+            char == '/' || char == '\\' -> '_'
+            char.code < 32 -> '_'
+            else -> char
+          }
+        }
+        .joinToString("")
+        .take(180)
+
+private fun String.guessMimeType(): String =
+    when (substringAfterLast('.', "").lowercase()) {
+      "jpg",
+      "jpeg" -> "image/jpeg"
+      "png" -> "image/png"
+      "gif" -> "image/gif"
+      "webp" -> "image/webp"
+      "avif" -> "image/avif"
+      "bmp" -> "image/bmp"
+      "mp4",
+      "m4v" -> "video/mp4"
+      "webm" -> "video/webm"
+      "mov" -> "video/quicktime"
+      "mp3" -> "audio/mpeg"
+      "m4a" -> "audio/mp4"
+      "wav" -> "audio/wav"
+      "ogg" -> "audio/ogg"
+      "flac" -> "audio/flac"
+      "zip" -> "application/zip"
+      "rar" -> "application/vnd.rar"
+      "7z" -> "application/x-7z-compressed"
+      "pdf" -> "application/pdf"
+      "txt" -> "text/plain"
+      else -> "application/octet-stream"
+    }
 
 @Composable
 private fun CommentRow(comment: Comment, onParentClick: (() -> Unit)?) {

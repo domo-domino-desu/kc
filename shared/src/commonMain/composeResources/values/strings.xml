@@ -73,6 +73,9 @@
   <string name="download_save_path">Save Path</string>
   <string name="download_save_path_not_configured">Not configured</string>
   <string name="choose_save_path">Choose Save Path</string>
+  <string name="download_save_path_required">Save path is not configured</string>
+  <string name="download_saved">Saved: %1$s</string>
+  <string name="download_failed">Download failed: %1$s</string>
   <string name="save">Save</string>
   <string name="cancel">Cancel</string>
   <string name="favorites_requires_login">Log in to %1$s first</string>
@@ -114,7 +117,7 @@
   <string name="link_copied">Link copied</string>
   <!-- About screen -->
   <string name="about_libraries_metadata_source">License and dependency metadata provided by AboutLibraries</string>
-  <string name="about_description">Third-party Kemono/Coomer client</string>
+  <string name="about_description">Third-party Pawchive client</string>
   <string name="about_project_address">GitHub</string>
   <string name="about_project_address_url">https://github.com/domo-domino-desu/kc</string>
   <string name="about_libraries">Open-source libraries</string>

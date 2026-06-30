@@ -18,7 +18,7 @@ import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
 val LocalAppSettings = staticCompositionLocalOf<AppSettings> { error("AppSettings not provided") }
-val LocalActivePlatform = staticCompositionLocalOf<Platform> { Platform.KEMONO }
+val LocalActivePlatform = staticCompositionLocalOf<Platform> { Platform.PAWCHIVE }
 
 @Composable
 fun KcApp(externalKcLinkEvents: Flow<String> = emptyFlow()) {

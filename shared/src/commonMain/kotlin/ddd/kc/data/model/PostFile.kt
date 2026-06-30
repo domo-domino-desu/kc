@@ -15,6 +15,8 @@ private val audioExtensions = setOf("mp3", "m4a", "aac", "wav", "ogg", "flac", "
 
 private fun PostFile.ext(): String = (name ?: path)?.substringAfterLast('.')?.lowercase() ?: ""
 
+fun PostFile.hasPath(): Boolean = !path.isNullOrBlank()
+
 fun PostFile.isImage(): Boolean = ext() in imageExtensions
 
 fun PostFile.isGif(): Boolean = ext() == "gif"
@@ -25,8 +27,8 @@ fun PostFile.isAudio(): Boolean = ext() in audioExtensions
 
 fun PostFile.fullUrl(cdnUrl: String): String? {
   val p = path ?: return null
-  val baseUrl = cdnUrl.replace("://img.", "://")
-  val base = "$baseUrl/data$p"
+  val fileUrl = cdnUrl.replace("://img.", "://file.")
+  val base = "$fileUrl/data$p"
   val fileName = name ?: p.substringAfterLast('/')
   return if (fileName.isNotBlank()) "$base?f=${encodeUrlComponent(fileName)}" else base
 }

@@ -2,7 +2,12 @@ package ddd.kc.data.network
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import ddd.kc.data.model.Platform
+import ddd.kc.data.model.PostFile
+import ddd.kc.data.model.allFiles
+import ddd.kc.data.model.fullUrl
+import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.data.settings.AppSettings
+import ddd.kc.fake.TestFixtures
 import eu.anifantakis.lib.ksafe.KSafe
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -22,7 +27,6 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -40,9 +44,7 @@ class KcApiClientTest {
     val file = File.createTempFile("kc-test-settings", ".preferences_pb")
     file.delete()
     return AppSettings(
-        PreferenceDataStoreFactory.createWithPath(
-            produceFile = { file.absolutePath.toPath() },
-        )
+        PreferenceDataStoreFactory.createWithPath(produceFile = { file.absolutePath.toPath() })
     )
   }
 
@@ -56,152 +58,168 @@ class KcApiClientTest {
       respond(
           content = body,
           status = status,
-          headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+          headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Html.toString()),
       )
     }
-    val httpClient =
-        HttpClient(engine) {
-          install(ContentNegotiation) {
-            json(json)
-            json(json, contentType = ContentType("text", "css"))
-          }
-        }
+    val httpClient = HttpClient(engine) { install(ContentNegotiation) { json(json) } }
     val sessionStore =
         KcSessionStore(
             KSafe(fileName = "kc_test_${UUID.randomUUID().toString().replace("-", "_")}")
         )
-    sessionStore.saveSession(Platform.KEMONO, "test_session")
-    return KcApiClient(httpClient, settings(), sessionStore) to requests
+    sessionStore.saveSession(Platform.PAWCHIVE, "session=test_session; path=/")
+    return KcApiClient(httpClient, settings(), sessionStore, json) to requests
   }
 
   @Test
-  fun usesCurrentPublicEndpointsAndResponseShapes() = runBlocking {
+  fun usesPawchiveJsonAndHtmlEndpoints() = runBlocking {
     val (api, requests) =
         client { request ->
           HttpStatusCode.OK to
               when (request.url.encodedPath) {
                 "/api/v1/creators" -> creatorsJson
-                "/api/v1/posts" -> postsPageJson
-                "/api/v1/posts/popular" -> popularPostsJson
-                "/api/v1/posts/tags" -> tagsJson
-                "/api/v1/dms" -> dmsJson
-                "/api/v1/patreon/user/artist/posts" -> creatorPostsJson
+                "/api/v1/posts" -> postsJson
+                "/posts" -> TestFixtures.read("pawchive.st:posts:service-patreon.html")
+                "/posts/popular" -> TestFixtures.read("pawchive.st:posts:popular.html")
+                "/posts/tags" -> TestFixtures.read("pawchive.st:posts:tags.html")
+                "/dms" -> TestFixtures.read("pawchive.st:dms:search-test.html")
+                "/api/v1/patreon/user/artist" -> creatorPostsJson
                 "/api/v1/patreon/user/artist/post/post1" -> postDetailJson
                 "/api/v1/patreon/user/artist/post/post1/comments" -> commentsJson
                 "/api/v1/patreon/user/artist/announcements" -> announcementsJson
-                "/api/v1/patreon/user/artist/dms" -> creatorDmsJson
-                "/api/v1/patreon/user/artist/tags" -> tagsJson
+                "/patreon/user/artist/tags" ->
+                    TestFixtures.read("pawchive.st:patreon:user:3295915:tags.html")
                 "/api/v1/account/favorites" ->
                     if (request.url.parameters["type"] == "post") favoritePostsJson
                     else favoriteCreatorsJson
                 "/api/v1/favorites/creator/patreon/artist" -> "{}"
                 "/api/v1/favorites/post/patreon/artist/post1" -> "{}"
-                "/api/v1/authentication/login" -> "{}"
-                "/api/v1/authentication/logout" -> "{}"
                 else -> error("Unexpected path ${request.url.encodedPath}")
               }
         }
 
-    assertEquals(2, api.getCreators(Platform.KEMONO).size)
-    assertEquals(listOf("post1"), api.getRecentPosts(Platform.KEMONO, 50).map { it.id })
-    assertEquals(listOf("post1"), api.searchPosts(Platform.KEMONO, "art", 0).map { it.id })
-    assertEquals(listOf("post1"), api.getPostsByTag(Platform.KEMONO, "wip", 0).map { it.id })
-    assertEquals(listOf("post1"), api.getPopularPosts(Platform.KEMONO).map { it.id })
-    assertEquals(listOf("wip"), api.getTags(Platform.KEMONO).map { it.tag })
-    assertEquals(listOf("dm1"), api.getRecentDMs(Platform.KEMONO, 0).map { it.id })
-    assertEquals(listOf("dm1"), api.searchDMs(Platform.KEMONO, "hello", 0).map { it.id })
+    assertEquals(2, api.getCreators().size)
+    assertEquals(listOf("post1"), api.getRecentPosts(offset = 50).map { it.id })
+    assertTrue(api.searchPosts(query = "art", offset = 0).isNotEmpty())
+    assertTrue(api.getPostsByTag(tag = "nsfw", offset = 0).isNotEmpty())
+    assertTrue(api.getPopularPosts().posts.isNotEmpty())
+    assertTrue(api.getTags().any { it.tag == "nsfw" && it.count > 0 })
+    assertEquals(emptyList(), api.getRecentDMs())
     assertEquals(
         listOf("post1"),
-        api.getCreatorPosts(Platform.KEMONO, "patreon", "artist", 0).map { it.id },
+        api.getCreatorPosts(Platform.PAWCHIVE, "patreon", "artist", 0).map { it.id },
     )
-    val detail = api.getPost(Platform.KEMONO, "patreon", "artist", "post1")
+    assertEquals(
+        listOf("Animation", "Chainsaw-Man", "Quoted Tag"),
+        api.getCreatorPosts(Platform.PAWCHIVE, "patreon", "artist", 0).first().tags,
+    )
+    val detail = api.getPost(Platform.PAWCHIVE, "patreon", "artist", "post1")
     assertEquals("post1", detail.id)
     assertEquals("detail text", detail.content)
+    assertEquals(listOf("Tomoe Umari", "Vtuber", "winner"), detail.tags)
     assertEquals(listOf("detail.jpg"), detail.attachments.map { it.name })
     assertEquals(
         listOf("comment1"),
-        api.getPostComments(Platform.KEMONO, "patreon", "artist", "post1").map { it.id },
+        api.getPostComments(Platform.PAWCHIVE, "patreon", "artist", "post1").map { it.id },
     )
     assertEquals(
         listOf("ann1"),
-        api.getCreatorAnnouncements(Platform.KEMONO, "patreon", "artist").map { it.hash },
+        api.getCreatorAnnouncements(Platform.PAWCHIVE, "patreon", "artist").map { it.hash },
     )
     assertEquals(
-        listOf("dm1"),
-        api.getCreatorDMs(Platform.KEMONO, "patreon", "artist").map { it.id },
+        true,
+        api.getCreatorTags(Platform.PAWCHIVE, "patreon", "artist").any { it.tag == "Animation" },
     )
-    assertEquals(
-        listOf("wip"),
-        api.getCreatorTags(Platform.KEMONO, "patreon", "artist").map { it.tag },
-    )
-    assertEquals(listOf("artist"), api.getFavorites(Platform.KEMONO, "artist").map { it.id })
-    assertEquals(listOf("post1"), api.getFavoritePosts(Platform.KEMONO).map { it.id })
-    api.addFavoriteCreator(Platform.KEMONO, "patreon", "artist")
-    api.removeFavoriteCreator(Platform.KEMONO, "patreon", "artist")
-    api.addFavoritePost(Platform.KEMONO, "patreon", "artist", "post1")
-    api.removeFavoritePost(Platform.KEMONO, "patreon", "artist", "post1")
-    api.login(Platform.KEMONO, "user", "password")
-    api.logout(Platform.KEMONO)
+    assertEquals(listOf("artist"), api.getFavorites(type = "artist").map { it.id })
+    assertEquals(listOf("post1"), api.getFavoritePosts().map { it.id })
+    api.addFavoriteCreator(service = "patreon", creatorId = "artist")
+    api.removeFavoriteCreator(service = "patreon", creatorId = "artist")
+    api.addFavoritePost(service = "patreon", creatorId = "artist", postId = "post1")
+    api.removeFavoritePost(service = "patreon", creatorId = "artist", postId = "post1")
 
     val paths = requests.map { it.url.encodedPath }
-    assertFalse(paths.any { it == "/api/v1/creators.txt" })
-    assertFalse(paths.any { it == "/api/v1/posts/search" })
-    assertFalse(paths.any { it == "/api/v1/tags/search" })
-    assertTrue(
-        requests.any { it.url.encodedPath == "/api/v1/posts" && it.url.parameters["q"] == "art" }
-    )
-    assertTrue(
-        requests.any { it.url.encodedPath == "/api/v1/posts" && it.url.parameters["tag"] == "wip" }
-    )
-    assertTrue(
-        requests.any {
-          it.url.encodedPath == "/api/v1/account/favorites" && it.url.parameters["type"] == "artist"
-        }
-    )
-    assertTrue(
-        requests.any {
-          it.url.encodedPath == "/api/v1/account/favorites" && it.url.parameters["type"] == "post"
-        }
-    )
+    assertTrue(paths.contains("/api/v1/patreon/user/artist"))
+    assertTrue(paths.contains("/posts"))
+    assertTrue(paths.contains("/posts/popular"))
+    assertTrue(paths.contains("/posts/tags"))
+    assertTrue(paths.contains("/dms"))
     assertTrue(
         requests
             .filter {
               it.url.encodedPath.startsWith("/api/v1/account/") ||
-                  it.url.encodedPath.startsWith("/api/v1/favorites/") ||
-                  it.url.encodedPath == "/api/v1/authentication/logout"
+                  it.url.encodedPath.startsWith("/api/v1/favorites/")
             }
             .all { it.headers[HttpHeaders.Cookie] == "session=test_session" }
-    )
-    assertTrue(
-        requests
-            .filter {
-              it.url.encodedPath == "/api/v1/posts" ||
-                  it.url.encodedPath == "/api/v1/dms" ||
-                  it.url.encodedPath == "/api/v1/creators" ||
-                  it.url.encodedPath == "/api/v1/patreon/user/artist/post/post1"
-            }
-            .all { it.headers[HttpHeaders.Cookie] == null }
     )
   }
 
   @Test
   fun favorites401BecomesAuthRequired() = runBlocking {
     val (api, _) = client { HttpStatusCode.Unauthorized to "{}" }
-
-    assertFailsWith<AuthRequiredException> { api.getFavorites(Platform.KEMONO, "artist") }
+    assertFailsWith<AuthRequiredException> { api.getFavorites(type = "artist") }
     Unit
   }
 
   @Test
-  fun ddosGuard403BecomesDomainException() = runBlocking {
-    val (api, _) =
-        client {
-          HttpStatusCode.Forbidden to
-              """If you want to scrape, use "Accept: text/css" header in your requests for now."""
-        }
+  fun comments404BecomesEmptyList() = runBlocking {
+    val (api, _) = client { HttpStatusCode.NotFound to """{"error":"not found"}""" }
+    assertEquals(emptyList(), api.getPostComments(Platform.PAWCHIVE, "fanbox", "artist", "post1"))
+  }
 
-    assertFailsWith<KcDdosGuardException> { api.getRecentDMs(Platform.KEMONO, 0) }
-    Unit
+  @Test
+  fun postFileUrlsUseFileAndImageSubdomains() {
+    val file =
+        PostFile(
+            name = "5gTzmuRAtZ6PkriYNyM6sZZI.jpeg",
+            path = "/6c/15/6c1582a2125bb308c8226ff469f22d1343f9de8881a2028295f6fe9585e7eeb1.jpeg",
+        )
+
+    assertEquals(
+        "https://file.pawchive.st/data/6c/15/6c1582a2125bb308c8226ff469f22d1343f9de8881a2028295f6fe9585e7eeb1.jpeg?f=5gTzmuRAtZ6PkriYNyM6sZZI.jpeg",
+        file.fullUrl("https://img.pawchive.st"),
+    )
+    assertEquals(
+        "https://img.pawchive.st/thumbnail/data/6c/15/6c1582a2125bb308c8226ff469f22d1343f9de8881a2028295f6fe9585e7eeb1.jpeg",
+        file.thumbnailUrl("https://img.pawchive.st"),
+    )
+  }
+
+  @Test
+  fun parsesPawchiveHtmlFixtures() {
+    val (api, _) = client { HttpStatusCode.OK to "{}" }
+
+    val popular = api.parsePopularPostsPage(TestFixtures.read("pawchive.st:posts:popular.html"))
+    assertTrue(popular.posts.isNotEmpty())
+    assertEquals(42, popular.posts.first().attachmentCount)
+    assertEquals(101, popular.posts.first().favoriteCount)
+    assertEquals("2026-06-30", popular.info.maxDate)
+    assertTrue(popular.info.navigationDates?.day.orEmpty().isNotEmpty())
+
+    val servicePosts =
+        api.parsePostCards(TestFixtures.read("pawchive.st:posts:service-patreon.html"))
+    assertTrue(servicePosts.isNotEmpty())
+    assertTrue(servicePosts.all { it.service == "patreon" })
+    assertTrue(servicePosts.any { it.file?.path?.startsWith("/") == true })
+
+    val tagPosts = api.parsePostCards(TestFixtures.read("pawchive.st:posts:tag-nsfw.html"))
+    assertTrue(tagPosts.isNotEmpty())
+
+    val tags = api.parseTags(TestFixtures.read("pawchive.st:posts:tags.html"))
+    assertTrue(tags.any { it.tag == "nsfw" && it.count > 0 })
+
+    val creatorTags =
+        api.parseCreatorTags(TestFixtures.read("pawchive.st:patreon:user:3295915:tags.html"))
+    assertTrue(creatorTags.any { it.tag == "Animation" && it.count > 0 })
+
+    assertEquals(emptyList(), api.parseDms(TestFixtures.read("pawchive.st:dms:search-test.html")))
+  }
+
+  @Test
+  fun emptyPostFileIsNotCountedAsAttachment() {
+    val post =
+        json.decodeFromString<ddd.kc.data.model.Post>(
+            """{"id":"p","user":"u","service":"s","file":{}}"""
+        )
+    assertEquals(emptyList(), post.allFiles())
   }
 
   @Test
@@ -209,14 +227,8 @@ class KcApiClientTest {
     if (System.getenv("KC_LIVE_API_TESTS") != "true") return@runBlocking
     val httpClient =
         HttpClient(io.ktor.client.engine.okhttp.OkHttp) {
-          install(ContentNegotiation) {
-            json(json)
-            json(json, contentType = ContentType("text", "css"))
-          }
-          defaultRequest {
-            headers[HttpHeaders.Accept] = "text/css"
-            headers[HttpHeaders.UserAgent] = "Mozilla/5.0 (compatible; KC/1.0)"
-          }
+          install(ContentNegotiation) { json(json) }
+          defaultRequest { headers[HttpHeaders.UserAgent] = "Mozilla/5.0 (compatible; KC/1.0)" }
         }
 
     suspend fun assertLive(url: String) {
@@ -228,26 +240,11 @@ class KcApiClientTest {
       )
     }
 
-    suspend fun assertLiveAuthEndpointNotDdosGuard(url: String) {
-      val response = httpClient.get(url)
-      assertTrue(
-          response.status == HttpStatusCode.OK || response.status == HttpStatusCode.Unauthorized,
-          "$url status=${response.status} body=${response.bodyAsText().take(200)}",
-      )
-    }
-
-    listOf("https://kemono.cr/api", "https://coomer.st/api").forEach { base ->
-      assertLive("$base/v1/creators")
-      assertLive("$base/v1/posts")
-      assertLive("$base/v1/posts?q=art&o=0")
-      assertLive("$base/v1/posts/popular")
-      assertLive("$base/v1/posts/tags")
-      assertLive("$base/v1/dms")
-      assertLiveAuthEndpointNotDdosGuard("$base/v1/account/favorites?type=post")
-    }
-    assertLive("https://kemono.cr/api/v1/patreon/user/728497/posts?o=0")
-    assertLive("https://kemono.cr/api/v1/patreon/user/728497/post/61926225")
-    assertLive("https://kemono.cr/api/v1/patreon/user/728497/post/61926225/comments")
+    assertLive("https://pawchive.st/api/v1/creators")
+    assertLive("https://pawchive.st/api/v1/posts?o=0")
+    assertLive("https://pawchive.st/posts/popular")
+    assertLive("https://pawchive.st/posts/tags")
+    assertLive("https://pawchive.st/dms")
   }
 
   private companion object {
@@ -256,19 +253,12 @@ class KcApiClientTest {
           {"id":"artist","name":"Artist One","service":"patreon","indexed":10,"updated":20,"favorited":5,"public_id":"artist_one"},
           {"id":"fan","name":"Fan Creator","service":"fanbox","indexed":30,"updated":10,"favorited":9}
         ]"""
-    const val postsPageJson =
-        """{"count":1,"true_count":1,"posts":[{"id":"post1","user":"artist","service":"patreon","title":"Post","file":{"name":"a.jpg","path":"/a.jpg"},"attachments":[]}]}"""
-    const val popularPostsJson =
-        """{"info":{},"props":{"today":"2026-06-01","count":1},"posts":[{"id":"post1","user":"artist","service":"patreon","title":"Popular"}]}"""
+    const val postsJson =
+        """[{"id":"post1","user":"artist","service":"patreon","title":"Post","file":{"name":"a.jpg","path":"/a.jpg"},"attachments":[]}]"""
     const val creatorPostsJson =
-        """[{"id":"post1","user":"artist","service":"patreon","title":"Creator Post"}]"""
+        """[{"id":"post1","user":"artist","service":"patreon","title":"Creator Post","tags":"{Animation,Chainsaw-Man,\"Quoted Tag\"}"}]"""
     const val postDetailJson =
-        """{"post":{"id":"post1","user":"artist","service":"patreon","title":"Detail","content":"detail text"},"attachments":[{"name":"detail.jpg","path":"/detail.jpg"}],"previews":[],"props":{"flagged":false,"revisions":[]}}"""
-    const val tagsJson = """[{"tag":"wip","post_count":2}]"""
-    const val dmsJson =
-        """{"props":{"currentPage":"artists","count":1,"limit":50,"dms":[{"id":"dm1","service":"patreon","user":"artist","content":"hello"}]},"base":{}}"""
-    const val creatorDmsJson =
-        """[{"id":"dm1","service":"patreon","user":"artist","content":"hello"}]"""
+        """{"id":"post1","user":"artist","service":"patreon","title":"Detail","content":"detail text","attachments":[{"name":"detail.jpg","path":"/detail.jpg"}],"tags":"{\"Tomoe Umari\",Vtuber,winner}"}"""
     const val commentsJson = """[{"id":"comment1","content":"ok","commenter":"reader"}]"""
     const val announcementsJson =
         """[{"service":"patreon","user_id":"artist","hash":"ann1","content":"notice"}]"""

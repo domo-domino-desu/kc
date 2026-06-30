@@ -1,18 +1,7 @@
 {
   "version": 1,
   "platforms": {
-    "kemono": [
-      "patreon",
-      "fanbox",
-      "discord",
-      "fantia",
-      "afdian",
-      "boosty",
-      "dlsite",
-      "gumroad",
-      "subscribestar"
-    ],
-    "coomer": ["onlyfans", "fansly", "candfans"]
+    "pawchive": ["patreon", "fanbox"]
   },
   "services": {
     "patreon": {

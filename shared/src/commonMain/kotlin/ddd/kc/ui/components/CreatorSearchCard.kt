@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Platform
+import ddd.kc.data.model.bannerUrl
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
@@ -46,8 +47,8 @@ fun CreatorSearchCard(
     modifier: Modifier = Modifier,
     showFavoriteCount: Boolean = true,
 ) {
-  val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
-  val bannerUrl = "$cdnUrl/banners/${creator.service}/${creator.id}"
+  val baseUrl = LocalAppSettings.current.baseUrl(platform)
+  val bannerUrl = creator.bannerUrl(baseUrl)
   Surface(
       shape = RoundedCornerShape(8.dp),
       border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
@@ -79,7 +80,7 @@ fun CreatorSearchCard(
             color = MaterialTheme.colorScheme.surface,
         ) {
           NetworkImage(
-              url = creator.thumbnailUrl(cdnUrl),
+              url = creator.thumbnailUrl(baseUrl),
               modifier = Modifier.size(64.dp).clip(CircleShape),
               contentScale = ContentScale.Crop,
           )

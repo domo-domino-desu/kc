@@ -145,6 +145,7 @@ class ImageViewerScreen(
 private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?) {
   val isGif = remember(fullUrl) { fullUrl?.let(::isGifUrl) == true }
   var isLoading by remember(fullUrl) { mutableStateOf(true) }
+  var loadFailed by remember(fullUrl) { mutableStateOf(false) }
 
   Box(modifier = Modifier.fillMaxSize()) {
     if (isGif) {
@@ -159,7 +160,7 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?) {
     }
 
     // Thumbnail shown as placeholder while full image loads
-    if (isLoading && !thumbnailUrl.isNullOrBlank()) {
+    if ((isLoading || loadFailed) && !thumbnailUrl.isNullOrBlank()) {
       AsyncImage(
           model = thumbnailUrl,
           contentDescription = null,
@@ -172,9 +173,21 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?) {
         model = fullUrl,
         contentDescription = null,
         modifier = Modifier.fillMaxSize(),
-        onLoading = { isLoading = true },
-        onSuccess = { isLoading = false },
-        onError = { isLoading = false },
+        onLoading = {
+          isLoading = true
+          loadFailed = false
+        },
+        onSuccess = {
+          isLoading = false
+          loadFailed = false
+        },
+        onError = { error ->
+          isLoading = false
+          loadFailed = true
+          log.w(error.result.throwable) {
+            "图片查看器 -> 大图加载失败(url=${fullUrl.orEmpty()},thumbnailUrl=${thumbnailUrl.orEmpty()})"
+          }
+        },
     )
 
     if (isLoading) {

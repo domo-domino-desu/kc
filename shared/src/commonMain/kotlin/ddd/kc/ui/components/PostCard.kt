@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -39,7 +38,8 @@ fun PostCard(
     modifier: Modifier = Modifier,
 ) {
   val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
-  val fileCount = post.allFiles().size
+  val fileCount = post.attachmentCount ?: post.allFiles().size
+  val favCount = post.favoriteCount
   val date = post.published?.take(10)?.takeIf { it.isNotBlank() } ?: post.added?.take(10).orEmpty()
   Surface(
       shape = RoundedCornerShape(8.dp),
@@ -53,27 +53,22 @@ fun PostCard(
             url = post.thumbnailUrl(cdnUrl),
             modifier = Modifier.matchParentSize(),
         )
-        if (fileCount > 0) {
-          Surface(
-              color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-              shape = RoundedCornerShape(10.dp),
-              modifier = Modifier.padding(8.dp),
+        if (fileCount > 0 || favCount != null) {
+          Row(
+              modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+              horizontalArrangement = Arrangement.spacedBy(5.dp),
+              verticalAlignment = Alignment.Top,
           ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
-            ) {
-              Icon(
-                  imageVector = Icons.AttachFileW400Outlined,
-                  contentDescription = null,
-                  modifier = Modifier.size(13.dp),
-                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
-              Text(
+            if (fileCount > 0) {
+              PostCardImageChip(
+                  icon = Icons.AttachFileW400Outlined,
                   text = fileCount.toString(),
-                  style = MaterialTheme.typography.labelMedium,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+            if (favCount != null) {
+              PostCardImageChip(
+                  icon = Icons.FavoriteW400Outlined,
+                  text = favCount.toString(),
               )
             }
           }
@@ -93,28 +88,8 @@ fun PostCard(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.End,
         ) {
-          val favCount = post.favoriteCount
-          if (favCount != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-              Icon(
-                  imageVector = Icons.FavoriteW400Outlined,
-                  contentDescription = null,
-                  modifier = Modifier.size(12.dp),
-                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
-              Text(
-                  text = favCount.toString(),
-                  style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
-            }
-            Spacer(Modifier.weight(1f))
-          }
           if (date.isNotBlank()) {
             Text(
                 text = date,
@@ -125,6 +100,35 @@ fun PostCard(
           }
         }
       }
+    }
+  }
+}
+
+@Composable
+private fun PostCardImageChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+) {
+  Surface(
+      color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+      shape = RoundedCornerShape(10.dp),
+  ) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+    ) {
+      Icon(
+          imageVector = icon,
+          contentDescription = null,
+          modifier = Modifier.size(13.dp),
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Text(
+          text = text,
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
     }
   }
 }

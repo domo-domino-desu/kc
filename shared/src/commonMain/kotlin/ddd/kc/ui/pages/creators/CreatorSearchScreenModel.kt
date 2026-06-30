@@ -5,6 +5,7 @@ import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Platform
+import ddd.kc.data.model.QueryState
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.util.logging.KcLog
 import kc.shared.generated.resources.Res
@@ -58,16 +59,21 @@ data class CreatorSearchState(
     val selectedService: String? = null,
     val sortBy: CreatorSort = CreatorSort.FAVORITED,
     val sortOrder: SortOrder = SortOrder.DESC,
+    val result: QueryState<List<Creator>> = QueryState(isLoading = true),
     val creators: List<Creator> = emptyList(),
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null,
-)
+) {
+  val isLoading: Boolean
+    get() = result.isLoading
+
+  val errorMessage: String?
+    get() = result.error?.message
+}
 
 class CreatorSearchScreenModel(
     private val creatorRepo: CreatorRepository,
 ) : StateScreenModel<CreatorSearchState>(CreatorSearchState()) {
   private var searchJob: Job? = null
-  private var platform = Platform.KEMONO
+  private var platform = Platform.PAWCHIVE
 
   fun init(platform: Platform) {
     val platformChanged = this.platform != platform
@@ -109,30 +115,66 @@ class CreatorSearchScreenModel(
           try {
             if (delayMs > 0) delay(delayMs)
             val state = mutableState.value
-            mutableState.value = state.copy(isLoading = true, errorMessage = null)
-            runCatching {
-                  creatorRepo.searchCreators(
-                      platform,
-                      state.query,
-                      state.selectedService,
-                      state.sortBy.apiValue,
-                      state.sortOrder.apiValue,
-                      forceRefresh,
-                  )
-                }
-                .onSuccess {
-                  log.i { "创作者搜索 -> 成功(queryLength=${state.query.length},count=${it.size})" }
-                  mutableState.value = mutableState.value.copy(creators = it, isLoading = false)
-                }
-                .onFailure {
-                  if (it is CancellationException) return@launch
-                  log.e(it) { "创作者搜索 -> 失败" }
-                  mutableState.value =
-                      mutableState.value.copy(isLoading = false, errorMessage = it.message)
-                }
+            mutableState.value =
+                state.copy(
+                    result =
+                        state.result.copy(
+                            isLoading = state.result.data == null,
+                            isRefreshing = state.result.data != null,
+                            error = null,
+                        )
+                )
+            creatorRepo.observeCreators(forceRefresh).collect { next ->
+              val rows =
+                  next.data?.let {
+                    filterCreators(
+                        it,
+                        state.query,
+                        state.selectedService,
+                        state.sortBy,
+                        state.sortOrder,
+                    )
+                  } ?: mutableState.value.creators
+              log.i { "创作者搜索 -> 状态(queryLength=${state.query.length},count=${rows.size})" }
+              mutableState.value = mutableState.value.copy(result = next, creators = rows)
+              if (!next.isLoading && !next.isRefreshing) {
+                searchJob = null
+              }
+            }
           } catch (_: CancellationException) {
             return@launch
           }
         }
   }
+}
+
+private fun filterCreators(
+    creators: List<Creator>,
+    query: String,
+    service: String?,
+    sortBy: CreatorSort,
+    order: SortOrder,
+): List<Creator> {
+  val normalizedQuery = query.trim()
+  val comparator =
+      when (sortBy) {
+        CreatorSort.FAVORITED -> compareBy<Creator> { it.favorited }
+        CreatorSort.INDEXED -> compareBy { it.indexed }
+        CreatorSort.UPDATED -> compareBy { it.updated }
+        CreatorSort.NAME -> compareBy { it.name.lowercase() }
+        CreatorSort.SERVICE ->
+            compareBy<Creator> { it.service.lowercase() }.thenBy { it.name.lowercase() }
+      }
+  val filtered =
+      creators
+          .asSequence()
+          .filter { service == null || it.service.equals(service, ignoreCase = true) }
+          .filter {
+            normalizedQuery.isBlank() ||
+                it.name.contains(normalizedQuery, ignoreCase = true) ||
+                it.id.contains(normalizedQuery, ignoreCase = true) ||
+                it.publicId?.contains(normalizedQuery, ignoreCase = true) == true
+          }
+          .toList()
+  return filtered.sortedWith(if (order == SortOrder.ASC) comparator else comparator.reversed())
 }

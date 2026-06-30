@@ -15,30 +15,15 @@ data class Creator(
     @SerialName("public_id") val publicId: String? = null,
 )
 
-fun Creator.thumbnailUrl(cdnUrl: String): String = "$cdnUrl/icons/${service}/${id}"
+fun Creator.thumbnailUrl(baseUrl: String): String = "$baseUrl/icons/${service}/${id}"
 
-private val kemonoFallbackServices =
-    listOf(
-        "patreon",
-        "fanbox",
-        "discord",
-        "fantia",
-        "afdian",
-        "boosty",
-        "dlsite",
-        "gumroad",
-        "subscribestar",
-    )
-private val coomerFallbackServices = listOf("onlyfans", "fansly", "candfans")
+fun Creator.bannerUrl(baseUrl: String): String = "$baseUrl/banners/${service}/${id}"
+
+private val pawchiveServices = listOf("patreon", "fanbox")
 
 fun Platform.services(): List<String> {
   val catalog = ServiceIconCatalogRepository.catalog.value
   val key = name.lowercase()
   val fromJson = catalog?.servicesForPlatform(key)
-  return if (!fromJson.isNullOrEmpty()) fromJson
-  else
-      when (this) {
-        Platform.KEMONO -> kemonoFallbackServices
-        Platform.COOMER -> coomerFallbackServices
-      }
+  return if (!fromJson.isNullOrEmpty()) fromJson else pawchiveServices
 }

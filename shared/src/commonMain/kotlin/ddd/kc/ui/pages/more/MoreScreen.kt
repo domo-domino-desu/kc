@@ -17,7 +17,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -34,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -48,7 +46,6 @@ import ddd.kc.LocalActivePlatform
 import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Platform
 import ddd.kc.data.network.KcSessionStore
-import ddd.kc.data.settings.AppSettings
 import ddd.kc.data.settings.AppSettings.Companion.CELL_MIN_WIDTH_DEFAULT
 import ddd.kc.data.settings.AppSettings.Companion.CELL_MIN_WIDTH_MAX
 import ddd.kc.data.settings.AppSettings.Companion.CELL_MIN_WIDTH_MIN
@@ -56,7 +53,6 @@ import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.LogoutW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.MenuW400Outlined
 import ddd.kc.i18n.AppLanguage
-import ddd.kc.platform.PlatformShortcutManager
 import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.platform.rememberPlatformDirectoryPicker
@@ -76,18 +72,11 @@ import kc.shared.generated.resources.language_label
 import kc.shared.generated.resources.language_system
 import kc.shared.generated.resources.language_zh
 import kc.shared.generated.resources.logout
-import kc.shared.generated.resources.mirror_coomer
-import kc.shared.generated.resources.mirror_dialog_title
-import kc.shared.generated.resources.mirror_kemono
-import kc.shared.generated.resources.platform_label
 import kc.shared.generated.resources.platform_logged_in
 import kc.shared.generated.resources.platform_login
 import kc.shared.generated.resources.save
 import kc.shared.generated.resources.section_account
-import kc.shared.generated.resources.section_platform
 import kc.shared.generated.resources.section_settings
-import kc.shared.generated.resources.shortcut_pin_coomer
-import kc.shared.generated.resources.shortcut_pin_kemono
 import kc.shared.generated.resources.theme_mode
 import kc.shared.generated.resources.theme_mode_dark
 import kc.shared.generated.resources.theme_mode_light
@@ -124,16 +113,11 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
     val activePlatform = LocalActivePlatform.current
     val sessionStore = koinInject<KcSessionStore>()
     val screenModel = koinInject<MoreScreenModel>()
-    val shortcutManager = koinInject<PlatformShortcutManager>()
     val showToast = LocalShowToast.current
     val listState = rememberLazyListState()
     var lastHandledRepeatToken by remember { mutableIntStateOf(repeatSelectionToken) }
 
     val loggedInPlatforms by sessionStore.loggedInPlatforms.collectAsState()
-    val kemonoUrl by
-        appSettings.baseUrlFlow(Platform.KEMONO).collectAsState(Platform.KEMONO.defaultBaseUrl)
-    val coomerUrl by
-        appSettings.baseUrlFlow(Platform.COOMER).collectAsState(Platform.COOMER.defaultBaseUrl)
     val cellWidth by appSettings.cellMinWidthDpFlow().collectAsState(CELL_MIN_WIDTH_DEFAULT)
     val downloadSavePath by
         appSettings.downloadSavePathFlow().collectAsState(appSettings.downloadSavePath())
@@ -142,13 +126,13 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
     val favoritesLoginToast =
         stringResource(Res.string.favorites_requires_login, activePlatform.displayName)
     val triggerDirectoryPicker = rememberPlatformDirectoryPicker { selectedPath ->
-      if (selectedPath != null) {
-        scope.launch { appSettings.setDownloadSavePath(selectedPath) }
-      }
+      if (selectedPath != null) scope.launch { appSettings.setDownloadSavePath(selectedPath) }
     }
 
-    var domainPickerTarget by remember { mutableStateOf<Platform?>(null) }
-    var showPlatformPicker by remember { mutableStateOf(false) }
+    var showSessionEditor by remember { mutableStateOf(false) }
+    var sessionInput by remember {
+      mutableStateOf(sessionStore.getSession(Platform.PAWCHIVE).orEmpty())
+    }
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var showGridWidthEditor by remember { mutableStateOf(false) }
@@ -158,83 +142,35 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
     LaunchedEffect(repeatSelectionToken) {
       if (repeatSelectionToken == lastHandledRepeatToken) return@LaunchedEffect
       lastHandledRepeatToken = repeatSelectionToken
-      if (!listState.isAtTop) {
-        scope.launch { listState.animateScrollToItem(0) }
-      }
+      if (!listState.isAtTop) scope.launch { listState.animateScrollToItem(0) }
     }
 
-    domainPickerTarget?.let { targetPlatform ->
-      val currentUrl = if (targetPlatform == Platform.KEMONO) kemonoUrl else coomerUrl
-      val presets =
-          if (targetPlatform == Platform.KEMONO) AppSettings.KEMONO_PRESET_DOMAINS
-          else AppSettings.COOMER_PRESET_DOMAINS
+    if (showSessionEditor) {
       AlertDialog(
-          onDismissRequest = { domainPickerTarget = null },
-          title = {
-            Text(stringResource(Res.string.mirror_dialog_title, targetPlatform.displayName))
-          },
+          onDismissRequest = { showSessionEditor = false },
+          title = { Text("Pawchive Session Cookie") },
           text = {
-            Column {
-              presets.forEach { url ->
-                ListItem(
-                    headlineContent = { Text(url.removePrefix("https://")) },
-                    leadingContent = {
-                      RadioButton(
-                          selected = currentUrl == url,
-                          onClick = {
-                            scope.launch { appSettings.setBaseUrl(targetPlatform, url) }
-                            domainPickerTarget = null
-                          },
-                      )
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier =
-                        Modifier.clickable {
-                          scope.launch { appSettings.setBaseUrl(targetPlatform, url) }
-                          domainPickerTarget = null
-                        },
-                )
-              }
-            }
+            OutlinedTextField(
+                value = sessionInput,
+                onValueChange = { sessionInput = it },
+                singleLine = false,
+                minLines = 3,
+                label = { Text("session=...") },
+                modifier = Modifier.fillMaxWidth(),
+            )
           },
           confirmButton = {
-            TextButton(onClick = { domainPickerTarget = null }) {
-              Text(stringResource(Res.string.cancel))
+            TextButton(
+                onClick = {
+                  sessionStore.saveSession(Platform.PAWCHIVE, sessionInput)
+                  showSessionEditor = false
+                }
+            ) {
+              Text(stringResource(Res.string.save))
             }
           },
-      )
-    }
-
-    if (showPlatformPicker) {
-      AlertDialog(
-          onDismissRequest = { showPlatformPicker = false },
-          title = { Text(stringResource(Res.string.section_platform)) },
-          text = {
-            Column {
-              Platform.entries.forEach { p ->
-                ListItem(
-                    headlineContent = { Text(p.displayName) },
-                    leadingContent = {
-                      RadioButton(
-                          selected = activePlatform == p,
-                          onClick = {
-                            scope.launch { appSettings.setActivePlatformPersisted(p) }
-                            showPlatformPicker = false
-                          },
-                      )
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier =
-                        Modifier.clickable {
-                          scope.launch { appSettings.setActivePlatformPersisted(p) }
-                          showPlatformPicker = false
-                        },
-                )
-              }
-            }
-          },
-          confirmButton = {
-            TextButton(onClick = { showPlatformPicker = false }) {
+          dismissButton = {
+            TextButton(onClick = { showSessionEditor = false }) {
               Text(stringResource(Res.string.cancel))
             }
           },
@@ -265,7 +201,6 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
                           },
                       )
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier =
                         Modifier.clickable {
                           scope.launch { appSettings.setLanguage(lang) }
@@ -307,7 +242,6 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
                           },
                       )
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier =
                         Modifier.clickable {
                           scope.launch { appSettings.setThemeMode(mode) }
@@ -340,7 +274,7 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
                   modifier = Modifier.fillMaxWidth(),
               )
               Text(
-                  text = "${CELL_MIN_WIDTH_MIN}–${CELL_MIN_WIDTH_MAX} dp",
+                  text = "$CELL_MIN_WIDTH_MIN-$CELL_MIN_WIDTH_MAX dp",
                   modifier = Modifier.padding(top = 8.dp),
               )
             }
@@ -373,39 +307,6 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
       ) {
         item {
           Text(
-              text = stringResource(Res.string.section_platform),
-              style = MaterialTheme.typography.titleSmall,
-              color = MaterialTheme.colorScheme.primary,
-              modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-          )
-        }
-        item {
-          Card(modifier = Modifier.fillMaxWidth()) {
-            ListItem(
-                headlineContent = { Text(stringResource(Res.string.platform_label)) },
-                supportingContent = { Text(activePlatform.displayName) },
-                modifier = Modifier.clickable { showPlatformPicker = true },
-            )
-            if (shortcutManager.canPinShortcuts()) {
-              Platform.entries.forEach { p ->
-                HorizontalDivider()
-                ListItem(
-                    headlineContent = {
-                      Text(
-                          stringResource(
-                              if (p == Platform.KEMONO) Res.string.shortcut_pin_kemono
-                              else Res.string.shortcut_pin_coomer
-                          )
-                      )
-                    },
-                    modifier = Modifier.clickable { shortcutManager.pinShortcut(p) },
-                )
-              }
-            }
-          }
-        }
-        item {
-          Text(
               text = stringResource(Res.string.section_account),
               style = MaterialTheme.typography.titleSmall,
               color = MaterialTheme.colorScheme.primary,
@@ -414,39 +315,49 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
         }
         item {
           Card(modifier = Modifier.fillMaxWidth()) {
-            Platform.entries.forEachIndexed { index, platform ->
-              if (index > 0) HorizontalDivider()
-              val isLoggedIn = platform in loggedInPlatforms
-              if (isLoggedIn) {
-                ListItem(
-                    headlineContent = {
-                      Text(stringResource(Res.string.platform_logged_in, platform.displayName))
-                    },
-                    trailingContent = {
-                      IconButton(onClick = { screenModel.logout(platform) {} }) {
-                        Icon(
-                            Icons.LogoutW400Outlined,
-                            contentDescription = stringResource(Res.string.logout),
-                        )
-                      }
-                    },
-                )
-              } else {
-                ListItem(
-                    headlineContent = {
-                      Text(stringResource(Res.string.platform_login, platform.displayName))
-                    },
-                    modifier = Modifier.clickable { navigator.push(LoginScreen(platform)) },
-                )
-              }
+            val isLoggedIn = Platform.PAWCHIVE in loggedInPlatforms
+            if (isLoggedIn) {
+              ListItem(
+                  headlineContent = {
+                    Text(
+                        stringResource(Res.string.platform_logged_in, Platform.PAWCHIVE.displayName)
+                    )
+                  },
+                  supportingContent = { Text("Session cookie configured") },
+                  trailingContent = {
+                    IconButton(onClick = { screenModel.logout(Platform.PAWCHIVE) {} }) {
+                      Icon(
+                          Icons.LogoutW400Outlined,
+                          contentDescription = stringResource(Res.string.logout),
+                      )
+                    }
+                  },
+                  modifier =
+                      Modifier.clickable {
+                        sessionInput = sessionStore.getSession(Platform.PAWCHIVE).orEmpty()
+                        showSessionEditor = true
+                      },
+              )
+            } else {
+              ListItem(
+                  headlineContent = {
+                    Text(stringResource(Res.string.platform_login, Platform.PAWCHIVE.displayName))
+                  },
+                  supportingContent = { Text("Paste a Pawchive session cookie") },
+                  modifier =
+                      Modifier.clickable {
+                        sessionInput = ""
+                        showSessionEditor = true
+                      },
+              )
             }
             HorizontalDivider()
             ListItem(
                 headlineContent = { Text(stringResource(Res.string.favorites)) },
                 modifier =
                     Modifier.clickable {
-                      if (activePlatform in loggedInPlatforms) {
-                        navigator.push(FavoritesScreen(activePlatform))
+                      if (Platform.PAWCHIVE in loggedInPlatforms) {
+                        navigator.push(FavoritesScreen(Platform.PAWCHIVE))
                       } else {
                         showToast(favoritesLoginToast)
                       }
@@ -464,18 +375,6 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
         }
         item {
           Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-            ListItem(
-                headlineContent = { Text(stringResource(Res.string.mirror_kemono)) },
-                supportingContent = { Text(kemonoUrl.removePrefix("https://")) },
-                modifier = Modifier.clickable { domainPickerTarget = Platform.KEMONO },
-            )
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text(stringResource(Res.string.mirror_coomer)) },
-                supportingContent = { Text(coomerUrl.removePrefix("https://")) },
-                modifier = Modifier.clickable { domainPickerTarget = Platform.COOMER },
-            )
-            HorizontalDivider()
             ListItem(
                 headlineContent = { Text(stringResource(Res.string.grid_cell_width)) },
                 supportingContent = { Text("${cellWidth} dp") },

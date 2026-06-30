@@ -84,12 +84,9 @@ private fun parseKcRoute(url: String): KcRoute? {
   val path = rawPath.substringBefore('?').substringBefore('#')
   val platform =
       when {
-        scheme == "kc" && host == "kemono" -> Platform.KEMONO
-        scheme == "kc" && host == "coomer" -> Platform.COOMER
-        scheme in setOf("http", "https") && host in setOf("kemono.cr", "www.kemono.cr") ->
-            Platform.KEMONO
-        scheme in setOf("http", "https") && host in setOf("coomer.st", "www.coomer.st") ->
-            Platform.COOMER
+        scheme == "kc" && host == "pawchive" -> Platform.PAWCHIVE
+        scheme in setOf("http", "https") && host in setOf("pawchive.st", "www.pawchive.st") ->
+            Platform.PAWCHIVE
         else -> return null
       }
   val segments = path.split('/').filter { it.isNotBlank() }

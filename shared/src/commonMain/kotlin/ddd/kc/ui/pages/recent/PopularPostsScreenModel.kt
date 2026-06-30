@@ -4,9 +4,13 @@ import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.QueryState
 import ddd.kc.data.network.PopularInfo
+import ddd.kc.data.network.PopularPage
 import ddd.kc.data.network.PopularProps
+import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.PostRepository
+import ddd.kc.data.repository.awaitData
 import ddd.kc.util.logging.KcLog
 import kotlinx.coroutines.launch
 
@@ -20,6 +24,7 @@ enum class PopularPeriod(val apiValue: String, val label: String) {
 }
 
 data class PopularPostsState(
+    val result: QueryState<PopularPage> = QueryState(isLoading = true),
     val posts: List<Post> = emptyList(),
     val period: PopularPeriod = PopularPeriod.DAY,
     val date: String? = null,
@@ -27,17 +32,21 @@ data class PopularPostsState(
     val props: PopularProps? = null,
     val offset: Int = 0,
     val hasMore: Boolean = true,
-    val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
-    val errorMessage: String? = null,
     val appendErrorMessage: String? = null,
-)
+) {
+  val isLoading: Boolean
+    get() = result.isLoading
+
+  val errorMessage: String?
+    get() = result.error?.message
+}
 
 class PopularPostsScreenModel(
     private val postRepo: PostRepository,
 ) : StateScreenModel<PopularPostsState>(PopularPostsState()) {
 
-  private var platform = Platform.KEMONO
+  private var platform = Platform.PAWCHIVE
 
   fun load(platform: Platform, forceRefresh: Boolean = false) {
     val platformChanged = this.platform != platform
@@ -45,7 +54,15 @@ class PopularPostsScreenModel(
     val state = mutableState.value
     if (!forceRefresh && !platformChanged && state.posts.isNotEmpty()) return
     mutableState.value =
-        state.copy(isLoading = true, errorMessage = null, appendErrorMessage = null)
+        state.copy(
+            result =
+                state.result.copy(
+                    isLoading = state.posts.isEmpty(),
+                    isRefreshing = state.posts.isNotEmpty(),
+                    error = null,
+                ),
+            appendErrorMessage = null,
+        )
     screenModelScope.launch { loadPage(offset = 0, forceRefresh = forceRefresh) }
   }
 
@@ -106,9 +123,8 @@ class PopularPostsScreenModel(
             posts = emptyList(),
             offset = 0,
             hasMore = true,
-            isLoading = true,
+            result = QueryState(isLoading = true),
             isLoadingMore = false,
-            errorMessage = null,
             appendErrorMessage = null,
         )
     screenModelScope.launch { loadPage(offset = 0, forceRefresh = false) }
@@ -117,13 +133,14 @@ class PopularPostsScreenModel(
   private suspend fun loadPage(offset: Int, forceRefresh: Boolean) {
     val state = mutableState.value
     runCatching {
-          postRepo.getPopularPostsPage(
-              platform = platform,
-              date = normalizePopularBaseDate(state.date, state.period),
-              period = state.period.apiValue,
-              offset = offset,
-              forceRefresh = forceRefresh,
-          )
+          postRepo
+              .observePopularPostsPage(
+                  date = normalizePopularBaseDate(state.date, state.period),
+                  period = state.period.apiValue,
+                  offset = offset,
+                  forceRefresh = forceRefresh,
+              )
+              .awaitData()
         }
         .onSuccess { page ->
           val firstPage = offset == 0
@@ -133,14 +150,13 @@ class PopularPostsScreenModel(
           mutableState.value =
               mutableState.value.copy(
                   posts = merged,
+                  result = QueryState(data = page),
                   info = page.info,
                   props = page.props,
                   date = page.info.date ?: state.date,
                   offset = merged.size,
                   hasMore = page.posts.size >= PAGE_SIZE,
-                  isLoading = false,
                   isLoadingMore = false,
-                  errorMessage = null,
                   appendErrorMessage = null,
               )
           popularLog.i {
@@ -153,9 +169,13 @@ class PopularPostsScreenModel(
           }
           mutableState.value =
               mutableState.value.copy(
-                  isLoading = false,
+                  result =
+                      mutableState.value.result.copy(
+                          isLoading = false,
+                          isRefreshing = false,
+                          error = it.toQueryError(),
+                      ),
                   isLoadingMore = false,
-                  errorMessage = if (offset == 0) it.message else mutableState.value.errorMessage,
                   appendErrorMessage = if (offset == 0) null else it.message,
               )
         }

@@ -5,10 +5,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
+import ddd.kc.util.logging.KcLog
+
+private val networkImageLog = KcLog.withTag("NetworkImage")
 
 @Composable
 fun NetworkImage(
@@ -49,7 +53,12 @@ fun NetworkImage(
           Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
         }
       },
-      error = {
+      error = { error ->
+        LaunchedEffect(url, fallbackUrl, error) {
+          networkImageLog.w(error.result.throwable) {
+            "图片加载失败(url=$url,fallbackUrl=${fallbackUrl.orEmpty()})"
+          }
+        }
         if (!fallbackUrl.isNullOrBlank()) {
           NetworkImage(
               url = fallbackUrl,

@@ -1,8 +1,7 @@
 package ddd.kc.data.model
 
 enum class Platform(val defaultBaseUrl: String, val displayName: String) {
-  KEMONO("https://kemono.cr", "Kemono"),
-  COOMER("https://coomer.st", "Coomer"),
+  PAWCHIVE("https://pawchive.st", "Pawchive"),
 }
 
 fun Platform.defaultCdnUrl(): String = defaultBaseUrl.replace("://", "://img.")
