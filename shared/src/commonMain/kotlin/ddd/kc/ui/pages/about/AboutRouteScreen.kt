@@ -1,6 +1,7 @@
 package ddd.kc.ui.pages.about
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -52,8 +53,6 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.CodeW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.OutputCircleW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ReceiptLongW400Outlined
-import ddd.kc.generated.symbols.icons.service.Icons as ServiceIcons
-import ddd.kc.generated.symbols.icons.service.icons.Logo
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.platform.PlatformTextFileDestination
@@ -80,11 +79,13 @@ import kc.shared.generated.resources.about_project_address_url
 import kc.shared.generated.resources.about_thanks
 import kc.shared.generated.resources.about_version
 import kc.shared.generated.resources.about_version_copied
+import kc.shared.generated.resources.app_logo_foreground
 import kc.shared.generated.resources.close
 import kotlin.coroutines.resume
 import kotlin.time.Clock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 private const val aboutProjectUrl = "https://github.com/domo-domino-desu/kc"
@@ -229,10 +230,9 @@ private fun AboutHeaderCard() {
         color = aboutHeaderBackground,
     ) {
       Box(contentAlignment = Alignment.Center) {
-        Icon(
-            imageVector = ServiceIcons.Logo,
+        Image(
+            painter = painterResource(Res.drawable.app_logo_foreground),
             contentDescription = null,
-            tint = Color.Unspecified,
             modifier = Modifier.size(256.dp),
         )
       }
