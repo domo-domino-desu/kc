@@ -30,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -81,7 +80,7 @@ fun PlatformVideoPlayer(url: String, modifier: Modifier = Modifier) {
 private fun VideoControlsOverlay(playerState: VideoPlayerState) {
   var controlsVisible by remember { mutableStateOf(true) }
 
-  BackHandler(enabled = playerState.isFullscreen) { playerState.toggleFullscreen() }
+  NavigationBackHandler(enabled = playerState.isFullscreen) { playerState.toggleFullscreen() }
 
   Box(modifier = Modifier.fillMaxSize()) {
     Box(

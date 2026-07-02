@@ -1,6 +1,8 @@
 package ddd.kc.di
 
 import ddd.kc.application.translation.TranslationService
+import ddd.kc.data.media.ImageProgressTracker
+import ddd.kc.data.media.createCachedImageHttpClient
 import ddd.kc.data.network.KcApiClient
 import ddd.kc.data.network.KcSessionStore
 import ddd.kc.data.network.buildKcHttpClient
@@ -14,6 +16,8 @@ import org.koin.dsl.module
 fun networkModule() = module {
   single { AcceptAllCookiesStorage() }
   single { KcSessionStore(get(named(KOIN_QUALIFIER_SESSION_VAULT))) }
+  single { ImageProgressTracker() }
+  single(named(KOIN_QUALIFIER_CACHED_IMAGE_CLIENT)) { createCachedImageHttpClient(get()) }
   single { buildKcHttpClient(get()) }
   single { AppSettings(get()) }
   single { KcApiClient(get(), get(), get(), get()) }

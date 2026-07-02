@@ -7,8 +7,10 @@ import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 
 const val KOIN_QUALIFIER_SESSION_VAULT = "session_vault"
+const val KOIN_QUALIFIER_CACHED_IMAGE_CLIENT = "cached_image_client"
 
 fun appModules(platformModule: Module): List<Module> =
     listOf(
@@ -28,6 +30,7 @@ fun startAppKoin(platformModule: Module): Koin {
 fun stopAppKoin() {
   val koin = GlobalContext.getOrNull() ?: return
   runCatching { koin.get<HttpClient>().close() }
+  runCatching { koin.get<HttpClient>(named(KOIN_QUALIFIER_CACHED_IMAGE_CLIENT)).close() }
   runCatching { koin.get<AppDatabase>().close() }
   stopKoin()
 }

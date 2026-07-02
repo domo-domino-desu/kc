@@ -33,6 +33,7 @@ import ddd.kc.ui.components.BackAppBar
 import ddd.kc.ui.components.CreatorSearchCard
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.GridLoadingSkeleton
+import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.ListLoadingSkeleton
 import ddd.kc.ui.components.PostCard
 import ddd.kc.ui.navigation.nextRouteInstanceKey
@@ -58,6 +59,7 @@ class FavoritesScreen(
     val state by screenModel.state.collectAsState()
     val cellWidth = LocalAppSettings.current.cellMinWidthDp()
     var selectedTab by remember { mutableIntStateOf(0) }
+    val refresh = { screenModel.load(platform, forceRefresh = true) }
     val tabLabels =
         listOf(
             stringResource(Res.string.favorites_tab_creators),
@@ -68,78 +70,86 @@ class FavoritesScreen(
     ErrorToastEffect(state.errorMessage)
 
     Scaffold(topBar = { BackAppBar(stringResource(Res.string.favorites)) }) { paddingValues ->
-      Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        ButtonGroup(
-            overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
-            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-          tabLabels.forEachIndexed { index, label ->
-            toggleableItem(
-                checked = selectedTab == index,
-                label = label,
-                onCheckedChange = { selectedTab = index },
-                weight = 1f,
-            )
+      KcPullRefreshBox(
+          enabled = !state.isLoading,
+          refreshing = state.isRefreshing,
+          onRefresh = refresh,
+          modifier = Modifier.fillMaxSize().padding(paddingValues),
+      ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+          ButtonGroup(
+              overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
+              horizontalArrangement =
+                  Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+              modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+          ) {
+            tabLabels.forEachIndexed { index, label ->
+              toggleableItem(
+                  checked = selectedTab == index,
+                  label = label,
+                  onCheckedChange = { selectedTab = index },
+                  weight = 1f,
+              )
+            }
           }
-        }
 
-        when (selectedTab) {
-          0 ->
-              if (state.isLoading) {
-                ListLoadingSkeleton(modifier = Modifier.padding(horizontal = 12.dp))
-              } else
-                  LazyVerticalGrid(
-                      columns = GridCells.Adaptive(minSize = 320.dp),
-                      modifier = Modifier.fillMaxSize(),
-                      contentPadding = PaddingValues(12.dp),
-                      verticalArrangement = Arrangement.spacedBy(8.dp),
-                      horizontalArrangement = Arrangement.spacedBy(8.dp),
-                  ) {
-                    items(state.creators, key = { it.id }) { creator ->
-                      CreatorSearchCard(
-                          creator = creator,
-                          platform = platform,
-                          onClick = {
-                            navigator.push(
-                                CreatorRouteScreen(
-                                    platform,
-                                    state.creators,
-                                    state.creators.indexOf(creator),
-                                )
-                            )
-                          },
-                      )
+          when (selectedTab) {
+            0 ->
+                if (state.isLoading) {
+                  ListLoadingSkeleton(modifier = Modifier.padding(horizontal = 12.dp))
+                } else
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 320.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                      items(state.creators, key = { it.id }) { creator ->
+                        CreatorSearchCard(
+                            creator = creator,
+                            platform = platform,
+                            onClick = {
+                              navigator.push(
+                                  CreatorRouteScreen(
+                                      platform,
+                                      state.creators,
+                                      state.creators.indexOf(creator),
+                                  )
+                              )
+                            },
+                        )
+                      }
                     }
-                  }
-          1 ->
-              if (state.isLoading) {
-                GridLoadingSkeleton(minCardWidthDp = cellWidth)
-              } else
-                  LazyVerticalGrid(
-                      columns = GridCells.Adaptive(minSize = cellWidth.dp),
-                      modifier = Modifier.fillMaxSize(),
-                      contentPadding = PaddingValues(12.dp),
-                      verticalArrangement = Arrangement.spacedBy(8.dp),
-                      horizontalArrangement = Arrangement.spacedBy(8.dp),
-                  ) {
-                    items(state.posts, key = { it.id }) { post ->
-                      PostCard(
-                          post = post,
-                          platform = platform,
-                          onClick = {
-                            navigator.push(
-                                PostRouteScreen(
-                                    platform,
-                                    state.posts,
-                                    state.posts.indexOf(post),
-                                    source = "favorites",
-                                )
-                            )
-                          },
-                      )
+            1 ->
+                if (state.isLoading) {
+                  GridLoadingSkeleton(minCardWidthDp = cellWidth)
+                } else
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = cellWidth.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                      items(state.posts, key = { it.id }) { post ->
+                        PostCard(
+                            post = post,
+                            platform = platform,
+                            onClick = {
+                              navigator.push(
+                                  PostRouteScreen(
+                                      platform,
+                                      state.posts,
+                                      state.posts.indexOf(post),
+                                      source = "favorites",
+                                  )
+                              )
+                            },
+                        )
+                      }
                     }
-                  }
+          }
         }
       }
     }

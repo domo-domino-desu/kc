@@ -11,12 +11,14 @@ import ddd.kc.data.model.allFiles
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.imageFiles
 import ddd.kc.data.network.AuthRequiredException
+import ddd.kc.data.network.PageInfo
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.domain.translation.TranslationBlockResult
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.PAGER_NEXT_PREFETCH_COUNT
 import ddd.kc.ui.state.PAGER_PREFETCH_DEBOUNCE_MS
+import ddd.kc.ui.state.PAGER_PREVIOUS_PREFETCH_COUNT
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
 import ddd.kc.util.logging.KcLog
@@ -29,6 +31,11 @@ import kotlinx.coroutines.launch
 private const val PAGE_SIZE = 50
 private val log = KcLog.withTag("PostScreenModel")
 
+private data class DetailPagingPage(
+    val posts: List<Post>,
+    val pageInfo: PageInfo?,
+)
+
 class PostScreenModel(
     private val postRepo: PostRepository,
     private val creatorRepo: CreatorRepository,
@@ -36,26 +43,25 @@ class PostScreenModel(
     private val platform: Platform,
     initialPosts: List<Post>,
     startIndex: Int,
+    private val initialOffset: Int = 0,
+    initialHasMore: Boolean = false,
+    private val pagingContext: PostPagingContext = PostPagingContext.None,
 ) :
     StateScreenModel<PostPagerUiState>(
         PostPagerUiState(
             posts = initialPosts,
             currentIndex = startIndex,
-            hasMore = initialPosts.size >= PAGE_SIZE,
+            startOffset = initialOffset,
+            offset = initialOffset + initialPosts.size,
+            hasMore = pagingContext != PostPagingContext.None && initialHasMore,
         )
     ) {
-
-  init {
-    val isSingleCreator = initialPosts.map { it.service to it.creatorId }.toSet().size <= 1
-    if (!isSingleCreator) {
-      mutableState.value = mutableState.value.copy(hasMore = false)
-    }
-  }
 
   private var prefetchJob: Job? = null
   private var favoriteStatusDisabled = false
   private val loadedDetailIds = mutableSetOf<String>()
   private val loadingDetailIds = mutableSetOf<String>()
+  private val loadingCommentIds = mutableSetOf<String>()
 
   fun onPageChanged(index: Int) {
     val post = mutableState.value.posts.getOrNull(index)
@@ -71,6 +77,9 @@ class PostScreenModel(
     schedulePrefetch(index)
     if (index >= mutableState.value.posts.size - PAGER_NEXT_PREFETCH_COUNT) {
       loadMore()
+    }
+    if (index <= PAGER_PREVIOUS_PREFETCH_COUNT) {
+      loadPrevious()
     }
   }
 
@@ -94,32 +103,31 @@ class PostScreenModel(
 
   private fun loadMore() {
     val state = mutableState.value
-    if (state.isLoadingMore || !state.hasMore) return
-    val firstPost = state.posts.firstOrNull() ?: return
-    log.i {
-      "加载更多Post -> 开始(service=${firstPost.service},creator=${firstPost.creatorId},offset=${state.posts.size})"
-    }
+    if (state.isLoadingMore || state.isLoadingPrevious || !state.hasMore) return
+    if (pagingContext == PostPagingContext.None) return
+    val nextOffset = state.offset
+    log.i { "加载更多Post -> 开始(offset=$nextOffset)" }
     mutableState.value = state.copy(isLoadingMore = true)
     screenModelScope.launch {
-      runCatching {
-            postRepo.getCreatorPosts(
-                platform = platform,
-                service = firstPost.service,
-                creatorId = firstPost.creatorId,
-                offset = state.posts.size,
-                forceRefresh = false,
-            )
-          }
-          .onSuccess { newPosts ->
+      runCatching { fetchPagingPage(nextOffset, forceRefresh = false) }
+          .onSuccess { page ->
             val current = mutableState.value
-            val merged = (current.posts + newPosts).distinctBy { it.id }
+            val merged =
+                appendDetailPosts(
+                    currentPosts = current.posts,
+                    pagePosts = page.posts,
+                    nextOffset = nextOffset,
+                    pageInfo = page.pageInfo,
+                    pageSize = PAGE_SIZE,
+                )
             mutableState.value =
                 current.copy(
-                    posts = merged,
-                    hasMore = newPosts.size >= PAGE_SIZE,
+                    posts = merged.posts,
+                    offset = merged.offset,
+                    hasMore = merged.hasMore,
                     isLoadingMore = false,
                 )
-            log.i { "加载更多Post -> 成功(count=${newPosts.size},merged=${merged.size})" }
+            log.i { "加载更多Post -> 成功(count=${page.posts.size},merged=${merged.posts.size})" }
           }
           .onFailure {
             log.e(it) { "加载更多Post -> 失败" }
@@ -127,6 +135,100 @@ class PostScreenModel(
           }
     }
   }
+
+  private fun loadPrevious() {
+    val state = mutableState.value
+    if (
+        state.isLoadingPrevious ||
+            state.isLoadingMore ||
+            state.startOffset <= 0 ||
+            pagingContext == PostPagingContext.None
+    )
+        return
+    val previousOffset = (state.startOffset - PAGE_SIZE).coerceAtLeast(0)
+    log.i { "加载上一页Post -> 开始(offset=$previousOffset)" }
+    mutableState.value = state.copy(isLoadingPrevious = true)
+    screenModelScope.launch {
+      runCatching { fetchPagingPage(previousOffset, forceRefresh = false) }
+          .onSuccess { page ->
+            val current = mutableState.value
+            val merged =
+                prependDetailPosts(
+                    currentPosts = current.posts,
+                    currentIndex = current.currentIndex,
+                    previousOffset = previousOffset,
+                    pagePosts = page.posts,
+                )
+            mutableState.value =
+                current.copy(
+                    posts = merged.posts,
+                    currentIndex = merged.currentIndex,
+                    startOffset = merged.startOffset,
+                    isLoadingPrevious = false,
+                )
+            log.i { "加载上一页Post -> 成功(count=${page.posts.size},merged=${merged.posts.size})" }
+          }
+          .onFailure {
+            log.e(it) { "加载上一页Post -> 失败" }
+            mutableState.value = mutableState.value.copy(isLoadingPrevious = false)
+          }
+    }
+  }
+
+  private suspend fun fetchPagingPage(offset: Int, forceRefresh: Boolean): DetailPagingPage =
+      when (val context = pagingContext) {
+        PostPagingContext.None -> DetailPagingPage(emptyList(), null)
+        is PostPagingContext.Popular -> {
+          val page =
+              postRepo.getPopularPostsPage(
+                  platform = platform,
+                  date = context.date,
+                  period = context.period,
+                  offset = offset,
+                  forceRefresh = forceRefresh,
+              )
+          DetailPagingPage(page.posts, page.pageInfo)
+        }
+        is PostPagingContext.Search -> {
+          if (context.query.isBlank()) {
+            val page =
+                postRepo.getPopularPostsPage(
+                    platform = platform,
+                    date = context.defaultPopularDate,
+                    period = "day",
+                    offset = offset,
+                    forceRefresh = forceRefresh,
+                )
+            DetailPagingPage(page.posts, page.pageInfo)
+          } else {
+            val page =
+                postRepo.searchPostsPage(
+                    platform = platform,
+                    query = context.query,
+                    offset = offset,
+                    tag = null,
+                    service = null,
+                    forceRefresh = forceRefresh,
+                )
+            DetailPagingPage(page.items, page.pageInfo)
+          }
+        }
+        is PostPagingContext.Tag -> {
+          val page = postRepo.getPostsByTagPage(platform, context.tag, offset, forceRefresh)
+          DetailPagingPage(page.items, page.pageInfo)
+        }
+        is PostPagingContext.Creator -> {
+          val page =
+              postRepo.getCreatorPostsPage(
+                  platform = platform,
+                  service = context.service,
+                  creatorId = context.creatorId,
+                  offset = offset,
+                  forceRefresh = forceRefresh,
+              )
+          DetailPagingPage(page.items, page.pageInfo)
+        }
+      }
 
   fun loadPostDetail(post: Post) {
     if (post.id in loadedDetailIds || post.id in loadingDetailIds) return
@@ -148,7 +250,14 @@ class PostScreenModel(
             if (index >= 0) {
               val updated = current.posts.toMutableList()
               updated[index] = detail
-              mutableState.value = current.copy(posts = updated)
+              mutableState.value =
+                  current.copy(
+                      posts = updated,
+                      loadingDetailPostIds = current.loadingDetailPostIds - post.id,
+                  )
+            } else {
+              mutableState.value =
+                  current.copy(loadingDetailPostIds = current.loadingDetailPostIds - post.id)
             }
             log.i { "加载Post详情 -> 成功(${summarizePost(detail)},${summarizePostFiles(detail)})" }
             if (detail.content.isNullOrBlank()) {
@@ -172,32 +281,57 @@ class PostScreenModel(
             log.e(it) {
               "加载Post详情 -> 失败(platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id})"
             }
+            mutableState.value =
+                mutableState.value.copy(
+                    loadingDetailPostIds = mutableState.value.loadingDetailPostIds - post.id
+                )
           }
       loadingDetailIds -= post.id
-      mutableState.value =
-          mutableState.value.copy(
-              loadingDetailPostIds = mutableState.value.loadingDetailPostIds - post.id
-          )
     }
   }
 
   fun loadComments(post: Post) {
     if (mutableState.value.postComments.containsKey(post.id)) return
+    if (post.id in loadingCommentIds) return
+    loadingCommentIds += post.id
     screenModelScope.launch {
       runCatching { postRepo.getPostComments(platform, post.service, post.creatorId, post.id) }
           .onSuccess { comments ->
+            val current = mutableState.value
             mutableState.value =
-                mutableState.value.copy(
-                    postComments = mutableState.value.postComments + (post.id to comments)
-                )
+                current.copy(postComments = current.postComments + (post.id to comments))
             log.i { "加载Post评论 -> 成功(post=${post.id},count=${comments.size})" }
           }
           .onFailure { log.w(it) { "加载Post评论 -> 失败(post=${post.id})" } }
+      loadingCommentIds -= post.id
     }
   }
 
   fun getComments(post: Post): List<Comment> =
       mutableState.value.postComments[post.id] ?: emptyList()
+
+  fun requestFullImage(postId: String, fullUrl: String) {
+    if (fullUrl.isBlank()) return
+    val current = mutableState.value
+    val requested = current.requestedFullImageUrls[postId].orEmpty()
+    if (fullUrl in requested) return
+    mutableState.value =
+        current.copy(
+            requestedFullImageUrls =
+                current.requestedFullImageUrls + (postId to (requested + fullUrl))
+        )
+  }
+
+  fun requestFullImages(postId: String, fullUrls: Collection<String>) {
+    val validUrls = fullUrls.filter { it.isNotBlank() }.toSet()
+    if (validUrls.isEmpty()) return
+    val current = mutableState.value
+    val requested = current.requestedFullImageUrls[postId].orEmpty()
+    val merged = requested + validUrls
+    if (merged == requested) return
+    mutableState.value =
+        current.copy(requestedFullImageUrls = current.requestedFullImageUrls + (postId to merged))
+  }
 
   suspend fun downloadFile(url: String): ByteArray = postRepo.downloadFile(url)
 

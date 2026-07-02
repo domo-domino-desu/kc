@@ -16,6 +16,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ddd.kc.data.network.PageInfo
 import ddd.kc.ui.state.PaginationSnapshot
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -24,6 +25,9 @@ val LazyListState.isAtTop: Boolean
 
 val LazyGridState.isAtTop: Boolean
   get() = firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0
+
+fun shouldRefreshOnRepeatSelection(isAtTop: Boolean, visiblePageInfo: PageInfo?): Boolean =
+    isAtTop && (visiblePageInfo?.currentPage ?: 1) == 1
 
 @Composable
 fun <T> PageStateContent(
@@ -87,6 +91,73 @@ fun AutoLoadEffect(
       hasMore = hasMore,
       isLoadingMore = isLoadingMore,
       onLoadMore = onLoadMore,
+  )
+}
+
+@Composable
+private fun AutoLoadPreviousEffectCore(
+    getFirstVisible: () -> Int?,
+    key: Any,
+    totalItems: Int,
+    threshold: Int,
+    hasPrevious: Boolean,
+    isLoadingPrevious: Boolean,
+    onLoadPrevious: () -> Unit,
+) {
+  LaunchedEffect(key, totalItems) {
+    snapshotFlow { getFirstVisible() }
+        .distinctUntilChanged()
+        .collect { firstVisible ->
+          if (
+              firstVisible != null &&
+                  firstVisible <= threshold &&
+                  totalItems > 0 &&
+                  hasPrevious &&
+                  !isLoadingPrevious
+          ) {
+            onLoadPrevious()
+          }
+        }
+  }
+}
+
+@Composable
+fun AutoLoadPreviousEffect(
+    listState: LazyListState,
+    totalItems: Int,
+    threshold: Int = 3,
+    hasPrevious: Boolean,
+    isLoadingPrevious: Boolean,
+    onLoadPrevious: () -> Unit,
+) {
+  AutoLoadPreviousEffectCore(
+      getFirstVisible = { listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index },
+      key = listState,
+      totalItems = totalItems,
+      threshold = threshold,
+      hasPrevious = hasPrevious,
+      isLoadingPrevious = isLoadingPrevious,
+      onLoadPrevious = onLoadPrevious,
+  )
+}
+
+@Composable
+fun AutoLoadPreviousEffect(
+    gridState: LazyGridState,
+    totalItems: Int,
+    threshold: Int = 3,
+    hasPrevious: Boolean,
+    isLoadingPrevious: Boolean,
+    onLoadPrevious: () -> Unit,
+) {
+  AutoLoadPreviousEffectCore(
+      getFirstVisible = { gridState.layoutInfo.visibleItemsInfo.firstOrNull()?.index },
+      key = gridState,
+      totalItems = totalItems,
+      threshold = threshold,
+      hasPrevious = hasPrevious,
+      isLoadingPrevious = isLoadingPrevious,
+      onLoadPrevious = onLoadPrevious,
   )
 }
 

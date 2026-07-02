@@ -3,8 +3,7 @@ name: Android Build and Release
 on:
   push:
     branches:
-      - main
-      - paw
+      - "**"
     tags:
       - "v*"
   workflow_dispatch:
@@ -99,14 +98,14 @@ jobs:
             echo "previous_tag=${previous_tag}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Publish pre-release for push
-        if: github.ref == 'refs/heads/main'
+      - name: Publish pre-release for branch
+        if: startsWith(github.ref, 'refs/heads/')
         uses: ncipollo/release-action@v1
         with:
-          tag: pre-main
-          name: Pre Release (main)
+          tag: pre-${{ github.ref_name }}
+          name: Pre Release (${{ github.ref_name }})
           body: |
-            Automated pre-release build from main.
+            Automated pre-release build from ${{ github.ref_name }}.
             Commit: ${{ github.sha }}
           prerelease: true
           allowUpdates: true

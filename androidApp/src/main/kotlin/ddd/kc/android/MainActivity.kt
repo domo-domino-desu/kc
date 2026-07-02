@@ -11,6 +11,7 @@ import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
 import coil3.gif.GifDecoder
 import ddd.kc.KcApp
+import ddd.kc.data.media.installKcCoilImageProgressSupport
 import ddd.kc.data.model.Platform
 import ddd.kc.data.settings.AppSettings
 import ddd.kc.platform.EXTRA_PLATFORM
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
       setSingletonImageLoaderFactory { platformContext ->
         ImageLoader.Builder(platformContext)
             .components { add(GifDecoder.Factory()) }
+            .installKcCoilImageProgressSupport()
             .diskCache {
               DiskCache.Builder()
                   .directory("${platformContext.cacheDir.absolutePath}/coil-image-cache".toPath())

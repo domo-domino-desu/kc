@@ -49,6 +49,7 @@ fun CreatorSearchCard(
 ) {
   val baseUrl = LocalAppSettings.current.baseUrl(platform)
   val bannerUrl = creator.bannerUrl(baseUrl)
+  val avatarUrl = creator.thumbnailUrl(baseUrl)
   Surface(
       shape = RoundedCornerShape(8.dp),
       border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
@@ -60,6 +61,12 @@ fun CreatorSearchCard(
           url = bannerUrl,
           modifier = Modifier.matchParentSize(),
           contentScale = ContentScale.Crop,
+          fallbackContent = {
+            CreatorBannerFallback(
+                avatarSeed = avatarUrl.ifBlank { "${creator.service}:${creator.id}" }
+            )
+          },
+          logFailureAsWarning = false,
       )
       Box(
           modifier =
@@ -80,7 +87,7 @@ fun CreatorSearchCard(
             color = MaterialTheme.colorScheme.surface,
         ) {
           NetworkImage(
-              url = creator.thumbnailUrl(baseUrl),
+              url = avatarUrl,
               modifier = Modifier.size(64.dp).clip(CircleShape),
               contentScale = ContentScale.Crop,
           )

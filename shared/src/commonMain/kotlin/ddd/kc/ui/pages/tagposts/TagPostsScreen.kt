@@ -1,12 +1,9 @@
 package ddd.kc.ui.pages.tagposts
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -22,13 +19,13 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Platform
-import ddd.kc.ui.components.AutoLoadEffect
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
-import ddd.kc.ui.components.GridLoadingSkeleton
-import ddd.kc.ui.components.PostCard
-import ddd.kc.ui.components.loadingFooter
+import ddd.kc.ui.components.PagedPostGrid
+import ddd.kc.ui.components.PostGridPagingActions
+import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.navigation.nextRouteInstanceKey
+import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.util.logging.KcLog
 import ddd.kc.util.logging.summarizePost
@@ -51,56 +48,58 @@ class TagPostsScreen(
     val state by screenModel.state.collectAsState()
     val gridState = rememberLazyGridState()
     val cellWidth = LocalAppSettings.current.cellMinWidthDp()
+    val refresh = { screenModel.load(platform, forceRefresh = true) }
 
     LaunchedEffect(Unit) { screenModel.load(platform) }
-    AutoLoadEffect(
-        gridState,
-        state.items.size,
-        hasMore = state.hasMore,
-        isLoadingMore = state.isLoadingMore,
-    ) {
-      screenModel.loadMore(platform)
-    }
     ErrorToastEffect(state.errorMessage)
     ErrorToastEffect(state.appendErrorMessage)
+    ErrorToastEffect(state.prependErrorMessage)
 
     Scaffold(topBar = { DetailAppBar("#$tag") }) { paddingValues ->
-      if (state.loading && state.items.isEmpty()) {
-        GridLoadingSkeleton(
-            minCardWidthDp = cellWidth,
-            state = gridState,
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
-        )
-      } else {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = cellWidth.dp),
-            state = gridState,
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
-            contentPadding = PaddingValues(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          items(state.items, key = { it.id }) { post ->
-            PostCard(
-                post = post,
-                platform = platform,
-                onClick = {
-                  log.i {
-                    "打开Post -> 点击来源(source=tag,platform=${platform.name},${summarizePost(post)})"
-                  }
-                  navigator.push(
-                      PostRouteScreen(
-                          platform,
-                          state.items,
-                          state.items.indexOf(post),
-                          source = "tag",
+      Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        PagedPostGrid(
+            platform = platform,
+            state =
+                PostGridPagingState(
+                    posts = state.items,
+                    visiblePageInfo = state.visiblePageInfo,
+                    loading = state.loading,
+                    refreshing = state.refreshing,
+                    isLoadingMore = state.isLoadingMore,
+                    isLoadingPrevious = state.isLoadingPrevious,
+                    hasMore = state.hasMore,
+                    canLoadPrevious = state.canAutoLoadPrevious,
+                    appendErrorMessage = state.appendErrorMessage,
+                ),
+            actions =
+                PostGridPagingActions(
+                    onRefresh = refresh,
+                    onLoadMore = { screenModel.loadMore(platform) },
+                    onLoadPrevious = { screenModel.loadPrevious(platform) },
+                    onJumpToPage = { page -> screenModel.jumpToPage(platform, page) },
+                    onVisiblePostIndex = screenModel::onVisiblePostIndex,
+                    onPostClick = { post ->
+                      log.i {
+                        "打开Post -> 点击来源(source=tag,platform=${platform.name},${summarizePost(post)})"
+                      }
+                      navigator.push(
+                          PostRouteScreen(
+                              platform = platform,
+                              posts = state.items,
+                              startIndex = state.items.indexOf(post),
+                              source = "tag",
+                              initialOffset = state.startOffset,
+                              initialHasMore = state.hasMore,
+                              pagingContext = PostPagingContext.Tag(tag),
+                          )
                       )
-                  )
-                },
-            )
-          }
-          loadingFooter(state.isLoadingMore, state.appendErrorMessage)
-        }
+                    },
+                ),
+            gridState = gridState,
+            minCardWidth = cellWidth.dp,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
+        )
       }
     }
   }

@@ -58,16 +58,18 @@ class DiscordChannelScreenModel(
     }
   }
 
-  fun loadChannelPosts(channel: DiscordChannel) {
+  fun loadChannelPosts(channel: DiscordChannel, forceRefresh: Boolean = false) {
     val existing = mutableState.value.channelSnapshots[channel.id] ?: PaginationSnapshot()
-    if (existing.items.isNotEmpty() || existing.loading) return
-    val loading = reducer.beginLoad(existing, false)
+    if (!forceRefresh && (existing.items.isNotEmpty() || existing.loading)) return
+    val loading = reducer.beginLoad(existing, forceRefresh)
     mutableState.value =
         mutableState.value.copy(
             channelSnapshots = mutableState.value.channelSnapshots + (channel.id to loading)
         )
     screenModelScope.launch {
-      log.i { "Discord频道消息 -> 首屏开始(platform=${platform.name},channel=${channel.id})" }
+      log.i {
+        "Discord频道消息 -> 首屏开始(platform=${platform.name},channel=${channel.id},forceRefresh=$forceRefresh)"
+      }
       runCatching { discordRepo.getChannelPosts(platform, channel.id, 0) }
           .onSuccess { posts ->
             val snap = reducer.reduceFirstPage(loading, posts, posts.size >= PAGE_SIZE, posts.size)

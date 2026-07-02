@@ -38,7 +38,25 @@ data class PopularPage(
     val props: PopularProps = PopularProps(),
     val info: PopularInfo = PopularInfo(),
     val posts: List<Post> = emptyList(),
+    val pageInfo: PageInfo? = null,
 )
+
+@Serializable
+data class PageInfo(
+    val currentPage: Int = 1,
+    val lastPage: Int = 1,
+    val currentOffset: Int = 0,
+    val lastOffset: Int = 0,
+) {
+  val hasPrevious: Boolean
+    get() = currentPage > 1
+
+  val hasNext: Boolean
+    get() = currentPage < lastPage
+}
+
+@Serializable
+data class PagedResult<T>(val items: List<T> = emptyList(), val pageInfo: PageInfo? = null)
 
 @Serializable
 data class PopularProps(
@@ -142,14 +160,21 @@ class KcApiClient(
       body: String,
       date: String? = null,
       period: String? = null,
+      offset: Int = 0,
   ): PopularPage {
     val doc = Ksoup.parse(body)
     val posts = parsePostCards(body)
     val heading = doc.selectFirst(".site-section--popular-posts .site-section__heading")
     val rangeTitle = heading?.selectFirst("span[title]")?.attr("title")?.ifBlankOrNull()
     val headingText = heading?.text()
-    val navLinks = doc.select("a[href^=/posts/popular]").map { it.attr("href") }
-    val navDates = navLinks.mapNotNull { hrefQueryParam(it, "date") }.distinct()
+    val recentDates =
+        doc.select("#paginator-dates a[href^=/posts/popular]")
+            .map { it.attr("href") }
+            .mapNotNull { hrefQueryParam(it, "date") }
+            .distinct()
+    val dayDates = popularDateLinks(doc.selectFirst("#daily"))
+    val weekDates = popularDateLinks(doc.selectFirst("#weekly"))
+    val monthDates = popularDateLinks(doc.selectFirst("#monthly"))
     val minDate = rangeTitle?.substringBefore(" to ")?.take(10)
     val maxDate = rangeTitle?.substringAfter(" to ", "")?.take(10)
     val info =
@@ -161,18 +186,27 @@ class KcApiClient(
             scale = period,
             navigationDates =
                 PopularNavigationDates(
-                    recent = navDates,
-                    day = navDates,
-                    week = navDates,
-                    month = navDates,
+                    recent = recentDates,
+                    day = dayDates,
+                    week = weekDates,
+                    month = monthDates,
                 ),
         )
     return PopularPage(
         props = PopularProps(count = posts.size, today = date),
         info = info,
         posts = posts,
+        pageInfo = parsePageInfo(body, offset),
     )
   }
+
+  private fun popularDateLinks(element: Element?): List<String> =
+      element
+          ?.select("a[href^=/posts/popular]")
+          ?.map { it.attr("href") }
+          ?.mapNotNull { hrefQueryParam(it, "date") }
+          ?.distinct()
+          .orEmpty()
 
   suspend fun getPopularPosts(
       platform: Platform = Platform.PAWCHIVE,
@@ -180,7 +214,12 @@ class KcApiClient(
       period: String? = null,
       offset: Int? = null,
   ): PopularPage =
-      parsePopularPostsPage(fetchPopularPostsBody(platform, date, period, offset), date, period)
+      parsePopularPostsPage(
+          fetchPopularPostsBody(platform, date, period, offset),
+          date,
+          period,
+          offset ?: 0,
+      )
 
   suspend fun fetchPostSearchBody(
       platform: Platform = Platform.PAWCHIVE,
@@ -204,6 +243,9 @@ class KcApiClient(
     return doc.select(".post-card").mapNotNull { it.toPostCard() }
   }
 
+  fun parsePostCardsPage(body: String, offset: Int = 0): PagedResult<Post> =
+      PagedResult(items = parsePostCards(body), pageInfo = parsePageInfo(body, offset))
+
   suspend fun searchPosts(
       platform: Platform = Platform.PAWCHIVE,
       query: String,
@@ -211,6 +253,15 @@ class KcApiClient(
       tag: String? = null,
       service: String? = null,
   ): List<Post> = parsePostCards(fetchPostSearchBody(platform, query, offset, tag, service))
+
+  suspend fun searchPostsPage(
+      platform: Platform = Platform.PAWCHIVE,
+      query: String,
+      offset: Int = 0,
+      tag: String? = null,
+      service: String? = null,
+  ): PagedResult<Post> =
+      parsePostCardsPage(fetchPostSearchBody(platform, query, offset, tag, service), offset)
 
   suspend fun getPostsByTag(
       platform: Platform = Platform.PAWCHIVE,
@@ -252,6 +303,9 @@ class KcApiClient(
     }
   }
 
+  fun parseDmsPage(body: String, offset: Int = 0): PagedResult<DM> =
+      PagedResult(items = parseDms(body), pageInfo = parsePageInfo(body, offset))
+
   suspend fun getRecentDMs(platform: Platform = Platform.PAWCHIVE, offset: Int = 0): List<DM> =
       parseDms(fetchDmsBody(platform, offset = offset))
 
@@ -260,6 +314,12 @@ class KcApiClient(
       query: String,
       offset: Int = 0,
   ): List<DM> = parseDms(fetchDmsBody(platform, query, offset))
+
+  suspend fun searchDMsPage(
+      platform: Platform = Platform.PAWCHIVE,
+      query: String = "",
+      offset: Int = 0,
+  ): PagedResult<DM> = parseDmsPage(fetchDmsBody(platform, query, offset), offset)
 
   suspend fun fetchTagsBody(platform: Platform = Platform.PAWCHIVE): String =
       requireSuccess(client.get("${platform.url()}/posts/tags"), "请求Tags")
@@ -290,12 +350,33 @@ class KcApiClient(
           "请求Creator Posts(service=$service,creator=$creatorId,offset=$offset)",
       )
 
+  suspend fun fetchCreatorPostsPageBody(
+      platform: Platform = Platform.PAWCHIVE,
+      service: String,
+      creatorId: String,
+      offset: Int = 0,
+  ): String =
+      requireSuccess(
+          client.get("${platform.url()}/$service/user/$creatorId") {
+            offset.takeIf { it > 0 }?.let { parameter("o", it) }
+          },
+          "请求Creator Posts分页(service=$service,creator=$creatorId,offset=$offset)",
+      )
+
   suspend fun getCreatorPosts(
       platform: Platform = Platform.PAWCHIVE,
       service: String,
       creatorId: String,
       offset: Int = 0,
   ): List<Post> = parsePosts(fetchCreatorPostsBody(platform, service, creatorId, offset))
+
+  suspend fun getCreatorPostsPageInfo(
+      platform: Platform = Platform.PAWCHIVE,
+      service: String,
+      creatorId: String,
+      offset: Int = 0,
+  ): PageInfo? =
+      parsePageInfo(fetchCreatorPostsPageBody(platform, service, creatorId, offset), offset)
 
   suspend fun fetchPostBody(
       platform: Platform = Platform.PAWCHIVE,
@@ -571,6 +652,28 @@ private fun String.parseAttachmentCount(): Int? {
 
 private fun String.parseFavoriteCount(): Int? =
     Regex("""(?i)\b(\d+)\s+favorites?\b""").find(this)?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+fun parsePageInfo(body: String, currentOffset: Int = 0): PageInfo? {
+  val doc = Ksoup.parse(body)
+  val countLastOffset =
+      doc.selectFirst("""meta[name=count]""")?.attr("content")?.toIntOrNull()?.let { count ->
+        ((count - 1).coerceAtLeast(0) / PAGE_SIZE) * PAGE_SIZE
+      }
+  val linkedLastOffset =
+      doc.select("a[href*=o=]")
+          .mapNotNull { hrefQueryParam(it.attr("href"), "o")?.toIntOrNull() }
+          .maxOrNull()
+  val lastOffset = countLastOffset ?: linkedLastOffset ?: return null
+  val normalizedCurrentOffset = currentOffset.coerceAtLeast(0)
+  val currentPage = normalizedCurrentOffset / PAGE_SIZE + 1
+  val lastPage = lastOffset / PAGE_SIZE + 1
+  return PageInfo(
+      currentPage = currentPage.coerceIn(1, lastPage.coerceAtLeast(1)),
+      lastPage = lastPage.coerceAtLeast(1),
+      currentOffset = normalizedCurrentOffset,
+      lastOffset = lastOffset.coerceAtLeast(0),
+  )
+}
 
 private fun hrefQueryParam(href: String, name: String): String? =
     href

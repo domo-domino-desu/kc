@@ -6,13 +6,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,7 +39,10 @@ import coil3.compose.AsyncImage
 import com.github.panpf.zoomimage.CoilZoomAsyncImage
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CloseW400Outlined
+import ddd.kc.ui.components.CenterCircularWavyImageLoadingProgress
+import ddd.kc.ui.components.ImageLoadLifecycleState
 import ddd.kc.ui.components.NetworkImage
+import ddd.kc.ui.components.rememberImageLoadProgressState
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.util.logging.KcLog
 import kc.shared.generated.resources.Res
@@ -53,6 +55,7 @@ class ImageViewerScreen(
     private val imageUrls: List<String>,
     private val thumbnailUrls: List<String> = emptyList(),
     private val startIndex: Int = 0,
+    private val onImageViewed: ((String) -> Unit)? = null,
     private val routeKey: String = nextRouteInstanceKey("image-viewer"),
 ) : Screen {
   override val key: String = routeKey
@@ -62,12 +65,14 @@ class ImageViewerScreen(
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
     val pagerState = rememberPagerState(initialPage = startIndex, pageCount = { imageUrls.size })
-    var showUi by remember { mutableStateOf(true) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
       log.i { "图片查看器 -> 打开(count=${imageUrls.size},startIndex=$startIndex)" }
       focusRequester.requestFocus()
+    }
+    LaunchedEffect(pagerState.currentPage) {
+      imageUrls.getOrNull(pagerState.currentPage)?.let { onImageViewed?.invoke(it) }
     }
 
     Box(
@@ -100,52 +105,53 @@ class ImageViewerScreen(
                     else -> false
                   }
                 }
-                .clickable { showUi = !showUi }
     ) {
       HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
         val fullUrl = imageUrls.getOrNull(page)
         val thumbUrl = thumbnailUrls.getOrNull(page)
-        ZoomImagePage(fullUrl = fullUrl, thumbnailUrl = thumbUrl)
+        ZoomImagePage(fullUrl = fullUrl, thumbnailUrl = thumbUrl, onClick = { navigator.pop() })
       }
 
-      if (showUi) {
-        Box(
-            modifier =
-                Modifier.align(Alignment.TopCenter)
-                    .padding(top = 48.dp, start = 16.dp, end = 16.dp)
-                    .background(
-                        color = Color.Black.copy(alpha = 0.4f),
-                        shape = MaterialTheme.shapes.small,
-                    )
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-        ) {
-          Text(
-              text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
-              color = Color.White,
-              style = MaterialTheme.typography.labelLarge,
-          )
-        }
+      Box(
+          modifier =
+              Modifier.align(Alignment.TopCenter)
+                  .safeDrawingPadding()
+                  .padding(top = 48.dp, start = 16.dp, end = 16.dp)
+                  .background(
+                      color = Color.Black.copy(alpha = 0.4f),
+                      shape = MaterialTheme.shapes.small,
+                  )
+                  .padding(horizontal = 12.dp, vertical = 4.dp),
+      ) {
+        Text(
+            text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+        )
+      }
 
-        IconButton(
-            onClick = { navigator.pop() },
-            modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
-        ) {
-          Icon(
-              imageVector = Icons.CloseW400Outlined,
-              contentDescription = stringResource(Res.string.close),
-              tint = Color.White,
-          )
-        }
+      IconButton(
+          onClick = { navigator.pop() },
+          modifier = Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(16.dp),
+      ) {
+        Icon(
+            imageVector = Icons.CloseW400Outlined,
+            contentDescription = stringResource(Res.string.close),
+            tint = Color.White,
+        )
       }
     }
   }
 }
 
 @Composable
-private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?) {
+private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -> Unit) {
   val isGif = remember(fullUrl) { fullUrl?.let(::isGifUrl) == true }
   var isLoading by remember(fullUrl) { mutableStateOf(true) }
   var loadFailed by remember(fullUrl) { mutableStateOf(false) }
+  var loadLifecycleState by remember(fullUrl) { mutableStateOf(ImageLoadLifecycleState.Idle) }
+  val progressState =
+      rememberImageLoadProgressState(progressKey = fullUrl, lifecycleState = loadLifecycleState)
 
   Box(modifier = Modifier.fillMaxSize()) {
     if (isGif) {
@@ -154,8 +160,14 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?) {
           thumbnailUrl = thumbnailUrl,
           contentDescription = null,
           contentScale = ContentScale.Fit,
-          modifier = Modifier.fillMaxSize(),
+          modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
       )
+      if (isLoading) {
+        CenterCircularWavyImageLoadingProgress(
+            progressState = progressState,
+            modifier = Modifier.align(Alignment.Center),
+        )
+      }
       return@Box
     }
 
@@ -176,25 +188,28 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?) {
         onLoading = {
           isLoading = true
           loadFailed = false
+          loadLifecycleState = ImageLoadLifecycleState.Loading
         },
         onSuccess = {
           isLoading = false
           loadFailed = false
+          loadLifecycleState = ImageLoadLifecycleState.Success
         },
         onError = { error ->
           isLoading = false
           loadFailed = true
+          loadLifecycleState = ImageLoadLifecycleState.Error
           log.w(error.result.throwable) {
             "图片查看器 -> 大图加载失败(url=${fullUrl.orEmpty()},thumbnailUrl=${thumbnailUrl.orEmpty()})"
           }
         },
+        onTap = { onClick() },
     )
 
     if (isLoading) {
-      LinearProgressIndicator(
-          modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
-          color = Color.White.copy(alpha = 0.7f),
-          trackColor = Color.White.copy(alpha = 0.2f),
+      CenterCircularWavyImageLoadingProgress(
+          progressState = progressState,
+          modifier = Modifier.align(Alignment.Center),
       )
     }
   }

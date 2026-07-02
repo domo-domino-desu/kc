@@ -6,6 +6,7 @@ import ddd.kc.data.model.DiscordChannel
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.Tag
 import ddd.kc.ui.state.ContentTranslationState
+import ddd.kc.ui.state.PaginationSnapshot
 
 data class CreatorPagerUiState(
     val creators: List<Creator> = emptyList(),
@@ -19,7 +20,7 @@ data class CreatorPagerUiState(
     val loadingCreatorTagIds: Set<String> = emptySet(),
     val loadingRecommendedCreatorIds: Set<String> = emptySet(),
     val loadingCreatorDiscordChannelIds: Set<String> = emptySet(),
-    val creatorPosts: Map<String, List<Post>> = emptyMap(),
+    val creatorPostSnapshots: Map<String, PaginationSnapshot<Post>> = emptyMap(),
     val creatorAnnouncements: Map<String, List<Announcement>> = emptyMap(),
     val creatorTags: Map<String, List<Tag>> = emptyMap(),
     val creatorLinks: Map<String, List<Creator>> = emptyMap(),

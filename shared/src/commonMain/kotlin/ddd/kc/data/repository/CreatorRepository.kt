@@ -8,13 +8,16 @@ import ddd.kc.data.model.Platform
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.Tag
 import ddd.kc.data.network.KcApiClient
+import ddd.kc.data.network.PagedResult
 import ddd.kc.data.network.toQueryError
 import ddd.kc.data.store.CacheNamespace
 import ddd.kc.data.store.rawBodyQueryStore
 import ddd.kc.util.logging.KcLog
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
@@ -82,13 +85,13 @@ class CreatorRepository(
   }
 
   private val dmsStore by lazy {
-    rawBodyQueryStore<DmKey, List<DM>>(
+    rawBodyQueryStore<DmKey, PagedResult<DM>>(
         cacheDao = dao,
         namespace = CacheNamespace.PostList,
         fetcherName = "pawchive-dms",
         cacheKey = { key -> "pawchive:dms:${key.offset}:${key.query}" },
         fetch = { key -> api.fetchDmsBody(query = key.query, offset = key.offset) },
-        parse = { _, body -> api.parseDms(body) },
+        parse = { key, body -> api.parseDmsPage(body, key.offset) },
     )
   }
 
@@ -109,6 +112,11 @@ class CreatorRepository(
   }
 
   fun observeCreators(forceRefresh: Boolean = false): Flow<QueryState<List<Creator>>> = flow {
+    if (forceRefresh) {
+      withContext(ioContext) {
+        dao.deleteKeyAndPrefixed(CREATORS_CACHE_KEY, "$CREATORS_CACHE_KEY:%")
+      }
+    }
     val now = currentTimeMs()
     val cached =
         withContext(ioContext) {
@@ -174,37 +182,49 @@ class CreatorRepository(
       service: String,
       creatorId: String,
       forceRefresh: Boolean = false,
-  ): Flow<QueryState<List<Announcement>>> =
-      announcementsStore.query(CreatorScopedKey(service, creatorId), forceRefresh = forceRefresh)
+  ): Flow<QueryState<List<Announcement>>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:announcements")
+    emitAll(announcementsStore.query(CreatorScopedKey(service, creatorId)))
+  }
 
   suspend fun getCreatorAnnouncements(
       platform: Platform,
       service: String,
       creatorId: String,
-  ): List<Announcement> = observeCreatorAnnouncements(service, creatorId).awaitData()
+      forceRefresh: Boolean = false,
+  ): List<Announcement> = observeCreatorAnnouncements(service, creatorId, forceRefresh).awaitData()
 
   fun observeCreatorTags(
       service: String,
       creatorId: String,
       forceRefresh: Boolean = false,
-  ): Flow<QueryState<List<Tag>>> =
-      creatorTagsStore.query(CreatorScopedKey(service, creatorId), forceRefresh = forceRefresh)
+  ): Flow<QueryState<List<Tag>>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:tags")
+    emitAll(creatorTagsStore.query(CreatorScopedKey(service, creatorId)))
+  }
 
-  suspend fun getCreatorTags(platform: Platform, service: String, creatorId: String): List<Tag> =
-      observeCreatorTags(service, creatorId).awaitData()
+  suspend fun getCreatorTags(
+      platform: Platform,
+      service: String,
+      creatorId: String,
+      forceRefresh: Boolean = false,
+  ): List<Tag> = observeCreatorTags(service, creatorId, forceRefresh).awaitData()
 
   fun observeCreatorLinks(
       service: String,
       creatorId: String,
       forceRefresh: Boolean = false,
-  ): Flow<QueryState<List<Creator>>> =
-      creatorLinksStore.query(CreatorScopedKey(service, creatorId), forceRefresh = forceRefresh)
+  ): Flow<QueryState<List<Creator>>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:links")
+    emitAll(creatorLinksStore.query(CreatorScopedKey(service, creatorId)))
+  }
 
   suspend fun getCreatorLinks(
       platform: Platform,
       service: String,
       creatorId: String,
-  ): List<Creator> = observeCreatorLinks(service, creatorId).awaitData()
+      forceRefresh: Boolean = false,
+  ): List<Creator> = observeCreatorLinks(service, creatorId, forceRefresh).awaitData()
 
   suspend fun getRecommendedCreators(
       platform: Platform,
@@ -220,7 +240,26 @@ class CreatorRepository(
       offset: Int = 0,
       forceRefresh: Boolean = false,
   ): Flow<QueryState<List<DM>>> =
-      dmsStore.query(DmKey(query.trim(), offset), forceRefresh = forceRefresh)
+      observeDmsPage(query, offset, forceRefresh).map { state ->
+        QueryState(
+            data = state.data?.items,
+            isLoading = state.isLoading,
+            isRefreshing = state.isRefreshing,
+            isFromCache = state.isFromCache,
+            isStale = state.isStale,
+            error = state.error,
+            lastUpdatedAtMillis = state.lastUpdatedAtMillis,
+        )
+      }
+
+  fun observeDmsPage(
+      query: String = "",
+      offset: Int = 0,
+      forceRefresh: Boolean = false,
+  ): Flow<QueryState<PagedResult<DM>>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:dms:")
+    emitAll(dmsStore.query(DmKey(query.trim(), offset)))
+  }
 
   suspend fun getRecentDMs(platform: Platform, offset: Int): List<DM> =
       observeDms(offset = offset).awaitData()
@@ -262,11 +301,24 @@ class CreatorRepository(
   suspend fun searchDMs(platform: Platform, query: String, offset: Int): List<DM> =
       observeDms(query = query, offset = offset, forceRefresh = true).awaitData()
 
-  fun observeFavoriteCreators(forceRefresh: Boolean = false): Flow<QueryState<List<Creator>>> =
-      favoriteCreatorsStore.query(Unit, forceRefresh = forceRefresh)
+  suspend fun searchDMsPage(
+      platform: Platform,
+      query: String,
+      offset: Int,
+      forceRefresh: Boolean,
+  ): PagedResult<DM> =
+      observeDmsPage(query = query, offset = offset, forceRefresh = forceRefresh).awaitData()
 
-  suspend fun getFavoriteCreators(platform: Platform): List<Creator> =
-      observeFavoriteCreators().awaitData()
+  fun observeFavoriteCreators(forceRefresh: Boolean = false): Flow<QueryState<List<Creator>>> =
+      flow {
+        if (forceRefresh) deleteCacheGroup("pawchive:favorites:creators")
+        emitAll(favoriteCreatorsStore.query(Unit))
+      }
+
+  suspend fun getFavoriteCreators(
+      platform: Platform,
+      forceRefresh: Boolean = false,
+  ): List<Creator> = observeFavoriteCreators(forceRefresh).awaitData()
 
   suspend fun clearFavoritesCache(platform: Platform) =
       withContext(ioContext) { dao.delete("pawchive:favorites:creators") }
@@ -291,4 +343,8 @@ class CreatorRepository(
         api.removeFavoriteCreator(platform, service, creatorId)
         dao.delete("pawchive:favorites:creators")
       }
+
+  private suspend fun deleteCacheGroup(prefix: String) {
+    withContext(ioContext) { dao.deleteKeyAndPrefixed(prefix, "$prefix%") }
+  }
 }

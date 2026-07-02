@@ -52,6 +52,8 @@ fun PostCard(
         NetworkImage(
             url = post.thumbnailUrl(cdnUrl),
             modifier = Modifier.matchParentSize(),
+            fallbackContent = { PostTitleCoverFallback(title = post.title) },
+            logFailureAsWarning = false,
         )
         if (fileCount > 0 || favCount != null) {
           Row(

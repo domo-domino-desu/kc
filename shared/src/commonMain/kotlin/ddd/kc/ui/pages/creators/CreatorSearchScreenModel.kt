@@ -6,7 +6,10 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.model.preserveRefreshUi
+import ddd.kc.data.network.PageInfo
 import ddd.kc.data.repository.CreatorRepository
+import ddd.kc.ui.state.pageInfoForOffset
 import ddd.kc.util.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.order_asc
@@ -53,6 +56,8 @@ fun sortOrderLabel(order: SortOrder): String =
     }
 
 private val log = KcLog.withTag("CreatorSearchScreenModel")
+private const val PAGE_SIZE = 50
+private const val AUTO_PREPEND_ARM_INDEX = 3
 
 data class CreatorSearchState(
     val query: String = "",
@@ -60,13 +65,33 @@ data class CreatorSearchState(
     val sortBy: CreatorSort = CreatorSort.FAVORITED,
     val sortOrder: SortOrder = SortOrder.DESC,
     val result: QueryState<List<Creator>> = QueryState(isLoading = true),
+    val allCreators: List<Creator> = emptyList(),
     val creators: List<Creator> = emptyList(),
+    val filteredCount: Int = 0,
+    val startOffset: Int = 0,
+    val offset: Int = 0,
+    val pageInfo: PageInfo? = null,
+    val visibleOffset: Int = startOffset,
+    val autoPrependArmed: Boolean = startOffset <= 0,
+    val isLoadingPrevious: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val prependErrorMessage: String? = null,
+    val appendErrorMessage: String? = null,
 ) {
   val isLoading: Boolean
     get() = result.isLoading
 
   val errorMessage: String?
     get() = result.error?.message
+
+  val hasMore: Boolean
+    get() = offset < filteredCount
+
+  val canAutoLoadPrevious: Boolean
+    get() = startOffset > 0 && autoPrependArmed
+
+  val visiblePageInfo: PageInfo?
+    get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
 }
 
 class CreatorSearchScreenModel(
@@ -108,6 +133,60 @@ class CreatorSearchScreenModel(
     reload(delayMs = 0, forceRefresh = true)
   }
 
+  fun loadMore() {
+    val state = mutableState.value
+    if (state.isLoading || state.isLoadingMore || !state.hasMore) return
+    val filtered = currentFilteredCreators(state)
+    val nextItems = filtered.drop(state.offset).take(PAGE_SIZE)
+    mutableState.value =
+        state.copy(
+            creators = mergeCreators(state.creators, nextItems),
+            offset = state.offset + nextItems.size,
+            isLoadingMore = false,
+            appendErrorMessage = null,
+        )
+  }
+
+  fun loadPrevious() {
+    val state = mutableState.value
+    if (
+        !state.canAutoLoadPrevious ||
+            state.isLoading ||
+            state.isLoadingPrevious ||
+            state.isLoadingMore
+    )
+        return
+    val filtered = currentFilteredCreators(state)
+    val previousOffset = (state.startOffset - PAGE_SIZE).coerceAtLeast(0)
+    val previousItems = filtered.drop(previousOffset).take(state.startOffset - previousOffset)
+    mutableState.value =
+        state.copy(
+            creators = mergeCreators(previousItems, state.creators),
+            startOffset = previousOffset,
+            autoPrependArmed = true,
+            isLoadingPrevious = false,
+            prependErrorMessage = null,
+        )
+  }
+
+  fun jumpToPage(page: Int) {
+    val state = mutableState.value
+    val targetPage = page.coerceIn(1, state.pageInfo?.lastPage ?: page.coerceAtLeast(1))
+    replaceWindow((targetPage - 1) * PAGE_SIZE)
+  }
+
+  fun onVisibleCreatorIndex(firstVisibleCreatorIndex: Int) {
+    val state = mutableState.value
+    if (state.creators.isEmpty()) return
+    val relativeIndex =
+        firstVisibleCreatorIndex.coerceAtLeast(0).coerceAtMost(state.creators.lastIndex)
+    val absoluteOffset = state.startOffset + relativeIndex
+    val autoPrependArmed = state.autoPrependArmed || relativeIndex > AUTO_PREPEND_ARM_INDEX
+    if (state.visibleOffset == absoluteOffset && state.autoPrependArmed == autoPrependArmed) return
+    mutableState.value =
+        state.copy(visibleOffset = absoluteOffset, autoPrependArmed = autoPrependArmed)
+  }
+
   private fun reload(delayMs: Long = 300, forceRefresh: Boolean = false) {
     searchJob?.cancel()
     searchJob =
@@ -125,19 +204,24 @@ class CreatorSearchScreenModel(
                         )
                 )
             creatorRepo.observeCreators(forceRefresh).collect { next ->
+              val allCreators = next.data ?: mutableState.value.allCreators
+              val result = next.preserveRefreshUi(allCreators.isNotEmpty())
               val rows =
-                  next.data?.let {
-                    filterCreators(
-                        it,
-                        state.query,
-                        state.selectedService,
-                        state.sortBy,
-                        state.sortOrder,
-                    )
-                  } ?: mutableState.value.creators
+                  filterCreators(
+                      allCreators,
+                      state.query,
+                      state.selectedService,
+                      state.sortBy,
+                      state.sortOrder,
+                  )
               log.i { "创作者搜索 -> 状态(queryLength=${state.query.length},count=${rows.size})" }
-              mutableState.value = mutableState.value.copy(result = next, creators = rows)
-              if (!next.isLoading && !next.isRefreshing) {
+              mutableState.value =
+                  pageStateFor(
+                      mutableState.value.copy(result = result, allCreators = allCreators),
+                      filtered = rows,
+                      offset = 0,
+                  )
+              if (!result.isLoading && !result.isRefreshing) {
                 searchJob = null
               }
             }
@@ -146,7 +230,68 @@ class CreatorSearchScreenModel(
           }
         }
   }
+
+  private fun replaceWindow(offset: Int) {
+    val state = mutableState.value
+    val filtered = currentFilteredCreators(state)
+    mutableState.value = pageStateFor(state, filtered, offset)
+  }
+
+  private fun currentFilteredCreators(state: CreatorSearchState): List<Creator> =
+      filterCreators(
+          state.allCreators,
+          state.query,
+          state.selectedService,
+          state.sortBy,
+          state.sortOrder,
+      )
+
+  private fun pageStateFor(
+      state: CreatorSearchState,
+      filtered: List<Creator>,
+      offset: Int,
+  ): CreatorSearchState {
+    val safeOffset = offset.coerceIn(0, lastOffsetForCount(filtered.size))
+    val pageItems = filtered.drop(safeOffset).take(PAGE_SIZE)
+    return state.copy(
+        creators = pageItems,
+        filteredCount = filtered.size,
+        startOffset = safeOffset,
+        offset = safeOffset + pageItems.size,
+        pageInfo = pageInfoForCount(filtered.size, safeOffset),
+        visibleOffset = safeOffset,
+        autoPrependArmed = safeOffset <= 0,
+        isLoadingPrevious = false,
+        isLoadingMore = false,
+        prependErrorMessage = null,
+        appendErrorMessage = null,
+    )
+  }
 }
+
+private fun mergeCreators(existing: List<Creator>, incoming: List<Creator>): List<Creator> {
+  if (incoming.isEmpty()) return existing
+  val map = LinkedHashMap<String, Creator>(existing.size + incoming.size)
+  existing.forEach { map["${it.service}:${it.id}"] = it }
+  incoming.forEach { map["${it.service}:${it.id}"] = it }
+  return map.values.toList()
+}
+
+private fun pageInfoForCount(count: Int, currentOffset: Int): PageInfo? {
+  if (count <= PAGE_SIZE) return null
+  val lastOffset = lastOffsetForCount(count)
+  val currentPage = currentOffset / PAGE_SIZE + 1
+  val lastPage = lastOffset / PAGE_SIZE + 1
+  return PageInfo(
+      currentPage = currentPage.coerceIn(1, lastPage),
+      lastPage = lastPage,
+      currentOffset = currentOffset.coerceAtLeast(0),
+      lastOffset = lastOffset,
+  )
+}
+
+private fun lastOffsetForCount(count: Int): Int =
+    if (count <= 0) 0 else ((count - 1) / PAGE_SIZE) * PAGE_SIZE
 
 private fun filterCreators(
     creators: List<Creator>,

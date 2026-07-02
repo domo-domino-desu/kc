@@ -1,3 +1,5 @@
 package ddd.kc.data.repository
 
-expect fun currentTimeMs(): Long
+import kotlin.time.Clock
+
+fun currentTimeMs(): Long = Clock.System.now().toEpochMilliseconds()

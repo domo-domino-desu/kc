@@ -7,6 +7,7 @@ import ddd.kc.data.model.Post
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.network.KcApiClient
+import ddd.kc.data.network.PagedResult
 import ddd.kc.data.network.PopularPage
 import ddd.kc.data.network.asException
 import ddd.kc.data.store.CacheNamespace
@@ -15,8 +16,11 @@ import ddd.kc.util.logging.KcLog
 import ddd.kc.util.logging.summarizePost
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -68,12 +72,12 @@ class PostRepository(
         fetch = { key ->
           api.fetchPopularPostsBody(date = key.date, period = key.period, offset = key.offset)
         },
-        parse = { key, body -> api.parsePopularPostsPage(body, key.date, key.period) },
+        parse = { key, body -> api.parsePopularPostsPage(body, key.date, key.period, key.offset) },
     )
   }
 
   private val searchStore by lazy {
-    rawBodyQueryStore<SearchKey, List<Post>>(
+    rawBodyQueryStore<SearchKey, PagedResult<Post>>(
         cacheDao = dao,
         namespace = CacheNamespace.PostList,
         fetcherName = "pawchive-post-search",
@@ -88,7 +92,7 @@ class PostRepository(
               service = key.service,
           )
         },
-        parse = { _, body -> api.parsePostCards(body) },
+        parse = { key, body -> api.parsePostCardsPage(body, key.offset) },
     )
   }
 
@@ -139,7 +143,10 @@ class PostRepository(
   }
 
   fun observeRecentPosts(offset: Int, forceRefresh: Boolean = false): Flow<QueryState<List<Post>>> =
-      recentStore.query(OffsetKey(offset), forceRefresh = forceRefresh)
+      flow {
+        if (forceRefresh) deleteCacheGroup("pawchive:posts:recent:")
+        emitAll(recentStore.query(OffsetKey(offset)))
+      }
 
   suspend fun getRecentPosts(platform: Platform, offset: Int, forceRefresh: Boolean): List<Post> =
       observeRecentPosts(offset, forceRefresh).awaitData()
@@ -154,8 +161,12 @@ class PostRepository(
       period: String,
       offset: Int,
       forceRefresh: Boolean = false,
-  ): Flow<QueryState<PopularPage>> =
-      popularStore.query(PopularKey(date, period, offset), forceRefresh = forceRefresh)
+  ): Flow<QueryState<PopularPage>> = flow {
+    if (forceRefresh) {
+      deleteCacheGroup("pawchive:posts:popular:$period:")
+    }
+    emitAll(popularStore.query(PopularKey(date, period, offset)))
+  }
 
   suspend fun getPopularPostsPage(
       platform: Platform,
@@ -172,7 +183,28 @@ class PostRepository(
       service: String?,
       forceRefresh: Boolean = false,
   ): Flow<QueryState<List<Post>>> =
-      searchStore.query(SearchKey(query.trim(), offset, tag, service), forceRefresh = forceRefresh)
+      observePostSearchPage(query, offset, tag, service, forceRefresh).map { state ->
+        QueryState(
+            data = state.data?.items,
+            isLoading = state.isLoading,
+            isRefreshing = state.isRefreshing,
+            isFromCache = state.isFromCache,
+            isStale = state.isStale,
+            error = state.error,
+            lastUpdatedAtMillis = state.lastUpdatedAtMillis,
+        )
+      }
+
+  fun observePostSearchPage(
+      query: String,
+      offset: Int,
+      tag: String?,
+      service: String?,
+      forceRefresh: Boolean = false,
+  ): Flow<QueryState<PagedResult<Post>>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:posts:search:")
+    emitAll(searchStore.query(SearchKey(query.trim(), offset, tag, service)))
+  }
 
   suspend fun searchPosts(
       platform: Platform,
@@ -182,19 +214,55 @@ class PostRepository(
       service: String?,
   ): List<Post> = observePostSearch(query, offset, tag, service, forceRefresh = true).awaitData()
 
-  suspend fun getPostsByTag(platform: Platform, tag: String, offset: Int): List<Post> =
-      observePostSearch(query = "", offset = offset, tag = tag, service = null).awaitData()
+  suspend fun searchPostsPage(
+      platform: Platform,
+      query: String,
+      offset: Int,
+      tag: String?,
+      service: String?,
+      forceRefresh: Boolean,
+  ): PagedResult<Post> =
+      observePostSearchPage(query, offset, tag, service, forceRefresh = forceRefresh).awaitData()
+
+  suspend fun getPostsByTag(
+      platform: Platform,
+      tag: String,
+      offset: Int,
+      forceRefresh: Boolean = false,
+  ): List<Post> =
+      observePostSearch(
+              query = "",
+              offset = offset,
+              tag = tag,
+              service = null,
+              forceRefresh = forceRefresh,
+          )
+          .awaitData()
+
+  suspend fun getPostsByTagPage(
+      platform: Platform,
+      tag: String,
+      offset: Int,
+      forceRefresh: Boolean = false,
+  ): PagedResult<Post> =
+      observePostSearchPage(
+              query = "",
+              offset = offset,
+              tag = tag,
+              service = null,
+              forceRefresh = forceRefresh,
+          )
+          .awaitData()
 
   fun observeCreatorPosts(
       service: String,
       creatorId: String,
       offset: Int,
       forceRefresh: Boolean = false,
-  ): Flow<QueryState<List<Post>>> =
-      creatorPostsStore.query(
-          CreatorPostsKey(service, creatorId, offset),
-          forceRefresh = forceRefresh,
-      )
+  ): Flow<QueryState<List<Post>>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:posts:")
+    emitAll(creatorPostsStore.query(CreatorPostsKey(service, creatorId, offset)))
+  }
 
   suspend fun getCreatorPosts(
       platform: Platform,
@@ -204,13 +272,28 @@ class PostRepository(
       forceRefresh: Boolean,
   ): List<Post> = observeCreatorPosts(service, creatorId, offset, forceRefresh).awaitData()
 
+  suspend fun getCreatorPostsPage(
+      platform: Platform,
+      service: String,
+      creatorId: String,
+      offset: Int,
+      forceRefresh: Boolean,
+  ): PagedResult<Post> {
+    val posts = getCreatorPosts(platform, service, creatorId, offset, forceRefresh)
+    val pageInfo =
+        withContext(ioContext) { api.getCreatorPostsPageInfo(platform, service, creatorId, offset) }
+    return PagedResult(items = posts, pageInfo = pageInfo)
+  }
+
   fun observePost(
       service: String,
       creatorId: String,
       postId: String,
       forceRefresh: Boolean = false,
-  ): Flow<QueryState<Post>> =
-      postStore.query(PostKey(service, creatorId, postId), forceRefresh = forceRefresh)
+  ): Flow<QueryState<Post>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:post:$postId")
+    emitAll(postStore.query(PostKey(service, creatorId, postId)))
+  }
 
   suspend fun getPost(
       platform: Platform,
@@ -222,10 +305,13 @@ class PostRepository(
         log.i { "加载Post详情 -> 成功(${summarizePost(it)})" }
       }
 
-  fun observeFavoritePosts(forceRefresh: Boolean = false): Flow<QueryState<List<Post>>> =
-      favoritePostsStore.query(Unit, forceRefresh = forceRefresh)
+  fun observeFavoritePosts(forceRefresh: Boolean = false): Flow<QueryState<List<Post>>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:favorites:posts")
+    emitAll(favoritePostsStore.query(Unit))
+  }
 
-  suspend fun getFavoritePosts(platform: Platform): List<Post> = observeFavoritePosts().awaitData()
+  suspend fun getFavoritePosts(platform: Platform, forceRefresh: Boolean = false): List<Post> =
+      observeFavoritePosts(forceRefresh).awaitData()
 
   fun hasSession(platform: Platform): Boolean = api.hasSession(platform)
 
@@ -276,6 +362,10 @@ class PostRepository(
 
   suspend fun downloadFile(url: String): ByteArray =
       withContext(ioContext) { api.downloadFileBytes(url) }
+
+  private suspend fun deleteCacheGroup(prefix: String) {
+    withContext(ioContext) { dao.deleteKeyAndPrefixed(prefix, "$prefix%") }
+  }
 }
 
 internal suspend fun <T : Any> Flow<QueryState<T>>.awaitData(): T {

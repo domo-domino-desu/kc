@@ -75,6 +75,7 @@ kotlin {
         implementation(libs.koin.compose)
         implementation(libs.koin.core)
         implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.kotlinx.datetime)
         implementation(libs.kotlinx.serialization.json)
         implementation(libs.ksafe)
         implementation(libs.ksoup)
@@ -146,6 +147,7 @@ symbolCraft {
   materialSymbols(
       "explore",
       "favorite",
+      "hd",
       "menu",
       "search",
       "tag",
@@ -179,6 +181,7 @@ symbolCraft {
       "forward_30",
       "fullscreen",
       "fullscreen_exit",
+      "hd",
       "home",
       "image",
       "keyboard_arrow_left",

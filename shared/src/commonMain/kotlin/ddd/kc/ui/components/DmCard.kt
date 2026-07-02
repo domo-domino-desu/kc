@@ -33,6 +33,7 @@ import ddd.kc.data.model.Platform
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.util.collapseConsecutiveBlankLines
 
 private val urlRegex = Regex("""https?://[^\s<>"']+""")
 
@@ -99,7 +100,9 @@ fun DmCard(
       } else {
         SelectionContainer {
           LinkifiedDmText(
-              text = dm.content?.takeIf { it.isNotBlank() } ?: "(no content)",
+              text =
+                  dm.content?.takeIf { it.isNotBlank() }?.let(::collapseConsecutiveBlankLines)
+                      ?: "(no content)",
               modifier = Modifier.padding(top = 8.dp),
           )
         }
@@ -112,13 +115,14 @@ fun DmCard(
 private fun DmTranslatedBlockItem(block: TranslationBlockState, showDivider: Boolean) {
   SelectionContainer {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-      LinkifiedDmText(text = block.originalHtml)
+      LinkifiedDmText(text = collapseConsecutiveBlankLines(block.originalHtml))
       Spacer(Modifier.height(6.dp))
       Text(
           text =
               when (block.status) {
                 TranslationStatus.PENDING -> "……"
-                TranslationStatus.SUCCESS -> block.translated.orEmpty()
+                TranslationStatus.SUCCESS ->
+                    collapseConsecutiveBlankLines(block.translated.orEmpty())
                 TranslationStatus.EMPTY -> ""
                 TranslationStatus.FAILURE -> "翻译失败"
                 TranslationStatus.IDLE -> ""
@@ -157,14 +161,15 @@ private fun LinkifiedDmText(text: String, modifier: Modifier = Modifier) {
 private data class UrlPart(val value: String, val isUrl: Boolean)
 
 private fun splitUrlParts(text: String): List<UrlPart> {
+  val collapsedText = collapseConsecutiveBlankLines(text)
   val parts = mutableListOf<UrlPart>()
   var cursor = 0
-  urlRegex.findAll(text).forEach { match ->
+  urlRegex.findAll(collapsedText).forEach { match ->
     if (match.range.first > cursor)
-        parts += UrlPart(text.substring(cursor, match.range.first), false)
+        parts += UrlPart(collapsedText.substring(cursor, match.range.first), false)
     parts += UrlPart(match.value, true)
     cursor = match.range.last + 1
   }
-  if (cursor < text.length) parts += UrlPart(text.substring(cursor), false)
+  if (cursor < collapsedText.length) parts += UrlPart(collapsedText.substring(cursor), false)
   return parts
 }

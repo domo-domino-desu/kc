@@ -83,6 +83,7 @@ class KcApiClientTest {
                 "/posts/tags" -> TestFixtures.read("pawchive.st:posts:tags.html")
                 "/dms" -> TestFixtures.read("pawchive.st:dms:search-test.html")
                 "/api/v1/patreon/user/artist" -> creatorPostsJson
+                "/patreon/user/artist" -> TestFixtures.read("pawchive.st:patreon:user:3295915.html")
                 "/api/v1/patreon/user/artist/post/post1" -> postDetailJson
                 "/api/v1/patreon/user/artist/post/post1/comments" -> commentsJson
                 "/api/v1/patreon/user/artist/announcements" -> announcementsJson
@@ -111,6 +112,10 @@ class KcApiClientTest {
     assertEquals(
         listOf("Animation", "Chainsaw-Man", "Quoted Tag"),
         api.getCreatorPosts(Platform.PAWCHIVE, "patreon", "artist", 0).first().tags,
+    )
+    assertEquals(
+        4,
+        api.getCreatorPostsPageInfo(Platform.PAWCHIVE, "patreon", "artist", 0)?.lastPage,
     )
     val detail = api.getPost(Platform.PAWCHIVE, "patreon", "artist", "post1")
     assertEquals("post1", detail.id)
@@ -193,12 +198,14 @@ class KcApiClientTest {
     assertEquals(101, popular.posts.first().favoriteCount)
     assertEquals("2026-06-30", popular.info.maxDate)
     assertTrue(popular.info.navigationDates?.day.orEmpty().isNotEmpty())
+    assertEquals(10, popular.pageInfo?.lastPage)
 
     val servicePosts =
-        api.parsePostCards(TestFixtures.read("pawchive.st:posts:service-patreon.html"))
-    assertTrue(servicePosts.isNotEmpty())
-    assertTrue(servicePosts.all { it.service == "patreon" })
-    assertTrue(servicePosts.any { it.file?.path?.startsWith("/") == true })
+        api.parsePostCardsPage(TestFixtures.read("pawchive.st:posts:service-patreon.html"))
+    assertTrue(servicePosts.items.isNotEmpty())
+    assertTrue(servicePosts.items.all { it.service == "patreon" })
+    assertTrue(servicePosts.items.any { it.file?.path?.startsWith("/") == true })
+    assertEquals(1000, servicePosts.pageInfo?.lastPage)
 
     val tagPosts = api.parsePostCards(TestFixtures.read("pawchive.st:posts:tag-nsfw.html"))
     assertTrue(tagPosts.isNotEmpty())
@@ -210,7 +217,14 @@ class KcApiClientTest {
         api.parseCreatorTags(TestFixtures.read("pawchive.st:patreon:user:3295915:tags.html"))
     assertTrue(creatorTags.any { it.tag == "Animation" && it.count > 0 })
 
-    assertEquals(emptyList(), api.parseDms(TestFixtures.read("pawchive.st:dms:search-test.html")))
+    val dmsPage = api.parseDmsPage(TestFixtures.read("pawchive.st:dms:search-test.html"))
+    assertEquals(emptyList(), dmsPage.items)
+    assertEquals(null, dmsPage.pageInfo)
+
+    assertEquals(
+        4,
+        parsePageInfo(TestFixtures.read("pawchive.st:patreon:user:3295915.html"))?.lastPage,
+    )
   }
 
   @Test

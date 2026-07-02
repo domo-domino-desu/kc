@@ -41,19 +41,65 @@ class RecentDMsScreenModel(
     }
   }
 
-  private suspend fun fetch(offset: Int, forceRefresh: Boolean, firstPage: Boolean) {
-    runCatching { creatorRepo.observeDms(offset = offset, forceRefresh = forceRefresh).awaitData() }
-        .onSuccess { dms ->
-          val hasMore = dms.size >= PAGE_SIZE
+  fun loadPrevious() {
+    val current = mutableState.value
+    if (!reducer.canLoadPrevious(current)) return
+    val offset = (current.startOffset - PAGE_SIZE).coerceAtLeast(0)
+    screenModelScope.launch {
+      mutableState.value = reducer.beginPrepend(mutableState.value)
+      fetch(offset, forceRefresh = false, firstPage = false, prepend = true)
+    }
+  }
+
+  fun jumpToPage(page: Int) {
+    val previous = mutableState.value
+    val targetPage = page.coerceIn(1, previous.pageInfo?.lastPage ?: page.coerceAtLeast(1))
+    val offset = (targetPage - 1) * PAGE_SIZE
+    screenModelScope.launch {
+      mutableState.value = reducer.beginJump(mutableState.value, offset)
+      fetch(offset, forceRefresh = false, firstPage = true, rollbackSnapshot = previous)
+    }
+  }
+
+  fun onVisibleItemIndex(firstVisibleItemIndex: Int) {
+    mutableState.value =
+        reducer.updateVisiblePage(
+            mutableState.value,
+            firstVisibleItemIndex = firstVisibleItemIndex,
+            pageSize = PAGE_SIZE,
+        )
+  }
+
+  private suspend fun fetch(
+      offset: Int,
+      forceRefresh: Boolean,
+      firstPage: Boolean,
+      prepend: Boolean = false,
+      rollbackSnapshot: PaginationSnapshot<DM>? = null,
+  ) {
+    runCatching {
+          creatorRepo.observeDmsPage(offset = offset, forceRefresh = forceRefresh).awaitData()
+        }
+        .onSuccess { page ->
+          val dms = page.items
+          val hasMore = page.pageInfo?.hasNext ?: (dms.size >= PAGE_SIZE)
           val nextOffset = offset + dms.size
           log.i {
             "最近DMs -> 加载成功(platform=${platform.name},offset=$offset,count=${dms.size},hasMore=$hasMore)"
           }
           mutableState.value =
               if (firstPage) {
-                reducer.reduceFirstPage(mutableState.value, dms, hasMore, nextOffset)
+                reducer.reduceFirstPage(mutableState.value, dms, hasMore, nextOffset, page.pageInfo)
+              } else if (prepend) {
+                reducer.reducePrepend(
+                    mutableState.value,
+                    dms,
+                    mutableState.value.hasMore,
+                    offset,
+                    null,
+                )
               } else {
-                reducer.reduceAppend(mutableState.value, dms, hasMore, nextOffset)
+                reducer.reduceAppend(mutableState.value, dms, hasMore, nextOffset, null)
               }
         }
         .onFailure { error ->
@@ -62,7 +108,10 @@ class RecentDMsScreenModel(
           }
           mutableState.value =
               if (firstPage) {
-                reducer.reduceFirstPageError(mutableState.value, error)
+                rollbackSnapshot?.let { reducer.reduceJumpError(it, error) }
+                    ?: reducer.reduceFirstPageError(mutableState.value, error)
+              } else if (prepend) {
+                reducer.reducePrependError(mutableState.value, error)
               } else {
                 reducer.reduceAppendError(mutableState.value, error)
               }

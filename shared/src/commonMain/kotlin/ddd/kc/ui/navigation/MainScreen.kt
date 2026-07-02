@@ -3,9 +3,9 @@ package ddd.kc.ui.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -45,7 +47,7 @@ import kc.shared.generated.resources.tab_more
 import kc.shared.generated.resources.tab_works
 import org.jetbrains.compose.resources.stringResource
 
-private val navRailMinWidth = 600.dp
+private val navRailMinWidth = 960.dp
 
 private data class TabDef(
     val label: String,
@@ -97,28 +99,18 @@ class MainScreen : Screen {
   @Composable
   override fun Content() {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var creatorsRepeatToken by rememberSaveable { mutableIntStateOf(0) }
-    var worksRepeatToken by rememberSaveable { mutableIntStateOf(0) }
-    var dmRepeatToken by rememberSaveable { mutableIntStateOf(0) }
-    var moreRepeatToken by rememberSaveable { mutableIntStateOf(0) }
+    var currentTabReselectHandler by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val onReselectHandlerChanged = remember {
+      { handler: (() -> Unit)? -> currentTabReselectHandler = handler }
+    }
     val stateHolder = rememberSaveableStateHolder()
-    val repeatTokenForSelectedTab =
-        when (selectedTab) {
-          0 -> creatorsRepeatToken
-          1 -> worksRepeatToken
-          2 -> dmRepeatToken
-          else -> moreRepeatToken
-        }
     val onTabSelected: (Int) -> Unit = { targetTab ->
       when (resolveMainTabSelectionAction(targetTab, selectedTab)) {
-        MainTabSelectionAction.SelectTab -> selectedTab = targetTab
-        MainTabSelectionAction.RepeatCurrentTab ->
-            when (targetTab) {
-              0 -> creatorsRepeatToken += 1
-              1 -> worksRepeatToken += 1
-              2 -> dmRepeatToken += 1
-              3 -> moreRepeatToken += 1
-            }
+        MainTabSelectionAction.SelectTab -> {
+          currentTabReselectHandler = null
+          selectedTab = targetTab
+        }
+        MainTabSelectionAction.RepeatCurrentTab -> currentTabReselectHandler?.invoke()
       }
     }
 
@@ -126,14 +118,14 @@ class MainScreen : Screen {
       if (maxWidth >= navRailMinWidth) {
         RailLayout(
             selectedTab = selectedTab,
-            repeatSelectionToken = repeatTokenForSelectedTab,
+            onReselectHandlerChanged = onReselectHandlerChanged,
             onTabSelected = onTabSelected,
             stateHolder = stateHolder,
         )
       } else {
         BottomBarLayout(
             selectedTab = selectedTab,
-            repeatSelectionToken = repeatTokenForSelectedTab,
+            onReselectHandlerChanged = onReselectHandlerChanged,
             onTabSelected = onTabSelected,
             stateHolder = stateHolder,
         )
@@ -145,14 +137,13 @@ class MainScreen : Screen {
 @Composable
 private fun BottomBarLayout(
     selectedTab: Int,
-    repeatSelectionToken: Int,
+    onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
     onTabSelected: (Int) -> Unit,
     stateHolder: SaveableStateHolder,
 ) {
   val tabList = tabs()
   Scaffold(
       containerColor = MaterialTheme.colorScheme.surface,
-      contentWindowInsets = WindowInsets(0.dp),
       bottomBar = {
         NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
           tabList.forEachIndexed { index, tab ->
@@ -172,7 +163,7 @@ private fun BottomBarLayout(
       },
   ) { innerPadding ->
     Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-      TabContent(selectedTab, repeatSelectionToken, stateHolder)
+      TabContent(selectedTab, onReselectHandlerChanged, stateHolder)
     }
   }
 }
@@ -180,12 +171,12 @@ private fun BottomBarLayout(
 @Composable
 private fun RailLayout(
     selectedTab: Int,
-    repeatSelectionToken: Int,
+    onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
     onTabSelected: (Int) -> Unit,
     stateHolder: SaveableStateHolder,
 ) {
   val tabList = tabs()
-  Row(modifier = Modifier.fillMaxSize()) {
+  Row(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
     NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
       tabList.forEachIndexed { index, tab ->
         NavigationRailItem(
@@ -202,7 +193,7 @@ private fun RailLayout(
       }
     }
     Box(modifier = Modifier.fillMaxSize().weight(1f)) {
-      TabContent(selectedTab, repeatSelectionToken, stateHolder)
+      TabContent(selectedTab, onReselectHandlerChanged, stateHolder)
     }
   }
 }
@@ -210,17 +201,17 @@ private fun RailLayout(
 @Composable
 private fun TabContent(
     selectedTab: Int,
-    repeatSelectionToken: Int,
+    onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
     stateHolder: SaveableStateHolder,
 ) {
   // SaveableStateProvider preserves each tab's rememberSaveable state (scroll pos etc.)
   // across tab switches and root navigator pushes.
   stateHolder.SaveableStateProvider(key = selectedTab) {
     when (selectedTab) {
-      0 -> CreatorsScreen(repeatSelectionToken).Content()
-      1 -> WorksScreen(repeatSelectionToken).Content()
-      2 -> DmScreen(repeatSelectionToken).Content()
-      3 -> MoreScreen(repeatSelectionToken).Content()
+      0 -> CreatorsScreen(onReselectHandlerChanged).Content()
+      1 -> WorksScreen(onReselectHandlerChanged).Content()
+      2 -> DmScreen(onReselectHandlerChanged).Content()
+      3 -> MoreScreen(onReselectHandlerChanged).Content()
     }
   }
 }

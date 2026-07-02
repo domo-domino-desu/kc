@@ -10,6 +10,8 @@ import ddd.kc.data.store.rawBodyQueryStore
 import ddd.kc.util.logging.KcLog
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -32,8 +34,14 @@ class TagRepository(
     )
   }
 
-  fun observeTags(forceRefresh: Boolean = false): Flow<QueryState<List<Tag>>> =
-      tagsStore.query(Unit, forceRefresh = forceRefresh)
+  fun observeTags(forceRefresh: Boolean = false): Flow<QueryState<List<Tag>>> = flow {
+    if (forceRefresh) {
+      withContext(ioContext) {
+        db.cacheDao().deleteKeyAndPrefixed("pawchive:tags:v1", "pawchive:tags:v1%")
+      }
+    }
+    emitAll(tagsStore.query(Unit))
+  }
 
   suspend fun getAllTags(platform: Platform, forceRefresh: Boolean): List<Tag> =
       observeTags(forceRefresh).awaitData()

@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,13 +25,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -103,7 +105,9 @@ object MoreTab : Tab {
   }
 }
 
-class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
+class MoreScreen(
+    private val onReselectHandlerChanged: (((() -> Unit)?) -> Unit) = {},
+) : Screen {
   @OptIn(ExperimentalMaterial3Api::class)
   @Composable
   override fun Content() {
@@ -115,7 +119,6 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
     val screenModel = koinInject<MoreScreenModel>()
     val showToast = LocalShowToast.current
     val listState = rememberLazyListState()
-    var lastHandledRepeatToken by remember { mutableIntStateOf(repeatSelectionToken) }
 
     val loggedInPlatforms by sessionStore.loggedInPlatforms.collectAsState()
     val cellWidth by appSettings.cellMinWidthDpFlow().collectAsState(CELL_MIN_WIDTH_DEFAULT)
@@ -137,12 +140,15 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
     var showThemePicker by remember { mutableStateOf(false) }
     var showGridWidthEditor by remember { mutableStateOf(false) }
     var gridWidthInput by remember { mutableStateOf(cellWidth.toString()) }
+    val latestOnReselect by rememberUpdatedState {
+      if (!listState.isAtTop) scope.launch { listState.animateScrollToItem(0) }
+    }
 
     LaunchedEffect(cellWidth) { if (!showGridWidthEditor) gridWidthInput = cellWidth.toString() }
-    LaunchedEffect(repeatSelectionToken) {
-      if (repeatSelectionToken == lastHandledRepeatToken) return@LaunchedEffect
-      lastHandledRepeatToken = repeatSelectionToken
-      if (!listState.isAtTop) scope.launch { listState.animateScrollToItem(0) }
+    DisposableEffect(onReselectHandlerChanged) {
+      val handler = { latestOnReselect() }
+      onReselectHandlerChanged(handler)
+      onDispose { onReselectHandlerChanged(null) }
     }
 
     if (showSessionEditor) {
@@ -298,7 +304,7 @@ class MoreScreen(private val repeatSelectionToken: Int = 0) : Screen {
       )
     }
 
-    Scaffold { paddingValues ->
+    Scaffold(contentWindowInsets = WindowInsets(0.dp)) { paddingValues ->
       LazyColumn(
           state = listState,
           modifier = Modifier.fillMaxSize().padding(paddingValues),

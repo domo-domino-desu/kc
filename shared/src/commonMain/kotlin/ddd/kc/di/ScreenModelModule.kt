@@ -14,6 +14,7 @@ import ddd.kc.ui.pages.recent.RecentDMsScreenModel
 import ddd.kc.ui.pages.tagposts.TagPostsScreenModel
 import ddd.kc.ui.pages.tags.TagsScreenModel
 import ddd.kc.ui.pages.works.PostSearchScreenModel
+import ddd.kc.ui.pages.works.WorksScreenModel
 import org.koin.dsl.module
 
 fun screenModelModule() = module {
@@ -24,14 +25,23 @@ fun screenModelModule() = module {
   single { PostSearchScreenModel(get()) }
   single { DmSearchScreenModel(get()) }
   single { TagsScreenModel(get()) }
+  single { WorksScreenModel() }
   single { MoreScreenModel(get(), get(), get()) }
 
   // Detail models: factory (parameterised per navigation target)
   factory { (tag: String) -> TagPostsScreenModel(get(), tag) }
-  factory {
-      (platform: ddd.kc.data.model.Platform, posts: List<ddd.kc.data.model.Post>, startIndex: Int)
-    ->
-    PostScreenModel(get(), get(), get(), platform, posts, startIndex)
+  factory { params ->
+    PostScreenModel(
+        get(),
+        get(),
+        get(),
+        params[0],
+        params[1],
+        params[2],
+        params[3],
+        params[4],
+        params[5],
+    )
   }
   factory {
       (

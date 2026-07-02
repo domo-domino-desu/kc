@@ -78,6 +78,16 @@
   <string name="download_failed">下载失败：%1$s</string>
   <string name="save">保存</string>
   <string name="cancel">取消</string>
+  <string name="confirm">确认</string>
+  <string name="page_navigation">分页导航</string>
+  <string name="page_first">第一页</string>
+  <string name="page_previous">上一页</string>
+  <string name="page_next">下一页</string>
+  <string name="page_last">最后一页</string>
+  <string name="page_number">第 %1$d 页</string>
+  <string name="page_number_with_total">第 %1$d / %2$d 页</string>
+  <string name="jump_to_page">跳转页码</string>
+  <string name="target_page_number_with_range">页码 (1-%1$d)</string>
   <string name="favorites_requires_login">请先登录 %1$s</string>
   <string name="language_label">语言</string>
   <string name="language_system">跟随系统</string>

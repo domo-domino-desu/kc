@@ -5,9 +5,19 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.Tag
+import ddd.kc.data.model.preserveRefreshUi
 import ddd.kc.data.repository.TagRepository
 import ddd.kc.util.logging.KcLog
 import kotlinx.coroutines.launch
+
+data class TagsLayoutCacheKey(
+    val tagsSize: Int,
+    val tagsSignature: Long,
+    val rowWidthPx: Int,
+    val horizontalSpacingPx: Int,
+    val chipHorizontalPaddingPx: Int,
+    val textStyleHash: Int,
+)
 
 data class TagsState(
     val result: QueryState<List<Tag>> = QueryState(isLoading = true),
@@ -31,6 +41,8 @@ class TagsScreenModel(
 ) : StateScreenModel<TagsState>(TagsState()) {
   private val log = KcLog.withTag("TagsScreenModel")
   private var loadedPlatform: Platform? = null
+  private var cachedLayoutKey: TagsLayoutCacheKey? = null
+  private var cachedTagRows: List<List<Tag>> = emptyList()
 
   fun load(platform: Platform, forceRefresh: Boolean = false) {
     if (
@@ -55,16 +67,25 @@ class TagsScreenModel(
       log.i { "Tags页面 -> 加载开始(platform=${platform.name},forceRefresh=$forceRefresh)" }
       tagRepo.observeTags(forceRefresh).collect {
         val tags = it.data ?: mutableState.value.allTags
+        val result = it.preserveRefreshUi(tags.isNotEmpty())
         if (it.data != null) {
           log.i { "Tags页面 -> 加载成功(platform=${platform.name},count=${tags.size})" }
           loadedPlatform = platform
         }
-        mutableState.value = mutableState.value.copy(result = it, allTags = tags)
+        mutableState.value = mutableState.value.copy(result = result, allTags = tags)
       }
     }
   }
 
   fun onFilterChanged(filter: String) {
     mutableState.value = mutableState.value.copy(filter = filter)
+  }
+
+  fun cachedTagRows(key: TagsLayoutCacheKey): List<List<Tag>>? =
+      cachedTagRows.takeIf { cachedLayoutKey == key }
+
+  fun cacheTagRows(key: TagsLayoutCacheKey, rows: List<List<Tag>>) {
+    cachedLayoutKey = key
+    cachedTagRows = rows
   }
 }

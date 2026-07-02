@@ -13,6 +13,9 @@ data class QueryState<out T>(
     get() = data != null
 }
 
+fun <T> QueryState<T>.preserveRefreshUi(hasExistingData: Boolean): QueryState<T> =
+    if (isLoading && hasExistingData) copy(isLoading = false, isRefreshing = true) else this
+
 sealed interface QueryError {
   val message: String
   val cause: Throwable?

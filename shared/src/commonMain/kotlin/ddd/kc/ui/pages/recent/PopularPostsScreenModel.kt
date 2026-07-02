@@ -5,16 +5,29 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.network.PageInfo
 import ddd.kc.data.network.PopularInfo
 import ddd.kc.data.network.PopularPage
 import ddd.kc.data.network.PopularProps
 import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.data.repository.awaitData
+import ddd.kc.ui.state.pageInfoForOffset
 import ddd.kc.util.logging.KcLog
+import kotlin.time.Clock
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.todayIn
+import kotlinx.datetime.yearMonth
 
 private const val PAGE_SIZE = 50
+private const val AUTO_PREPEND_ARM_INDEX = 3
+private const val SERVER_WEEK_START_ISO_DAY_NUMBER = 2
 private val popularLog = KcLog.withTag("PopularPostsScreenModel")
 
 enum class PopularPeriod(val apiValue: String, val label: String) {
@@ -27,12 +40,18 @@ data class PopularPostsState(
     val result: QueryState<PopularPage> = QueryState(isLoading = true),
     val posts: List<Post> = emptyList(),
     val period: PopularPeriod = PopularPeriod.DAY,
-    val date: String? = null,
+    val date: String? = defaultPopularDate(PopularPeriod.DAY),
     val info: PopularInfo? = null,
     val props: PopularProps? = null,
+    val startOffset: Int = 0,
     val offset: Int = 0,
+    val pageInfo: PageInfo? = null,
+    val visibleOffset: Int = startOffset,
+    val autoPrependArmed: Boolean = startOffset <= 0,
     val hasMore: Boolean = true,
+    val isLoadingPrevious: Boolean = false,
     val isLoadingMore: Boolean = false,
+    val prependErrorMessage: String? = null,
     val appendErrorMessage: String? = null,
 ) {
   val isLoading: Boolean
@@ -40,6 +59,18 @@ data class PopularPostsState(
 
   val errorMessage: String?
     get() = result.error?.message
+
+  val visiblePageInfo: PageInfo?
+    get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
+
+  val canAutoLoadPrevious: Boolean
+    get() = startOffset > 0 && autoPrependArmed
+
+  val canShiftPrevious: Boolean
+    get() = canShiftPopularDate(this, delta = -1)
+
+  val canShiftNext: Boolean
+    get() = canShiftPopularDate(this, delta = 1)
 }
 
 class PopularPostsScreenModel(
@@ -62,35 +93,82 @@ class PopularPostsScreenModel(
                     error = null,
                 ),
             appendErrorMessage = null,
+            prependErrorMessage = null,
         )
-    screenModelScope.launch { loadPage(offset = 0, forceRefresh = forceRefresh) }
+    screenModelScope.launch { loadPage(offset = 0, forceRefresh = forceRefresh, replace = true) }
   }
 
   fun loadMore() {
     val state = mutableState.value
     if (state.isLoading || state.isLoadingMore || !state.hasMore) return
     mutableState.value = state.copy(isLoadingMore = true, appendErrorMessage = null)
-    screenModelScope.launch { loadPage(offset = state.offset, forceRefresh = false) }
+    screenModelScope.launch {
+      loadPage(offset = state.offset, forceRefresh = false, replace = false)
+    }
+  }
+
+  fun loadPrevious() {
+    val state = mutableState.value
+    if (
+        !state.canAutoLoadPrevious ||
+            state.isLoading ||
+            state.result.isRefreshing ||
+            state.isLoadingPrevious ||
+            state.isLoadingMore
+    )
+        return
+    mutableState.value = state.copy(isLoadingPrevious = true, prependErrorMessage = null)
+    val offset = (state.startOffset - PAGE_SIZE).coerceAtLeast(0)
+    screenModelScope.launch {
+      loadPage(offset = offset, forceRefresh = false, replace = false, prepend = true)
+    }
+  }
+
+  fun jumpToPage(page: Int) {
+    val state = mutableState.value
+    val targetPage = page.coerceIn(1, state.pageInfo?.lastPage ?: page.coerceAtLeast(1))
+    val offset = (targetPage - 1) * PAGE_SIZE
+    mutableState.value =
+        state.copy(
+            result =
+                state.result.copy(
+                    isLoading = state.posts.isEmpty(),
+                    isRefreshing = state.posts.isNotEmpty(),
+                    error = null,
+                ),
+            startOffset = offset,
+            visibleOffset = offset,
+            autoPrependArmed = offset <= 0,
+            isLoadingMore = false,
+            isLoadingPrevious = false,
+            appendErrorMessage = null,
+            prependErrorMessage = null,
+        )
+    screenModelScope.launch {
+      loadPage(offset = offset, forceRefresh = false, replace = true, rollbackState = state)
+    }
+  }
+
+  fun onVisiblePostIndex(firstVisiblePostIndex: Int) {
+    val state = mutableState.value
+    if (state.posts.isEmpty()) return
+    val relativeIndex = firstVisiblePostIndex.coerceAtLeast(0).coerceAtMost(state.posts.lastIndex)
+    val absoluteOffset = state.startOffset + relativeIndex
+    val autoPrependArmed = state.autoPrependArmed || relativeIndex > AUTO_PREPEND_ARM_INDEX
+    if (state.visibleOffset == absoluteOffset && state.autoPrependArmed == autoPrependArmed) return
+    mutableState.value =
+        state.copy(visibleOffset = absoluteOffset, autoPrependArmed = autoPrependArmed)
   }
 
   fun selectPeriod(period: PopularPeriod) {
-    val date = currentTriple(period)?.second ?: mutableState.value.date
+    val state = mutableState.value
+    val date = state.date ?: state.info?.date ?: state.props?.today
     submit(date = date, period = period)
   }
 
+  @Suppress("UNUSED_PARAMETER")
   fun selectBoundaryDate(boundary: PopularDateBoundary, date: String) {
-    val period = mutableState.value.period
-    val baseDate =
-        when (period) {
-          PopularPeriod.DAY -> date
-          PopularPeriod.WEEK ->
-              when (boundary) {
-                PopularDateBoundary.START -> date
-                PopularDateBoundary.END -> shiftIsoDate(date, PopularDateShiftUnit.DAY, -7) ?: date
-              }
-          PopularPeriod.MONTH -> firstDayOfMonth(date) ?: date
-        }
-    submit(date = baseDate, period = period)
+    submit(date = date, period = mutableState.value.period)
   }
 
   fun shift(period: PopularPeriod, slot: PopularNavSlot) {
@@ -110,7 +188,7 @@ class PopularPostsScreenModel(
             ?: mutableState.value.info?.date
             ?: mutableState.value.props?.today
             ?: return
-    val next = shiftIsoDate(base.take(10), unit, delta) ?: return
+    val next = shiftIsoDate(base, unit, delta) ?: return
     submit(date = next, period = mutableState.value.period)
   }
 
@@ -121,16 +199,28 @@ class PopularPostsScreenModel(
             date = normalizedDate,
             period = period,
             posts = emptyList(),
+            startOffset = 0,
             offset = 0,
+            pageInfo = null,
+            visibleOffset = 0,
+            autoPrependArmed = true,
             hasMore = true,
             result = QueryState(isLoading = true),
+            isLoadingPrevious = false,
             isLoadingMore = false,
+            prependErrorMessage = null,
             appendErrorMessage = null,
         )
-    screenModelScope.launch { loadPage(offset = 0, forceRefresh = false) }
+    screenModelScope.launch { loadPage(offset = 0, forceRefresh = false, replace = true) }
   }
 
-  private suspend fun loadPage(offset: Int, forceRefresh: Boolean) {
+  private suspend fun loadPage(
+      offset: Int,
+      forceRefresh: Boolean,
+      replace: Boolean,
+      prepend: Boolean = false,
+      rollbackState: PopularPostsState? = null,
+  ) {
     val state = mutableState.value
     runCatching {
           postRepo
@@ -143,20 +233,51 @@ class PopularPostsScreenModel(
               .awaitData()
         }
         .onSuccess { page ->
-          val firstPage = offset == 0
+          val firstPage = replace || (offset == 0 && !prepend)
           val merged =
-              if (firstPage) page.posts
-              else (mutableState.value.posts + page.posts).distinctBy { it.id }
+              when {
+                firstPage -> page.posts
+                prepend -> (page.posts + mutableState.value.posts).distinctBy { it.id }
+                else -> (mutableState.value.posts + page.posts).distinctBy { it.id }
+              }
+          val nextStartOffset =
+              when {
+                firstPage -> offset
+                prepend -> offset
+                else -> mutableState.value.startOffset
+              }
+          val nextOffset =
+              when {
+                firstPage -> offset + page.posts.size
+                prepend -> mutableState.value.offset
+                else -> offset + page.posts.size
+              }
           mutableState.value =
               mutableState.value.copy(
                   posts = merged,
                   result = QueryState(data = page),
                   info = page.info,
                   props = page.props,
-                  date = page.info.date ?: state.date,
-                  offset = merged.size,
-                  hasMore = page.posts.size >= PAGE_SIZE,
+                  date = canonicalPopularDate(page.info, state.period, state.date),
+                  startOffset = nextStartOffset,
+                  offset = nextOffset,
+                  pageInfo = if (firstPage) page.pageInfo else mutableState.value.pageInfo,
+                  visibleOffset =
+                      when {
+                        firstPage -> nextStartOffset
+                        prepend -> mutableState.value.visibleOffset
+                        else -> mutableState.value.visibleOffset
+                      },
+                  autoPrependArmed =
+                      when {
+                        firstPage -> nextStartOffset <= 0
+                        prepend -> true
+                        else -> mutableState.value.autoPrependArmed
+                      },
+                  hasMore = page.pageInfo?.hasNext ?: (page.posts.size >= PAGE_SIZE),
+                  isLoadingPrevious = false,
                   isLoadingMore = false,
+                  prependErrorMessage = null,
                   appendErrorMessage = null,
               )
           popularLog.i {
@@ -168,16 +289,33 @@ class PopularPostsScreenModel(
             "热门Posts -> 加载失败(period=${state.period.apiValue},date=${state.date},offset=$offset)"
           }
           mutableState.value =
-              mutableState.value.copy(
-                  result =
-                      mutableState.value.result.copy(
-                          isLoading = false,
-                          isRefreshing = false,
-                          error = it.toQueryError(),
-                      ),
-                  isLoadingMore = false,
-                  appendErrorMessage = if (offset == 0) null else it.message,
-              )
+              if (replace && rollbackState != null) {
+                rollbackState.copy(
+                    result =
+                        rollbackState.result.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            error = it.toQueryError(),
+                        ),
+                    isLoadingPrevious = false,
+                    isLoadingMore = false,
+                    prependErrorMessage = null,
+                    appendErrorMessage = null,
+                )
+              } else {
+                mutableState.value.copy(
+                    result =
+                        mutableState.value.result.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            error = it.toQueryError(),
+                        ),
+                    isLoadingPrevious = false,
+                    isLoadingMore = false,
+                    prependErrorMessage = if (prepend) it.message else null,
+                    appendErrorMessage = if (!prepend && offset != 0) it.message else null,
+                )
+              }
         }
   }
 
@@ -211,90 +349,79 @@ enum class PopularDateShiftUnit {
   MONTH,
 }
 
-private fun normalizePopularBaseDate(date: String?, period: PopularPeriod): String? =
-    when (period) {
-      PopularPeriod.DAY -> date?.take(10)
-      PopularPeriod.WEEK -> date?.take(10)
-      PopularPeriod.MONTH -> date?.take(10)?.let { firstDayOfMonth(it) }
-    }
+private fun normalizePopularBaseDate(date: String?, period: PopularPeriod): String? {
+  val baseDate = date?.toLocalDateOrNull() ?: return null
+  val cappedBaseDate = minOf(baseDate, latestAllowedPopularDate())
+  val normalizedDate =
+      when (period) {
+        PopularPeriod.DAY -> cappedBaseDate
+        PopularPeriod.WEEK -> cappedBaseDate.startOfServerWeek()
+        PopularPeriod.MONTH -> cappedBaseDate.startOfMonth()
+      }
+  return normalizedDate.toString()
+}
 
-private fun firstDayOfMonth(date: String): String? {
-  val parts = date.split('-')
-  if (parts.size != 3) return null
-  val year = parts[0].toIntOrNull() ?: return null
-  val month = parts[1].toIntOrNull() ?: return null
-  if (month !in 1..12) return null
-  return "${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-01"
+private fun canonicalPopularDate(
+    info: PopularInfo,
+    period: PopularPeriod,
+    fallbackDate: String?,
+): String? {
+  val actualDate = info.minDate ?: info.date ?: fallbackDate
+  return normalizePopularBaseDate(actualDate, period)
 }
 
 private fun shiftIsoDate(date: String, unit: PopularDateShiftUnit, delta: Int): String? {
-  val parts = date.split('-')
-  if (parts.size != 3) return null
-  var year = parts[0].toIntOrNull() ?: return null
-  var month = parts[1].toIntOrNull() ?: return null
-  var day = parts[2].toIntOrNull() ?: return null
-  when (unit) {
-    PopularDateShiftUnit.DAY -> {
-      var remaining = delta
-      while (remaining != 0) {
-        if (remaining > 0) {
-          day += 1
-          if (day > daysInMonth(year, month)) {
-            day = 1
-            month += 1
-            if (month > 12) {
-              month = 1
-              year += 1
-            }
-          }
-          remaining -= 1
-        } else {
-          day -= 1
-          if (day < 1) {
-            month -= 1
-            if (month < 1) {
-              month = 12
-              year -= 1
-            }
-            day = daysInMonth(year, month)
-          }
-          remaining += 1
-        }
+  val baseDate = date.toLocalDateOrNull() ?: return null
+  val shiftedDate =
+      when (unit) {
+        PopularDateShiftUnit.DAY -> baseDate.plus(delta, DateTimeUnit.DAY)
+        PopularDateShiftUnit.WEEK -> baseDate.plus(delta, DateTimeUnit.WEEK)
+        PopularDateShiftUnit.MONTH -> baseDate.plus(delta, DateTimeUnit.MONTH)
       }
-    }
-
-    PopularDateShiftUnit.WEEK -> return shiftIsoDate(date, PopularDateShiftUnit.DAY, delta * 7)
-    PopularDateShiftUnit.MONTH -> {
-      month += delta
-      while (month > 12) {
-        month -= 12
-        year += 1
-      }
-      while (month < 1) {
-        month += 12
-        year -= 1
-      }
-      day = day.coerceAtMost(daysInMonth(year, month))
-    }
-  }
-  return "${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
+  if (shiftedDate > latestAllowedPopularDate()) return null
+  return shiftedDate.toString()
 }
 
-private fun daysInMonth(year: Int, month: Int): Int =
-    when (month) {
-      1,
-      3,
-      5,
-      7,
-      8,
-      10,
-      12 -> 31
-      4,
-      6,
-      9,
-      11 -> 30
-      2 -> if (isLeapYear(year)) 29 else 28
-      else -> 30
-    }
+private fun defaultPopularDate(period: PopularPeriod): String =
+    normalizePopularBaseDate(latestAllowedPopularDate().toString(), period)
+        ?: latestAllowedPopularDate().toString()
 
-private fun isLeapYear(year: Int): Boolean = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+private fun canShiftPopularDate(state: PopularPostsState, delta: Int): Boolean {
+  val baseDate =
+      state.date ?: state.info?.date ?: state.props?.today ?: defaultPopularDate(state.period)
+  val normalizedBase =
+      normalizePopularBaseDate(baseDate, state.period)?.toLocalDateOrNull() ?: return false
+  val navDates =
+      when (state.period) {
+            PopularPeriod.DAY -> state.info?.navigationDates?.day
+            PopularPeriod.WEEK -> state.info?.navigationDates?.week
+            PopularPeriod.MONTH -> state.info?.navigationDates?.month
+          }
+          .orEmpty()
+          .mapNotNull { normalizePopularBaseDate(it, state.period)?.toLocalDateOrNull() }
+  if (navDates.isNotEmpty()) {
+    return if (delta < 0) {
+      navDates.any { it < normalizedBase }
+    } else {
+      navDates.any { it > normalizedBase }
+    }
+  }
+  val unit =
+      when (state.period) {
+        PopularPeriod.DAY -> PopularDateShiftUnit.DAY
+        PopularPeriod.WEEK -> PopularDateShiftUnit.WEEK
+        PopularPeriod.MONTH -> PopularDateShiftUnit.MONTH
+      }
+  return shiftIsoDate(normalizedBase.toString(), unit, delta) != null
+}
+
+private fun String.toLocalDateOrNull(): LocalDate? =
+    runCatching { LocalDate.parse(take(10)) }.getOrNull()
+
+private fun LocalDate.startOfServerWeek(): LocalDate =
+    minus((dayOfWeek.isoDayNumber - SERVER_WEEK_START_ISO_DAY_NUMBER + 7) % 7, DateTimeUnit.DAY)
+
+private fun LocalDate.startOfMonth(): LocalDate = yearMonth.firstDay
+
+private fun latestAllowedPopularDate(): LocalDate =
+    Clock.System.todayIn(TimeZone.currentSystemDefault())

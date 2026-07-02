@@ -78,6 +78,16 @@
   <string name="download_failed">Download failed: %1$s</string>
   <string name="save">Save</string>
   <string name="cancel">Cancel</string>
+  <string name="confirm">Confirm</string>
+  <string name="page_navigation">Page navigation</string>
+  <string name="page_first">First page</string>
+  <string name="page_previous">Previous page</string>
+  <string name="page_next">Next page</string>
+  <string name="page_last">Last page</string>
+  <string name="page_number">Page %1$d</string>
+  <string name="page_number_with_total">Page %1$d of %2$d</string>
+  <string name="jump_to_page">Jump to Page</string>
+  <string name="target_page_number_with_range">Page number (1-%1$d)</string>
   <string name="favorites_requires_login">Log in to %1$s first</string>
   <string name="language_label">Language</string>
   <string name="language_system">System Default</string>

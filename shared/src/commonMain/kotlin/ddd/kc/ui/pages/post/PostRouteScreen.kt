@@ -33,6 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -40,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -88,18 +90,23 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.DateRangeW400Outline
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.DownloadW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlinedfill1
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400Outlined
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400Outlinedfill1
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.LinkW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
+import ddd.kc.ui.components.ImageLoadLifecycleState
 import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.PlatformVideoPlayer
 import ddd.kc.ui.components.SkeletonBlock
+import ddd.kc.ui.components.TopLinearImageLoadingProgress
 import ddd.kc.ui.components.platform.PlatformBinaryFileDestination
 import ddd.kc.ui.components.platform.PlatformBinaryFileWriteRequest
 import ddd.kc.ui.components.platform.PlatformBinaryFileWriteResult
 import ddd.kc.ui.components.platform.rememberPlatformBinaryFileWriter
+import ddd.kc.ui.components.rememberImageLoadProgressState
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.imageviewer.ImageViewerScreen
@@ -107,6 +114,7 @@ import ddd.kc.ui.pages.tagposts.TagPostsScreen
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.util.collapseConsecutiveBlankLines
 import ddd.kc.util.logging.KcLog
 import ddd.kc.util.logging.summarizePost
 import ddd.kc.util.logging.summarizePostFiles
@@ -121,12 +129,16 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 
 private val log = KcLog.withTag("PostRouteScreen")
+private const val PostTitleItemKey = "post-title"
 
 class PostRouteScreen(
     private val platform: Platform,
     private val posts: List<Post>,
     private val startIndex: Int,
     private val source: String = "unknown",
+    private val initialOffset: Int = 0,
+    private val initialHasMore: Boolean = false,
+    private val pagingContext: PostPagingContext = PostPagingContext.None,
     private val routeKey: String = nextRouteInstanceKey("post"),
 ) : Screen {
   override val key: String = routeKey
@@ -135,7 +147,10 @@ class PostRouteScreen(
   @Composable
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
-    val screenModel = koinScreenModel<PostScreenModel> { parametersOf(platform, posts, startIndex) }
+    val screenModel =
+        koinScreenModel<PostScreenModel> {
+          parametersOf(platform, posts, startIndex, initialOffset, initialHasMore, pagingContext)
+        }
     val state by screenModel.state.collectAsState()
 
     val focusRequester = remember { FocusRequester() }
@@ -210,8 +225,13 @@ class PostRouteScreen(
             creator = state.postCreators["${post.service}:${post.creatorId}"],
             comments = screenModel.getComments(post),
             translationState = state.postTranslations[post.id] ?: ContentTranslationState(),
+            requestedFullImageUrls = state.requestedFullImageUrls[post.id].orEmpty(),
             onFavoriteClick = { screenModel.toggleFavoritePost(post) },
             onTranslate = { screenModel.translateContent(post) },
+            onFullImageRequested = { fullUrl -> screenModel.requestFullImage(post.id, fullUrl) },
+            onFullImagesRequested = { fullUrls ->
+              screenModel.requestFullImages(post.id, fullUrls)
+            },
             onTagClick = { tag -> navigator.push(TagPostsScreen(platform, tag)) },
             onArtistClick = {
               val creator = state.postCreators["${post.service}:${post.creatorId}"]
@@ -235,7 +255,16 @@ class PostRouteScreen(
                 "打开图片 -> 点击Post图片(platform=${platform.name},service=${post.service},creator=${post.user},post=${post.id},index=$startIndex,count=${urls.size})"
               }
               if (urls.isNotEmpty() && startIndex in urls.indices) {
-                navigator.push(ImageViewerScreen(urls, thumbs, startIndex))
+                navigator.push(
+                    ImageViewerScreen(
+                        imageUrls = urls,
+                        thumbnailUrls = thumbs,
+                        startIndex = startIndex,
+                        onImageViewed = { fullUrl ->
+                          screenModel.requestFullImage(post.id, fullUrl)
+                        },
+                    )
+                )
               }
             },
             isAttachmentDownloading = { file ->
@@ -312,8 +341,11 @@ private fun PostDetailPage(
     creator: Creator?,
     comments: List<Comment>,
     translationState: ContentTranslationState,
+    requestedFullImageUrls: Set<String>,
     onFavoriteClick: () -> Unit,
     onTranslate: () -> Unit,
+    onFullImageRequested: (String) -> Unit,
+    onFullImagesRequested: (Collection<String>) -> Unit,
     onTagClick: (String) -> Unit,
     onArtistClick: () -> Unit,
     onScrollToTop: () -> Unit,
@@ -324,8 +356,29 @@ private fun PostDetailPage(
   val cardBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
   val cardShape = RoundedCornerShape(14.dp)
   val scope = rememberCoroutineScope()
+  val postTitle = post.title.orEmpty()
+  val showTitleInAppBar by
+      remember(post.id, postTitle, listState) {
+        derivedStateOf {
+          postTitle.isNotBlank() &&
+              listState.layoutInfo.totalItemsCount > 0 &&
+              listState.layoutInfo.visibleItemsInfo.none { it.key == PostTitleItemKey }
+        }
+      }
   // page 级别缓存，key=url，避免 item 出屏后状态丢失导致滚动跳动
   val imageAspectRatios = remember(post.id) { mutableStateMapOf<String, Float>() }
+  val imageFiles = remember(post) { post.imageFiles() }
+  val loadableFullImageUrls =
+      remember(imageFiles, cdnUrl) {
+        imageFiles.mapNotNull { file ->
+          val thumbnailUrl = file.thumbnailUrl(cdnUrl)
+          val fullUrl = file.fullUrl(cdnUrl)
+          fullUrl?.takeIf { it.isNotBlank() && it != thumbnailUrl }
+        }
+      }
+  val hasLoadableFullImages = remember(loadableFullImageUrls) { loadableFullImageUrls.isNotEmpty() }
+  val allFullImagesRequested =
+      hasLoadableFullImages && requestedFullImageUrls.containsAll(loadableFullImageUrls)
   ErrorToastEffect(favoriteErrorMessage)
 
   Scaffold(
@@ -333,11 +386,20 @@ private fun PostDetailPage(
         val shareUrl =
             "${platform.defaultBaseUrl}/${post.service}/user/${post.creatorId}/post/${post.id}"
         DetailAppBar(
+            title = if (showTitleInAppBar) postTitle else "",
             shareUrl = shareUrl,
             onTranslate = if (!post.content.isNullOrBlank()) onTranslate else null,
             isTranslating = translationState.isTranslating,
             isTranslateActive = translationState.showTranslation,
             onScrollToTop = onScrollToTop,
+            leadingActions = {
+              if (hasLoadableFullImages) {
+                LoadFullSizeImagesIconButton(
+                    isActive = allFullImagesRequested,
+                    onClick = { onFullImagesRequested(loadableFullImageUrls) },
+                )
+              }
+            },
         )
       },
       floatingActionButton = {
@@ -350,9 +412,16 @@ private fun PostDetailPage(
         }
       },
   ) { paddingValues ->
-    val imageFiles = remember(post) { post.imageFiles() }
     val videoFiles = remember(post) { post.allFiles().filter { it.isVideo() } }
     val otherFiles = remember(post) { post.allFiles().filter { !it.isImage() && !it.isVideo() } }
+    val knownAttachmentCount = post.attachmentCount ?: post.allFiles().size
+    val knownRenderedAttachmentCount = imageFiles.size + videoFiles.size + otherFiles.size
+    val loadingAttachmentSkeletonCount =
+        if (isDetailLoading) {
+          (knownAttachmentCount - knownRenderedAttachmentCount).coerceAtLeast(0)
+        } else {
+          0
+        }
     val commentsItemIndex =
         remember(
             post.title,
@@ -360,6 +429,8 @@ private fun PostDetailPage(
             post.content,
             imageFiles.size,
             otherFiles.size,
+            videoFiles.size,
+            loadingAttachmentSkeletonCount,
             post.embed,
         ) {
           var index = 0
@@ -370,6 +441,7 @@ private fun PostDetailPage(
           if (!post.content.isNullOrBlank()) index += 1
           index += imageFiles.size
           index += videoFiles.size
+          index += loadingAttachmentSkeletonCount
           if (otherFiles.isNotEmpty()) index += 1
           val embed = post.embed
           if (embed != null && !embed.url.isNullOrBlank()) index += 1
@@ -382,10 +454,10 @@ private fun PostDetailPage(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
       // ── Title ──────────────────────────────────────────────────────
-      if (!post.title.isNullOrBlank()) {
-        item {
+      if (postTitle.isNotBlank()) {
+        item(key = PostTitleItemKey) {
           Text(
-              text = post.title,
+              text = postTitle,
               style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
               modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 4.dp),
           )
@@ -443,6 +515,7 @@ private fun PostDetailPage(
               modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
               horizontalArrangement = Arrangement.spacedBy(10.dp),
               verticalArrangement = Arrangement.spacedBy(6.dp),
+              itemVerticalAlignment = Alignment.CenterVertically,
           ) {
             if (!post.published.isNullOrBlank()) {
               PostInfoMetric(
@@ -456,17 +529,16 @@ private fun PostDetailPage(
                   text = post.added.take(10),
               )
             }
-            PostInfoMetric(
-                icon = Icons.CommentW400Outlined,
-                text = comments.size.toString(),
-                onClick = { scope.launch { listState.animateScrollToItem(commentsItemIndex) } },
-            )
             if (post.allFiles().isNotEmpty()) {
               PostInfoMetric(
                   icon = Icons.AttachFileW400Outlined,
                   text = post.allFiles().size.toString(),
               )
             }
+            PostInfoIconMetric(
+                icon = Icons.CommentW400Outlined,
+                onClick = { scope.launch { listState.animateScrollToItem(commentsItemIndex) } },
+            )
           }
         }
       }
@@ -527,7 +599,10 @@ private fun PostDetailPage(
               }
             }
           } else {
-            val htmlText = remember(post.content) { htmlToAnnotatedString(post.content) }
+            val htmlText =
+                remember(post.content) {
+                  htmlToAnnotatedString(collapseConsecutiveBlankLines(post.content))
+                }
             Text(
                 text = htmlText,
                 style = MaterialTheme.typography.bodyMedium,
@@ -539,15 +614,34 @@ private fun PostDetailPage(
 
       // ── Images ────────────────────────────────────────────────────
       itemsIndexed(imageFiles, key = { idx, _ -> "img-$idx" }) { idx, file ->
+        val fullUrl = file.fullUrl(cdnUrl)
         PostAttachmentImage(
             thumbnailUrl = file.thumbnailUrl(cdnUrl),
-            fullUrl = file.fullUrl(cdnUrl),
+            fullUrl = fullUrl,
             contentDescription = file.name,
             aspectRatioCache = imageAspectRatios,
+            loadFullSizeImage = !fullUrl.isNullOrBlank() && fullUrl in requestedFullImageUrls,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
             shape = cardShape,
+            onFullSizeImageRequested = {
+              if (!fullUrl.isNullOrBlank()) {
+                onFullImageRequested(fullUrl)
+              }
+            },
             onClick = { onImageClick(idx) },
         )
+      }
+
+      if (loadingAttachmentSkeletonCount > 0) {
+        itemsIndexed(
+            List(loadingAttachmentSkeletonCount) { it },
+            key = { index, _ -> "attachment-loading-$index" },
+        ) { _, _ ->
+          PostAttachmentSkeleton(
+              modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+              shape = cardShape,
+          )
+        }
       }
 
       // ── Videos ───────────────────────────────────────────────────
@@ -649,7 +743,10 @@ private fun PostDetailPage(
 
 @Composable
 private fun TranslatedBlockItem(block: TranslationBlockState, showDivider: Boolean) {
-  val originalText = remember(block.originalHtml) { htmlToAnnotatedString(block.originalHtml) }
+  val originalText =
+      remember(block.originalHtml) {
+        htmlToAnnotatedString(collapseConsecutiveBlankLines(block.originalHtml))
+      }
   SelectionContainer {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
       Text(
@@ -662,7 +759,8 @@ private fun TranslatedBlockItem(block: TranslationBlockState, showDivider: Boole
           text =
               when (block.status) {
                 TranslationStatus.PENDING -> "……"
-                TranslationStatus.SUCCESS -> block.translated.orEmpty()
+                TranslationStatus.SUCCESS ->
+                    collapseConsecutiveBlankLines(block.translated.orEmpty())
                 TranslationStatus.EMPTY -> ""
                 TranslationStatus.FAILURE -> "翻译失败"
                 TranslationStatus.IDLE -> ""
@@ -705,6 +803,25 @@ private fun PostInfoMetric(
 }
 
 @Composable
+private fun PostInfoIconMetric(
+    icon: ImageVector,
+    onClick: (() -> Unit)? = null,
+) {
+  Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(4.dp),
+      modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+  ) {
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(12.dp),
+    )
+  }
+}
+
+@Composable
 private fun PostInfoSkeleton() {
   FlowRow(
       modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
@@ -734,6 +851,14 @@ private fun PostTagsSkeleton() {
       )
     }
   }
+}
+
+@Composable
+private fun PostAttachmentSkeleton(
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(14.dp),
+) {
+  SkeletonBlock(modifier = modifier.fillMaxWidth().aspectRatio(1f).clip(shape))
 }
 
 @Composable
@@ -882,7 +1007,10 @@ private fun CommentRow(comment: Comment, onParentClick: (() -> Unit)?) {
         )
       }
       if (comment.content.isNotBlank()) {
-        val html = remember(comment.content) { htmlToAnnotatedString(comment.content) }
+        val html =
+            remember(comment.content) {
+              htmlToAnnotatedString(collapseConsecutiveBlankLines(comment.content))
+            }
         Text(
             text = html,
             style = MaterialTheme.typography.bodySmall,
@@ -890,6 +1018,27 @@ private fun CommentRow(comment: Comment, onParentClick: (() -> Unit)?) {
         )
       }
     }
+  }
+}
+
+@Composable
+private fun LoadFullSizeImagesIconButton(
+    isActive: Boolean,
+    onClick: () -> Unit,
+) {
+  IconButton(
+      onClick = onClick,
+      enabled = !isActive,
+      modifier = Modifier.size(32.dp),
+  ) {
+    Icon(
+        imageVector = if (isActive) Icons.HdW400Outlinedfill1 else Icons.HdW400Outlined,
+        contentDescription = "加载大图",
+        modifier = Modifier.size(18.dp),
+        tint =
+            if (isActive) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }
 
@@ -901,19 +1050,33 @@ private fun PostAttachmentImage(
     fullUrl: String?,
     contentDescription: String?,
     aspectRatioCache: MutableMap<String, Float>,
+    loadFullSizeImage: Boolean,
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(14.dp),
+    onFullSizeImageRequested: () -> Unit,
     onClick: () -> Unit,
 ) {
   val hasDistinctFullUrl = !fullUrl.isNullOrBlank() && fullUrl != thumbnailUrl
   var showFullImage by remember(thumbnailUrl, fullUrl) { mutableStateOf(!hasDistinctFullUrl) }
   var fullImageLoaded by remember(thumbnailUrl, fullUrl) { mutableStateOf(!hasDistinctFullUrl) }
+  var loadLifecycleState by
+      remember(thumbnailUrl, fullUrl) { mutableStateOf(ImageLoadLifecycleState.Idle) }
+  LaunchedEffect(loadFullSizeImage, hasDistinctFullUrl) {
+    if (loadFullSizeImage && hasDistinctFullUrl) {
+      showFullImage = true
+    }
+  }
   val url = if (showFullImage) fullUrl ?: thumbnailUrl else thumbnailUrl ?: fullUrl
   if (url.isNullOrBlank()) return
+  val progressState =
+      rememberImageLoadProgressState(
+          progressKey = if (url == fullUrl) fullUrl else null,
+          lifecycleState = loadLifecycleState,
+      )
   val aspectRatio = aspectRatioCache[url] ?: thumbnailUrl?.let { aspectRatioCache[it] }
   val clickAction = {
-    if (hasDistinctFullUrl && !fullImageLoaded) {
-      showFullImage = true
+    if (hasDistinctFullUrl && !loadFullSizeImage && !fullImageLoaded) {
+      onFullSizeImageRequested()
     } else {
       onClick()
     }
@@ -928,7 +1091,9 @@ private fun PostAttachmentImage(
               .aspectRatio(aspectRatio ?: 1f)
               .clip(shape)
               .clickable(onClick = clickAction),
+      onLoading = { loadLifecycleState = ImageLoadLifecycleState.Loading },
       onSuccess = { state ->
+        loadLifecycleState = ImageLoadLifecycleState.Success
         val size = state.painter.intrinsicSize
         if (
             size.width > 0f && size.height > 0f && size.width.isFinite() && size.height.isFinite()
@@ -938,12 +1103,30 @@ private fun PostAttachmentImage(
         fullImageLoaded = !hasDistinctFullUrl || url == fullUrl
       },
       onError = {
+        loadLifecycleState = ImageLoadLifecycleState.Error
         if (url == fullUrl && hasDistinctFullUrl) {
           showFullImage = false
           fullImageLoaded = false
         }
       },
-      loading = { SkeletonBlock(modifier = Modifier.fillMaxSize()) },
+      loading = {
+        if (url == fullUrl && !thumbnailUrl.isNullOrBlank()) {
+          Box(modifier = Modifier.fillMaxSize()) {
+            NetworkImage(
+                url = thumbnailUrl,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+                contentDescription = contentDescription,
+            )
+            TopLinearImageLoadingProgress(
+                progressState = progressState,
+                modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+            )
+          }
+        } else {
+          SkeletonBlock(modifier = Modifier.fillMaxSize())
+        }
+      },
       error = {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
       },

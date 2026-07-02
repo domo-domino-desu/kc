@@ -16,6 +16,8 @@ import ddd.kc.data.repository.PostRepository
 import ddd.kc.domain.translation.TranslationBlockResult
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.PAGER_NEXT_PREFETCH_COUNT
+import ddd.kc.ui.state.PaginationReducer
+import ddd.kc.ui.state.PaginationSnapshot
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
 import ddd.kc.util.logging.KcLog
@@ -42,6 +44,7 @@ class CreatorScreenModel(
     ) {
 
   private var favoriteStatusDisabled = false
+  private val postReducer = PaginationReducer<Post, String> { it.id }
 
   fun onPageChanged(index: Int) {
     log.d { "打开Creator -> 切换(index=$index)" }
@@ -66,18 +69,27 @@ class CreatorScreenModel(
     }
   }
 
-  fun getCreatorPosts(creator: Creator): List<Post> =
-      mutableState.value.creatorPosts[creator.id] ?: emptyList()
+  fun getCreatorPosts(creator: Creator): List<Post> = getCreatorPostSnapshot(creator).items
 
-  fun loadCreatorAnnouncements(creator: Creator) {
-    if (mutableState.value.creatorAnnouncements.containsKey(creator.id)) return
+  fun getCreatorPostSnapshot(creator: Creator): PaginationSnapshot<Post> =
+      mutableState.value.creatorPostSnapshots[creator.id] ?: PaginationSnapshot()
+
+  fun loadCreatorAnnouncements(creator: Creator, forceRefresh: Boolean = false) {
+    if (!forceRefresh && mutableState.value.creatorAnnouncements.containsKey(creator.id)) return
     mutableState.value =
         mutableState.value.copy(
             loadingCreatorAnnouncementIds =
                 mutableState.value.loadingCreatorAnnouncementIds + creator.id
         )
     screenModelScope.launch {
-      runCatching { creatorRepo.getCreatorAnnouncements(platform, creator.service, creator.id) }
+      runCatching {
+            creatorRepo.getCreatorAnnouncements(
+                platform,
+                creator.service,
+                creator.id,
+                forceRefresh,
+            )
+          }
           .onSuccess { announcements ->
             mutableState.value =
                 mutableState.value.copy(
@@ -275,24 +287,44 @@ class CreatorScreenModel(
     }
   }
 
-  fun loadCreatorPosts(creator: Creator, offset: Int = 0) {
-    if (offset == 0 && mutableState.value.creatorPosts.containsKey(creator.id)) return
+  fun loadCreatorPosts(creator: Creator, offset: Int = 0, forceRefresh: Boolean = false) {
+    val existing = getCreatorPostSnapshot(creator)
+    if (offset == 0 && !forceRefresh && (existing.items.isNotEmpty() || existing.loading)) return
+    val loading = postReducer.beginLoad(existing, forceRefresh)
     mutableState.value =
         mutableState.value.copy(
-            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id
+            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id,
+            creatorPostSnapshots =
+                mutableState.value.creatorPostSnapshots + (creator.id to loading),
         )
     screenModelScope.launch {
       log.i {
         "加载Creator Posts -> 开始(service=${creator.service},creator=${creator.id},offset=$offset)"
       }
-      runCatching { postRepo.getCreatorPosts(platform, creator.service, creator.id, offset, false) }
-          .onSuccess { posts ->
-            val existing = mutableState.value.creatorPosts[creator.id] ?: emptyList()
-            val merged = if (offset == 0) posts else existing + posts
+      runCatching {
+            postRepo.getCreatorPostsPage(
+                platform,
+                creator.service,
+                creator.id,
+                offset,
+                forceRefresh,
+            )
+          }
+          .onSuccess { page ->
+            val posts = page.items
+            val snapshot =
+                postReducer.reduceFirstPage(
+                    getCreatorPostSnapshot(creator),
+                    posts,
+                    page.pageInfo?.hasNext ?: (posts.size >= PAGE_SIZE),
+                    offset + posts.size,
+                    page.pageInfo,
+                )
             mutableState.value =
                 mutableState.value.copy(
                     loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
-                    creatorPosts = mutableState.value.creatorPosts + (creator.id to merged),
+                    creatorPostSnapshots =
+                        mutableState.value.creatorPostSnapshots + (creator.id to snapshot),
                 )
             log.i {
               "加载Creator Posts -> 成功(service=${creator.service},creator=${creator.id},offset=$offset,count=${posts.size})"
@@ -301,7 +333,14 @@ class CreatorScreenModel(
           .onFailure {
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    creatorPostSnapshots =
+                        mutableState.value.creatorPostSnapshots +
+                            (creator.id to
+                                postReducer.reduceFirstPageError(
+                                    getCreatorPostSnapshot(creator),
+                                    it,
+                                )),
                 )
             log.e(it) {
               "加载Creator Posts -> 失败(service=${creator.service},creator=${creator.id},offset=$offset)"
@@ -310,14 +349,162 @@ class CreatorScreenModel(
     }
   }
 
-  fun loadCreatorTags(creator: Creator) {
-    if (mutableState.value.creatorTags.containsKey(creator.id)) return
+  fun loadMoreCreatorPosts(creator: Creator) {
+    val current = getCreatorPostSnapshot(creator)
+    if (!postReducer.canLoadMore(current)) return
+    val appending = postReducer.beginAppend(current)
+    mutableState.value =
+        mutableState.value.copy(
+            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id,
+            creatorPostSnapshots =
+                mutableState.value.creatorPostSnapshots + (creator.id to appending),
+        )
+    screenModelScope.launch {
+      val offset = current.offset
+      runCatching {
+            postRepo.getCreatorPostsPage(platform, creator.service, creator.id, offset, false)
+          }
+          .onSuccess { page ->
+            val posts = page.items
+            val snapshot =
+                postReducer.reduceAppend(
+                    appending,
+                    posts,
+                    page.pageInfo?.hasNext ?: (posts.size >= PAGE_SIZE),
+                    offset + posts.size,
+                    null,
+                )
+            mutableState.value =
+                mutableState.value.copy(
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    creatorPostSnapshots =
+                        mutableState.value.creatorPostSnapshots + (creator.id to snapshot),
+                )
+          }
+          .onFailure {
+            mutableState.value =
+                mutableState.value.copy(
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    creatorPostSnapshots =
+                        mutableState.value.creatorPostSnapshots +
+                            (creator.id to postReducer.reduceAppendError(appending, it)),
+                )
+          }
+    }
+  }
+
+  fun loadPreviousCreatorPosts(creator: Creator) {
+    val current = getCreatorPostSnapshot(creator)
+    if (!postReducer.canLoadPrevious(current)) return
+    val offset = (current.startOffset - PAGE_SIZE).coerceAtLeast(0)
+    val prepending = postReducer.beginPrepend(current)
+    mutableState.value =
+        mutableState.value.copy(
+            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id,
+            creatorPostSnapshots =
+                mutableState.value.creatorPostSnapshots + (creator.id to prepending),
+        )
+    screenModelScope.launch {
+      runCatching {
+            postRepo.getCreatorPostsPage(platform, creator.service, creator.id, offset, false)
+          }
+          .onSuccess { page ->
+            val snapshot =
+                postReducer.reducePrepend(
+                    prepending,
+                    page.items,
+                    getCreatorPostSnapshot(creator).hasMore,
+                    offset,
+                    null,
+                )
+            mutableState.value =
+                mutableState.value.copy(
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    creatorPostSnapshots =
+                        mutableState.value.creatorPostSnapshots + (creator.id to snapshot),
+                )
+          }
+          .onFailure {
+            mutableState.value =
+                mutableState.value.copy(
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    creatorPostSnapshots =
+                        mutableState.value.creatorPostSnapshots +
+                            (creator.id to postReducer.reducePrependError(prepending, it)),
+                )
+          }
+    }
+  }
+
+  fun jumpCreatorPostsToPage(creator: Creator, page: Int) {
+    val current = getCreatorPostSnapshot(creator)
+    val targetPage = page.coerceIn(1, current.pageInfo?.lastPage ?: page.coerceAtLeast(1))
+    val offset = (targetPage - 1) * PAGE_SIZE
+    val loading = postReducer.beginJump(current, offset)
+    mutableState.value =
+        mutableState.value.copy(
+            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id,
+            creatorPostSnapshots =
+                mutableState.value.creatorPostSnapshots + (creator.id to loading),
+        )
+    screenModelScope.launch {
+      runCatching {
+            postRepo.getCreatorPostsPage(platform, creator.service, creator.id, offset, false)
+          }
+          .onSuccess { pageResult ->
+            val posts = pageResult.items
+            val snapshot =
+                postReducer.reduceFirstPage(
+                    getCreatorPostSnapshot(creator),
+                    posts,
+                    pageResult.pageInfo?.hasNext ?: (posts.size >= PAGE_SIZE),
+                    offset + posts.size,
+                    pageResult.pageInfo,
+                )
+            mutableState.value =
+                mutableState.value.copy(
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    creatorPostSnapshots =
+                        mutableState.value.creatorPostSnapshots + (creator.id to snapshot),
+                )
+          }
+          .onFailure {
+            mutableState.value =
+                mutableState.value.copy(
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    creatorPostSnapshots =
+                        mutableState.value.creatorPostSnapshots +
+                            (creator.id to postReducer.reduceJumpError(current, it)),
+                )
+          }
+    }
+  }
+
+  fun onCreatorPostVisibleIndex(creator: Creator, firstVisiblePostIndex: Int) {
+    val current = getCreatorPostSnapshot(creator)
+    val next =
+        postReducer.updateVisiblePage(
+            current,
+            firstVisibleItemIndex = firstVisiblePostIndex,
+            pageSize = PAGE_SIZE,
+        )
+    if (next === current || next == current) return
+    mutableState.value =
+        mutableState.value.copy(
+            creatorPostSnapshots = mutableState.value.creatorPostSnapshots + (creator.id to next),
+        )
+  }
+
+  fun loadCreatorTags(creator: Creator, forceRefresh: Boolean = false) {
+    if (!forceRefresh && mutableState.value.creatorTags.containsKey(creator.id)) return
     mutableState.value =
         mutableState.value.copy(
             loadingCreatorTagIds = mutableState.value.loadingCreatorTagIds + creator.id
         )
     screenModelScope.launch {
-      runCatching { creatorRepo.getCreatorTags(platform, creator.service, creator.id) }
+      runCatching {
+            creatorRepo.getCreatorTags(platform, creator.service, creator.id, forceRefresh)
+          }
           .onSuccess { tags ->
             mutableState.value =
                 mutableState.value.copy(
@@ -341,10 +528,12 @@ class CreatorScreenModel(
   fun getCreatorTags(creator: Creator): List<Tag> =
       mutableState.value.creatorTags[creator.id] ?: emptyList()
 
-  fun loadCreatorLinks(creator: Creator) {
-    if (mutableState.value.creatorLinks.containsKey(creator.id)) return
+  fun loadCreatorLinks(creator: Creator, forceRefresh: Boolean = false) {
+    if (!forceRefresh && mutableState.value.creatorLinks.containsKey(creator.id)) return
     screenModelScope.launch {
-      runCatching { creatorRepo.getCreatorLinks(platform, creator.service, creator.id) }
+      runCatching {
+            creatorRepo.getCreatorLinks(platform, creator.service, creator.id, forceRefresh)
+          }
           .onSuccess { links ->
             mutableState.value =
                 mutableState.value.copy(
@@ -459,8 +648,8 @@ class CreatorScreenModel(
     }
   }
 
-  fun loadDiscordChannels(creator: Creator) {
-    if (mutableState.value.creatorDiscordChannels.containsKey(creator.id)) return
+  fun loadDiscordChannels(creator: Creator, forceRefresh: Boolean = false) {
+    if (!forceRefresh && mutableState.value.creatorDiscordChannels.containsKey(creator.id)) return
     mutableState.value =
         mutableState.value.copy(
             loadingCreatorDiscordChannelIds =

@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,26 +75,35 @@ import ddd.kc.data.model.DiscordChannel
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.bannerUrl
+import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlinedfill1
+import ddd.kc.ui.components.CreatorBannerFallback
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
+import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.ListLoadingSkeleton
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.PostCard
+import ddd.kc.ui.components.PostGridPagingActions
+import ddd.kc.ui.components.PostGridPagingControls
+import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.components.TranslateIconButton
 import ddd.kc.ui.components.gridSkeletonItems
+import ddd.kc.ui.components.loadingFooter
 import ddd.kc.ui.icons.rememberServiceIconDefinition
 import ddd.kc.ui.icons.serviceIconVector
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.discord.DiscordChannelRouteScreen
+import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.ui.pages.tagposts.TagPostsScreen
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.util.collapseConsecutiveBlankLines
 import ddd.kc.util.logging.KcLog
 import ddd.kc.util.logging.summarizePost
 import kc.shared.generated.resources.Res
@@ -107,6 +118,7 @@ import kc.shared.generated.resources.no_discord_channels
 import kc.shared.generated.resources.no_tags
 import kc.shared.generated.resources.remove_favorite
 import kc.shared.generated.resources.similar_accounts
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 
@@ -169,12 +181,20 @@ class CreatorRouteScreen(
             platform = platform,
             state = state,
             screenModel = screenModel,
-            onPostClick = { post, posts ->
+            onPostClick = { post, posts, startOffset, hasMore ->
               log.i {
                 "打开Post -> 点击来源(source=creator,platform=${platform.name},${summarizePost(post)})"
               }
               navigator.push(
-                  PostRouteScreen(platform, posts, posts.indexOf(post), source = "creator")
+                  PostRouteScreen(
+                      platform,
+                      posts,
+                      posts.indexOf(post),
+                      source = "creator",
+                      initialOffset = startOffset,
+                      initialHasMore = hasMore,
+                      pagingContext = PostPagingContext.Creator(post.service, post.creatorId),
+                  )
               )
             },
             onTagClick = { tag -> navigator.push(TagPostsScreen(platform, tag)) },
@@ -209,7 +229,7 @@ private fun CreatorDetailPage(
     platform: Platform,
     state: CreatorPagerUiState,
     screenModel: CreatorScreenModel,
-    onPostClick: (Post, List<Post>) -> Unit,
+    onPostClick: (Post, List<Post>, Int, Boolean) -> Unit,
     onTagClick: (String) -> Unit,
     onCreatorListOpen: (String, List<Creator>, Boolean) -> Unit,
     onDiscordChannelClick: (List<DiscordChannel>, Int) -> Unit,
@@ -220,8 +240,12 @@ private fun CreatorDetailPage(
   val cellWidth = appSettings.cellMinWidthDp()
   val isDiscord = creator.service == "discord"
   var selectedTab by remember(creator.id) { mutableIntStateOf(0) }
+  val gridState = rememberLazyGridState()
+  val postSnapshot = screenModel.getCreatorPostSnapshot(creator)
   val posts = screenModel.getCreatorPosts(creator)
   val announcements = screenModel.getCreatorAnnouncements(creator)
+  val tags = screenModel.getCreatorTags(creator)
+  val discordChannels = screenModel.getDiscordChannels(creator)
   val isFavorite = creator.id in state.favoriteCreatorIds
   val isLoadingPosts = creator.id in state.loadingCreatorPostIds
   val isLoadingAnnouncements = creator.id in state.loadingCreatorAnnouncementIds
@@ -230,7 +254,42 @@ private fun CreatorDetailPage(
   val linkedCreators = screenModel.getCreatorLinks(creator)
   val recommended = screenModel.getRecommendedCreators(creator)
   val announcementTranslations = state.announcementTranslations[creator.id] ?: emptyMap()
+  val refresh = {
+    if (isDiscord) {
+      screenModel.loadDiscordChannels(creator, forceRefresh = true)
+    } else {
+      when (selectedTab) {
+        0 -> screenModel.loadCreatorPosts(creator, forceRefresh = true)
+        1 -> screenModel.loadCreatorAnnouncements(creator, forceRefresh = true)
+        2 -> screenModel.loadCreatorTags(creator, forceRefresh = true)
+      }
+    }
+  }
+  val isCurrentTabLoading =
+      if (isDiscord) {
+        isLoadingDiscordChannels
+      } else {
+        when (selectedTab) {
+          0 -> isLoadingPosts
+          1 -> isLoadingAnnouncements
+          2 -> isLoadingTags
+          else -> false
+        }
+      }
+  val hasCurrentTabContent =
+      if (isDiscord) {
+        discordChannels.isNotEmpty()
+      } else {
+        when (selectedTab) {
+          0 -> posts.isNotEmpty()
+          1 -> announcements.isNotEmpty()
+          2 -> tags.isNotEmpty()
+          else -> false
+        }
+      }
   ErrorToastEffect(state.favoriteErrorMessage)
+  ErrorToastEffect(postSnapshot.appendErrorMessage)
+  ErrorToastEffect(postSnapshot.prependErrorMessage)
 
   LaunchedEffect(creator.id) {
     if (isDiscord) {
@@ -246,6 +305,13 @@ private fun CreatorDetailPage(
   }
 
   val shareUrl = "${platform.defaultBaseUrl}/${creator.service}/user/${creator.id}"
+  if (!isDiscord && selectedTab == 0) {
+    LaunchedEffect(gridState, creator.id, selectedTab) {
+      snapshotFlow { gridState.firstVisibleItemIndex }
+          .distinctUntilChanged()
+          .collect { index -> screenModel.onCreatorPostVisibleIndex(creator, index - 2) }
+    }
+  }
   Scaffold(
       topBar = {
         DetailAppBar(
@@ -254,213 +320,279 @@ private fun CreatorDetailPage(
         )
       },
   ) { paddingValues ->
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = cellWidth.dp),
+    KcPullRefreshBox(
+        enabled = !isCurrentTabLoading,
+        refreshing = isCurrentTabLoading && hasCurrentTabContent,
+        onRefresh = refresh,
         modifier = Modifier.fillMaxSize().padding(paddingValues),
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-      // ── Creator card ───────────────────────────────────────────────
-      item(span = { GridItemSpan(maxLineSpan) }) {
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            border =
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+      Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = cellWidth.dp),
+            state = gridState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          Column {
-            // Banner
-            NetworkImage(
-                url = creator.bannerUrl(baseUrl),
-                modifier = Modifier.fillMaxWidth().height(100.dp),
-                contentScale = ContentScale.Crop,
-            )
-            // Avatar + name + subscribe row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
+          // ── Creator card ───────────────────────────────────────────────
+          item(span = { GridItemSpan(maxLineSpan) }) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                border =
+                    BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                    ),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             ) {
-              // Avatar
-              Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+              Column {
+                val avatarUrl = creator.thumbnailUrl(baseUrl)
+                // Banner
                 NetworkImage(
-                    url = creator.thumbnailUrl(baseUrl),
-                    modifier = Modifier.size(54.dp).clip(CircleShape),
+                    url = creator.bannerUrl(baseUrl),
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    contentScale = ContentScale.Crop,
+                    fallbackContent = {
+                      CreatorBannerFallback(
+                          avatarSeed = avatarUrl.ifBlank { "${creator.service}:${creator.id}" }
+                      )
+                    },
+                    logFailureAsWarning = false,
                 )
-              }
-              Spacer(Modifier.width(12.dp))
-              // Name + chips
-              Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = creator.name,
-                    style =
-                        MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                )
-                Spacer(Modifier.height(4.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                // Avatar + name + subscribe row
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                  // Service pill (platform)
-                  CreatorPill(text = creator.service, service = creator.service) {}
-                  if (linkedCreators.isNotEmpty()) {
-                    val linkedLabel =
-                        stringResource(Res.string.linked_accounts, linkedCreators.size)
-                    CreatorPill(text = linkedLabel) {
-                      onCreatorListOpen(linkedLabel, linkedCreators, false)
+                  // Avatar
+                  Surface(
+                      shape = CircleShape,
+                      color = MaterialTheme.colorScheme.secondaryContainer,
+                  ) {
+                    NetworkImage(
+                        url = avatarUrl,
+                        modifier = Modifier.size(54.dp).clip(CircleShape),
+                    )
+                  }
+                  Spacer(Modifier.width(12.dp))
+                  // Name + chips
+                  Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = creator.name,
+                        style =
+                            MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                      // Service pill (platform)
+                      CreatorPill(text = creator.service, service = creator.service) {}
+                      if (linkedCreators.isNotEmpty()) {
+                        val linkedLabel =
+                            stringResource(Res.string.linked_accounts, linkedCreators.size)
+                        CreatorPill(text = linkedLabel) {
+                          onCreatorListOpen(linkedLabel, linkedCreators, false)
+                        }
+                      }
+                      if (recommended.isNotEmpty()) {
+                        val similarLabel =
+                            stringResource(Res.string.similar_accounts, recommended.size)
+                        CreatorPill(text = similarLabel) {
+                          onCreatorListOpen(similarLabel, recommended, true)
+                        }
+                      }
                     }
                   }
-                  if (recommended.isNotEmpty()) {
-                    val similarLabel = stringResource(Res.string.similar_accounts, recommended.size)
-                    CreatorPill(text = similarLabel) {
-                      onCreatorListOpen(similarLabel, recommended, true)
-                    }
-                  }
-                }
-              }
-              Spacer(Modifier.width(8.dp))
-              // Subscribe / Favorite button
-              FilledTonalIconButton(
-                  onClick = { screenModel.toggleFavoriteCreator(creator) },
-                  modifier = Modifier.size(48.dp),
-              ) {
-                Icon(
-                    imageVector =
-                        if (isFavorite) Icons.FavoriteW400Outlinedfill1
-                        else Icons.FavoriteW400Outlined,
-                    contentDescription =
-                        if (isFavorite) stringResource(Res.string.remove_favorite)
-                        else stringResource(Res.string.add_favorite),
-                )
-              }
-            }
-          }
-        }
-      }
-
-      // ── Tab row ────────────────────────────────────────────────────
-      stickyHeader {
-        val tabLabels =
-            if (isDiscord) {
-              listOf(stringResource(Res.string.creator_tab_discord_channels))
-            } else {
-              listOf(
-                  stringResource(Res.string.creator_tab_posts),
-                  stringResource(Res.string.creator_tab_announcements),
-                  stringResource(Res.string.creator_tab_tags),
-              )
-            }
-        ButtonGroup(
-            overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
-            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-            modifier =
-                Modifier.fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(vertical = 8.dp),
-        ) {
-          tabLabels.forEachIndexed { index, label ->
-            toggleableItem(
-                checked = selectedTab == index,
-                label = label,
-                onCheckedChange = { selectedTab = index },
-                weight = 1f,
-            )
-          }
-        }
-      }
-
-      // ── Tab content ────────────────────────────────────────────────
-      if (isDiscord) {
-        // Discord: tab 0 = channel list
-        val channels = screenModel.getDiscordChannels(creator)
-        if (isLoadingDiscordChannels && channels.isEmpty()) {
-          item(span = { GridItemSpan(maxLineSpan) }) {
-            ListLoadingSkeleton(itemCount = 5, itemHeightDp = 56)
-          }
-        } else if (channels.isEmpty()) {
-          item(span = { GridItemSpan(maxLineSpan) }) {
-            Text(stringResource(Res.string.no_discord_channels), modifier = Modifier.padding(16.dp))
-          }
-        } else {
-          items(
-              channels,
-              key = { it.id },
-              span = { GridItemSpan(maxLineSpan) },
-          ) { channel ->
-            DiscordChannelRow(
-                channel = channel,
-                onClick = { onDiscordChannelClick(channels, channels.indexOf(channel)) },
-            )
-          }
-        }
-      } else {
-        when (selectedTab) {
-          0 -> {
-            if (isLoadingPosts && posts.isEmpty()) {
-              gridSkeletonItems()
-            } else {
-              items(posts, key = { it.id }) { post ->
-                PostCard(
-                    post = post,
-                    platform = platform,
-                    onClick = { onPostClick(post, posts) },
-                )
-              }
-            }
-          }
-          1 -> {
-            if (isLoadingAnnouncements && announcements.isEmpty()) {
-              item(span = { GridItemSpan(maxLineSpan) }) {
-                ListLoadingSkeleton(itemCount = 3, itemHeightDp = 88)
-              }
-            } else if (announcements.isEmpty()) {
-              item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    stringResource(Res.string.no_announcements),
-                    modifier = Modifier.padding(16.dp),
-                )
-              }
-            } else {
-              announcements.forEach { announcement ->
-                item(
-                    key =
-                        announcement.hash.ifBlank {
-                          "${announcement.service}:${announcement.userId}:${announcement.added}"
-                        },
-                    span = { GridItemSpan(maxLineSpan) },
-                ) {
-                  AnnouncementCard(
-                      announcement = announcement,
-                      translationState = announcementTranslations[announcement.translationKey()],
-                      onTranslate = { screenModel.translateAnnouncement(creator, announcement) },
-                  )
-                }
-              }
-            }
-          }
-          2 -> {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-              val tags = screenModel.getCreatorTags(creator)
-              if (isLoadingTags && tags.isEmpty()) {
-                ListLoadingSkeleton(itemCount = 3, itemHeightDp = 44)
-              } else if (tags.isEmpty()) {
-                Text(stringResource(Res.string.no_tags), modifier = Modifier.padding(16.dp))
-              } else {
-                FlowRow(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                  tags.forEach { tag ->
-                    AssistChip(
-                        onClick = { onTagClick(tag.tag) },
-                        label = { Text(tag.tag) },
+                  Spacer(Modifier.width(8.dp))
+                  // Subscribe / Favorite button
+                  FilledTonalIconButton(
+                      onClick = { screenModel.toggleFavoriteCreator(creator) },
+                      modifier = Modifier.size(48.dp),
+                  ) {
+                    Icon(
+                        imageVector =
+                            if (isFavorite) Icons.FavoriteW400Outlinedfill1
+                            else Icons.FavoriteW400Outlined,
+                        contentDescription =
+                            if (isFavorite) stringResource(Res.string.remove_favorite)
+                            else stringResource(Res.string.add_favorite),
                     )
                   }
                 }
               }
             }
           }
+
+          // ── Tab row ────────────────────────────────────────────────────
+          stickyHeader {
+            val tabLabels =
+                if (isDiscord) {
+                  listOf(stringResource(Res.string.creator_tab_discord_channels))
+                } else {
+                  listOf(
+                      stringResource(Res.string.creator_tab_posts),
+                      stringResource(Res.string.creator_tab_announcements),
+                      stringResource(Res.string.creator_tab_tags),
+                  )
+                }
+            ButtonGroup(
+                overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
+                horizontalArrangement =
+                    Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(vertical = 8.dp),
+            ) {
+              tabLabels.forEachIndexed { index, label ->
+                toggleableItem(
+                    checked = selectedTab == index,
+                    label = label,
+                    onCheckedChange = { selectedTab = index },
+                    weight = 1f,
+                )
+              }
+            }
+          }
+
+          // ── Tab content ────────────────────────────────────────────────
+          if (isDiscord) {
+            // Discord: tab 0 = channel list
+            val channels = screenModel.getDiscordChannels(creator)
+            if (isLoadingDiscordChannels && channels.isEmpty()) {
+              item(span = { GridItemSpan(maxLineSpan) }) {
+                ListLoadingSkeleton(itemCount = 5, itemHeightDp = 56)
+              }
+            } else if (channels.isEmpty()) {
+              item(span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    stringResource(Res.string.no_discord_channels),
+                    modifier = Modifier.padding(16.dp),
+                )
+              }
+            } else {
+              items(
+                  channels,
+                  key = { it.id },
+                  span = { GridItemSpan(maxLineSpan) },
+              ) { channel ->
+                DiscordChannelRow(
+                    channel = channel,
+                    onClick = { onDiscordChannelClick(channels, channels.indexOf(channel)) },
+                )
+              }
+            }
+          } else {
+            when (selectedTab) {
+              0 -> {
+                if (isLoadingPosts && posts.isEmpty()) {
+                  gridSkeletonItems()
+                } else {
+                  items(posts, key = { it.id }) { post ->
+                    PostCard(
+                        post = post,
+                        platform = platform,
+                        onClick = {
+                          onPostClick(post, posts, postSnapshot.startOffset, postSnapshot.hasMore)
+                        },
+                    )
+                  }
+                  loadingFooter(postSnapshot.isLoadingMore, postSnapshot.appendErrorMessage)
+                }
+              }
+              1 -> {
+                if (isLoadingAnnouncements && announcements.isEmpty()) {
+                  item(span = { GridItemSpan(maxLineSpan) }) {
+                    ListLoadingSkeleton(itemCount = 3, itemHeightDp = 88)
+                  }
+                } else if (announcements.isEmpty()) {
+                  item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        stringResource(Res.string.no_announcements),
+                        modifier = Modifier.padding(16.dp),
+                    )
+                  }
+                } else {
+                  announcements.forEach { announcement ->
+                    item(
+                        key =
+                            announcement.hash.ifBlank {
+                              "${announcement.service}:${announcement.userId}:${announcement.added}"
+                            },
+                        span = { GridItemSpan(maxLineSpan) },
+                    ) {
+                      AnnouncementCard(
+                          announcement = announcement,
+                          translationState =
+                              announcementTranslations[announcement.translationKey()],
+                          onTranslate = {
+                            screenModel.translateAnnouncement(creator, announcement)
+                          },
+                      )
+                    }
+                  }
+                }
+              }
+              2 -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                  val tags = screenModel.getCreatorTags(creator)
+                  if (isLoadingTags && tags.isEmpty()) {
+                    ListLoadingSkeleton(itemCount = 3, itemHeightDp = 44)
+                  } else if (tags.isEmpty()) {
+                    Text(stringResource(Res.string.no_tags), modifier = Modifier.padding(16.dp))
+                  } else {
+                    FlowRow(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                      tags.forEach { tag ->
+                        AssistChip(
+                            onClick = { onTagClick(tag.tag) },
+                            label = { Text(tag.tag) },
+                        )
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (!isDiscord && selectedTab == 0) {
+          PostGridPagingControls(
+              state =
+                  PostGridPagingState(
+                      posts = posts,
+                      visiblePageInfo = postSnapshot.visiblePageInfo,
+                      loading = postSnapshot.loading,
+                      refreshing = postSnapshot.refreshing,
+                      isLoadingMore = postSnapshot.isLoadingMore,
+                      isLoadingPrevious = postSnapshot.isLoadingPrevious,
+                      hasMore = postSnapshot.hasMore,
+                      canLoadPrevious = postSnapshot.canAutoLoadPrevious,
+                      appendErrorMessage = postSnapshot.appendErrorMessage,
+                  ),
+              actions =
+                  PostGridPagingActions(
+                      onRefresh = refresh,
+                      onLoadMore = { screenModel.loadMoreCreatorPosts(creator) },
+                      onLoadPrevious = { screenModel.loadPreviousCreatorPosts(creator) },
+                      onJumpToPage = { page -> screenModel.jumpCreatorPostsToPage(creator, page) },
+                      onVisiblePostIndex = { index ->
+                        screenModel.onCreatorPostVisibleIndex(creator, index)
+                      },
+                      onPostClick = {},
+                  ),
+              gridState = gridState,
+              leadingItemCount = 2,
+          )
         }
       }
     }
@@ -511,7 +643,10 @@ private fun AnnouncementCard(
           }
         }
       } else {
-        val html = remember(announcement.content) { htmlToAnnotatedString(announcement.content) }
+        val html =
+            remember(announcement.content) {
+              htmlToAnnotatedString(collapseConsecutiveBlankLines(announcement.content))
+            }
         SelectionContainer {
           Text(
               text = html,
@@ -526,7 +661,10 @@ private fun AnnouncementCard(
 
 @Composable
 private fun AnnouncementTranslatedBlockItem(block: TranslationBlockState, showDivider: Boolean) {
-  val originalText = remember(block.originalHtml) { htmlToAnnotatedString(block.originalHtml) }
+  val originalText =
+      remember(block.originalHtml) {
+        htmlToAnnotatedString(collapseConsecutiveBlankLines(block.originalHtml))
+      }
   SelectionContainer {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
       Text(
@@ -539,7 +677,8 @@ private fun AnnouncementTranslatedBlockItem(block: TranslationBlockState, showDi
           text =
               when (block.status) {
                 TranslationStatus.PENDING -> "……"
-                TranslationStatus.SUCCESS -> block.translated.orEmpty()
+                TranslationStatus.SUCCESS ->
+                    collapseConsecutiveBlankLines(block.translated.orEmpty())
                 TranslationStatus.EMPTY -> ""
                 TranslationStatus.FAILURE -> "翻译失败"
                 TranslationStatus.IDLE -> ""

@@ -69,6 +69,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.AttachFileW400Outlined
 import ddd.kc.ui.components.AutoLoadEffect
 import ddd.kc.ui.components.DetailAppBar
+import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.PageStateContent
 import ddd.kc.ui.components.SkeletonBlock
@@ -76,6 +77,7 @@ import ddd.kc.ui.components.loadingFooter
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.imageviewer.ImageViewerScreen
 import ddd.kc.ui.state.PaginationSnapshot
+import ddd.kc.util.collapseConsecutiveBlankLines
 import kotlinx.coroutines.launch
 import org.koin.core.parameter.parametersOf
 
@@ -136,6 +138,7 @@ class DiscordChannelRouteScreen(
             platform = platform,
             snapshot = screenModel.getSnapshot(channel),
             onLoadMore = { screenModel.loadMoreChannelPosts(channel) },
+            onRefresh = { screenModel.loadChannelPosts(channel, forceRefresh = true) },
         )
       }
     }
@@ -148,6 +151,7 @@ private fun DiscordChannelPage(
     platform: Platform,
     snapshot: PaginationSnapshot<DiscordPost>,
     onLoadMore: () -> Unit,
+    onRefresh: () -> Unit,
 ) {
   val navigator = LocalNavigator.currentOrThrow
   val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
@@ -191,33 +195,40 @@ private fun DiscordChannelPage(
         )
       },
   ) { padding ->
-    PageStateContent(snapshot = snapshot, modifier = Modifier.padding(padding)) {
-      AutoLoadEffect(
-          listState = listState,
-          totalItems = snapshot.items.size,
-          hasMore = snapshot.hasMore,
-          isLoadingMore = snapshot.isLoadingMore,
-          onLoadMore = onLoadMore,
-      )
-      LazyColumn(
-          state = listState,
-          modifier = Modifier.fillMaxSize().padding(padding),
-          contentPadding = PaddingValues(12.dp),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        items(snapshot.items, key = { it.id }) { post ->
-          DiscordMessageCard(
-              post = post,
-              cdnUrl = cdnUrl,
-              globalImageOffset = postImageOffsets[post.id] ?: 0,
-              imageAspectRatios = imageAspectRatios,
-              onImageClick = { globalIdx ->
-                navigator.push(ImageViewerScreen(allImageUrls, allThumbUrls, globalIdx))
-              },
-          )
+    KcPullRefreshBox(
+        enabled = !snapshot.loading,
+        refreshing = snapshot.refreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize().padding(padding),
+    ) {
+      PageStateContent(snapshot = snapshot) {
+        AutoLoadEffect(
+            listState = listState,
+            totalItems = snapshot.items.size,
+            hasMore = snapshot.hasMore,
+            isLoadingMore = snapshot.isLoadingMore,
+            onLoadMore = onLoadMore,
+        )
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          items(snapshot.items, key = { it.id }) { post ->
+            DiscordMessageCard(
+                post = post,
+                cdnUrl = cdnUrl,
+                globalImageOffset = postImageOffsets[post.id] ?: 0,
+                imageAspectRatios = imageAspectRatios,
+                onImageClick = { globalIdx ->
+                  navigator.push(ImageViewerScreen(allImageUrls, allThumbUrls, globalIdx))
+                },
+            )
+          }
+          loadingFooter(snapshot.isLoadingMore, snapshot.appendErrorMessage)
+          item { Spacer(Modifier.height(80.dp)) }
         }
-        loadingFooter(snapshot.isLoadingMore, snapshot.appendErrorMessage)
-        item { Spacer(Modifier.height(80.dp)) }
       }
     }
   }
@@ -293,7 +304,10 @@ private fun DiscordMessageCard(
       if (!post.content.isNullOrBlank()) {
         Spacer(Modifier.height(6.dp))
         SelectionContainer {
-          Text(text = post.content, style = MaterialTheme.typography.bodyMedium)
+          Text(
+              text = collapseConsecutiveBlankLines(post.content),
+              style = MaterialTheme.typography.bodyMedium,
+          )
         }
       }
 

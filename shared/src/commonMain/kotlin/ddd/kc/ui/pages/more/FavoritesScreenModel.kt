@@ -15,6 +15,7 @@ data class FavoritesState(
     val creators: List<Creator> = emptyList(),
     val posts: List<Post> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -24,21 +25,33 @@ class FavoritesScreenModel(
 ) : StateScreenModel<FavoritesState>(FavoritesState()) {
   private val log = KcLog.withTag("FavoritesScreenModel")
 
-  fun load(platform: Platform) {
-    mutableState.value = FavoritesState(isLoading = true)
+  fun load(platform: Platform, forceRefresh: Boolean = false) {
+    val current = mutableState.value
+    mutableState.value =
+        current.copy(
+            isLoading = current.creators.isEmpty() && current.posts.isEmpty(),
+            isRefreshing =
+                forceRefresh && (current.creators.isNotEmpty() || current.posts.isNotEmpty()),
+            errorMessage = null,
+        )
     screenModelScope.launch {
-      log.i { "收藏列表 -> 加载开始(platform=${platform.name})" }
-      val creatorsDeferred = async { runCatching { creatorRepo.getFavoriteCreators(platform) } }
-      val postsDeferred = async { runCatching { postRepo.getFavoritePosts(platform) } }
+      log.i { "收藏列表 -> 加载开始(platform=${platform.name},forceRefresh=$forceRefresh)" }
+      val creatorsDeferred = async {
+        runCatching { creatorRepo.getFavoriteCreators(platform, forceRefresh) }
+      }
+      val postsDeferred = async {
+        runCatching { postRepo.getFavoritePosts(platform, forceRefresh) }
+      }
       val creators = creatorsDeferred.await()
       val posts = postsDeferred.await()
       log.i {
         "收藏列表 -> 加载完成(platform=${platform.name},creators=${creators.getOrNull()?.size ?: 0},posts=${posts.getOrNull()?.size ?: 0})"
       }
+      val latest = mutableState.value
       mutableState.value =
           FavoritesState(
-              creators = creators.getOrDefault(emptyList()),
-              posts = posts.getOrDefault(emptyList()),
+              creators = creators.getOrDefault(latest.creators),
+              posts = posts.getOrDefault(latest.posts),
               errorMessage = (creators.exceptionOrNull() ?: posts.exceptionOrNull())?.message,
           )
     }

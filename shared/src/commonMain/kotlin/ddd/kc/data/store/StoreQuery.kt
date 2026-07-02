@@ -114,8 +114,8 @@ fun <Key : Any, Output : Any> rawBodyQueryStore(
               }
         }
 
-        override suspend fun write(key: Key, local: String) {
-          cacheDao.upsert(CacheEntity(cacheKey(key), local, currentTimeMs()))
+        override suspend fun write(key: Key, value: String) {
+          cacheDao.upsert(CacheEntity(cacheKey(key), value, currentTimeMs()))
           updates.emit(key)
         }
 
