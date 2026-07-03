@@ -37,7 +37,7 @@ data class Post(
     val poll: PostPoll? = null,
     val captions: List<PostCaption>? = null,
     @Serializable(with = FlexibleTagsSerializer::class) val tags: List<String>? = null,
-)
+) : PlatformSerializable
 
 val Post.creatorId: String
   get() = artistId ?: user
@@ -47,20 +47,20 @@ data class PostEmbed(
     val url: String? = null,
     val subject: String? = null,
     val description: String? = null,
-)
+) : PlatformSerializable
 
 @Serializable
 data class PostPoll(
     val options: List<PostPollOption> = emptyList(),
-)
+) : PlatformSerializable
 
-@Serializable data class PostPollOption(val text: String = "")
+@Serializable data class PostPollOption(val text: String = "") : PlatformSerializable
 
 @Serializable
 data class PostCaption(
     val language: String? = null,
     val content: String? = null,
-)
+) : PlatformSerializable
 
 fun Post.allFiles(): List<PostFile> = buildList {
   file?.takeIf { it.hasPath() }?.let { add(it) }

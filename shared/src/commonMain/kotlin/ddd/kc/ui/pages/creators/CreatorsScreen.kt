@@ -47,11 +47,10 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.LocalActivePlatform
-import ddd.kc.data.model.services
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ExpandMoreW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.SortW400Outlined
+import ddd.kc.ui.app.LocalActivePlatform
 import ddd.kc.ui.components.AutoLoadEffect
 import ddd.kc.ui.components.AutoLoadPreviousEffect
 import ddd.kc.ui.components.CreatorSearchCard
@@ -62,6 +61,7 @@ import ddd.kc.ui.components.SkeletonBlock
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.loadingFooter
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
+import ddd.kc.ui.icons.services
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.filter_all

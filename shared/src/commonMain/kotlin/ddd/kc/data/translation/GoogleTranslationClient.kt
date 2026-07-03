@@ -1,6 +1,5 @@
 package ddd.kc.data.translation
 
-import ddd.kc.domain.translation.TranslationRequest
 import io.ktor.http.ContentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray

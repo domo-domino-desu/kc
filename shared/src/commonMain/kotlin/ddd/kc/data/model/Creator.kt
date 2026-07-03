@@ -1,6 +1,5 @@
 package ddd.kc.data.model
 
-import ddd.kc.ui.icons.ServiceIconCatalogRepository
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -13,17 +12,8 @@ data class Creator(
     @Serializable(with = FlexibleLongSerializer::class) val updated: Long = 0L,
     val favorited: Int = 0,
     @SerialName("public_id") val publicId: String? = null,
-)
+) : PlatformSerializable
 
 fun Creator.thumbnailUrl(baseUrl: String): String = "$baseUrl/icons/${service}/${id}"
 
 fun Creator.bannerUrl(baseUrl: String): String = "$baseUrl/banners/${service}/${id}"
-
-private val pawchiveServices = listOf("patreon", "fanbox")
-
-fun Platform.services(): List<String> {
-  val catalog = ServiceIconCatalogRepository.catalog.value
-  val key = name.lowercase()
-  val fromJson = catalog?.servicesForPlatform(key)
-  return if (!fromJson.isNullOrEmpty()) fromJson else pawchiveServices
-}

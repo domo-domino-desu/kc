@@ -6,6 +6,7 @@ sealed interface PlatformBinaryFileDestination {
   data class Directory(
       val path: String,
       val relativeDirectories: List<String> = emptyList(),
+      val allowMediaIndexing: Boolean = true,
   ) : PlatformBinaryFileDestination
 
   data class File(val path: String) : PlatformBinaryFileDestination

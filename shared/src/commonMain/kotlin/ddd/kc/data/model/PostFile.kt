@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 data class PostFile(
     val name: String? = null,
     val path: String? = null,
-)
+) : PlatformSerializable
 
 private val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "webp", "avif", "jxl", "bmp")
 private val videoExtensions =

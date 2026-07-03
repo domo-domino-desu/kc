@@ -7,4 +7,4 @@ import kotlinx.serialization.Serializable
 data class Tag(
     val tag: String,
     @SerialName("post_count") val count: Int = 0,
-)
+) : PlatformSerializable

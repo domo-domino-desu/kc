@@ -18,10 +18,18 @@ private suspend fun writeBinaryFile(
     withContext(Dispatchers.IO) {
       val targetFile =
           when (val destination = request.destination) {
-            is PlatformBinaryFileDestination.Directory ->
-                destination.relativeDirectories
-                    .fold(File(destination.path)) { current, segment -> File(current, segment) }
-                    .resolve(request.fileName)
+            is PlatformBinaryFileDestination.Directory -> {
+              val rootDirectory = File(destination.path)
+              runCatching { syncNoMediaFlag(rootDirectory, destination.allowMediaIndexing) }
+                  .onFailure {
+                    return@withContext PlatformBinaryFileWriteResult.Failure(
+                        it.message ?: "Cannot sync .nomedia"
+                    )
+                  }
+              destination.relativeDirectories
+                  .fold(rootDirectory) { current, segment -> File(current, segment) }
+                  .resolve(request.fileName)
+            }
             is PlatformBinaryFileDestination.File -> File(destination.path)
           }
 
@@ -37,3 +45,15 @@ private suspend fun writeBinaryFile(
         PlatformBinaryFileWriteResult.Failure("Cannot write target file")
       }
     }
+
+private fun syncNoMediaFlag(rootDirectory: File, allowMediaIndexing: Boolean) {
+  if (!rootDirectory.exists() && !rootDirectory.mkdirs()) {
+    error("Cannot create save directory")
+  }
+  val marker = File(rootDirectory, ".nomedia")
+  if (allowMediaIndexing) {
+    if (marker.exists() && !marker.delete()) error("Cannot delete .nomedia")
+  } else if (!marker.exists()) {
+    marker.writeText("")
+  }
+}

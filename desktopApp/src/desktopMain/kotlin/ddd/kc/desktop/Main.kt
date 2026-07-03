@@ -5,11 +5,11 @@ import androidx.compose.ui.window.application
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
-import ddd.kc.KcApp
 import ddd.kc.data.media.installKcCoilImageProgressSupport
 import ddd.kc.di.startAppKoin
 import ddd.kc.di.stopAppKoin
-import ddd.kc.util.logging.KcLog
+import ddd.kc.ui.app.KcApp
+import ddd.kc.utils.logging.KcLog
 import okio.Path
 import okio.Path.Companion.toPath
 

@@ -10,7 +10,7 @@ import ddd.kc.data.model.preserveRefreshUi
 import ddd.kc.data.network.PageInfo
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.ui.state.pageInfoForOffset
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.order_asc
 import kc.shared.generated.resources.order_desc

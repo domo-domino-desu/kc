@@ -27,13 +27,13 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.Platform
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
-import ddd.kc.util.collapseConsecutiveBlankLines
+import ddd.kc.utils.collapseConsecutiveBlankLines
 
 private val urlRegex = Regex("""https?://[^\s<>"']+""")
 

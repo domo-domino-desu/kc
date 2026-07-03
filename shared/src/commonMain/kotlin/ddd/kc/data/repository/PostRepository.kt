@@ -12,8 +12,8 @@ import ddd.kc.data.network.PopularPage
 import ddd.kc.data.network.asException
 import ddd.kc.data.store.CacheNamespace
 import ddd.kc.data.store.rawBodyQueryStore
-import ddd.kc.util.logging.KcLog
-import ddd.kc.util.logging.summarizePost
+import ddd.kc.utils.logging.KcLog
+import ddd.kc.utils.logging.summarizePost
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll

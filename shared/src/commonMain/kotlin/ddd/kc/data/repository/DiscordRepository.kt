@@ -4,7 +4,7 @@ import ddd.kc.data.model.DiscordChannel
 import ddd.kc.data.model.DiscordPost
 import ddd.kc.data.model.Platform
 import ddd.kc.data.network.KcApiClient
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.withContext
 

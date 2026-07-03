@@ -1,7 +1,5 @@
 package ddd.kc.data.translation
 
-import ddd.kc.domain.translation.TranslationPort
-import ddd.kc.domain.translation.TranslationRequest
 import io.ktor.client.HttpClient
 
 class KtorTranslationPort(client: HttpClient) : TranslationPort {

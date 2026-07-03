@@ -43,13 +43,13 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.LocalActivePlatform
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Platform
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.DateRangeW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowLeftW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW400Outlined
+import ddd.kc.ui.app.LocalActivePlatform
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
 import ddd.kc.ui.components.PostGridPagingActions
@@ -66,8 +66,8 @@ import ddd.kc.ui.pages.recent.PopularPostsScreenModel
 import ddd.kc.ui.pages.recent.PopularPostsState
 import ddd.kc.ui.pages.tags.TagsContent
 import ddd.kc.ui.state.ScrollPosition
-import ddd.kc.util.logging.KcLog
-import ddd.kc.util.logging.summarizePost
+import ddd.kc.utils.logging.KcLog
+import ddd.kc.utils.logging.summarizePost
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.cancel
 import kc.shared.generated.resources.date_end

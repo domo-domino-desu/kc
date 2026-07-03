@@ -11,7 +11,7 @@ import ddd.kc.data.network.PagedResult
 import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.ui.state.pageInfoForOffset
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

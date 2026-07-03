@@ -2,16 +2,16 @@ package ddd.kc.data.settings
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import ddd.kc.application.translation.TranslationSettings
+import ddd.kc.data.i18n.AppLanguage
 import ddd.kc.data.model.Platform
 import ddd.kc.data.translation.OpenAiTranslationConfig
 import ddd.kc.data.translation.TranslationProvider
+import ddd.kc.data.translation.TranslationSettings
 import ddd.kc.data.translation.TranslationTargetLanguage
-import ddd.kc.i18n.AppLanguage
-import ddd.kc.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -22,8 +22,15 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
   companion object {
     private val CELL_MIN_WIDTH_DP = intPreferencesKey("cell_min_width_dp")
     private val DOWNLOAD_SAVE_PATH = stringPreferencesKey("download_save_path")
+    private val DOWNLOAD_ALLOW_MEDIA_INDEXING =
+        booleanPreferencesKey("download_allow_media_indexing")
+    private val DOWNLOAD_SUBFOLDER_MODE = stringPreferencesKey("download_subfolder_mode")
+    private val DOWNLOAD_FILE_NAME_MODE = stringPreferencesKey("download_file_name_mode")
+    private val DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE =
+        stringPreferencesKey("download_custom_file_name_template")
     private val THEME_MODE = stringPreferencesKey("theme_mode")
     private val UI_LANGUAGE = stringPreferencesKey("ui_language")
+    private val TRANSLATION_ENABLED = booleanPreferencesKey("translation_enabled")
     private val TRANSLATION_PROVIDER = stringPreferencesKey("translation_provider")
     private val TRANSLATION_TARGET_LANG = stringPreferencesKey("translation_target_lang")
     private val TRANSLATION_CHUNK_WORD_LIMIT = intPreferencesKey("translation_chunk_word_limit")
@@ -33,9 +40,28 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
     private val OPENAI_TRANSLATION_MODEL = stringPreferencesKey("openai_translation_model")
     private val OPENAI_TRANSLATION_PROMPT = stringPreferencesKey("openai_translation_prompt")
 
-    const val CELL_MIN_WIDTH_DEFAULT = 200
+    const val CELL_MIN_WIDTH_DEFAULT = 220
     const val CELL_MIN_WIDTH_MIN = 120
-    const val CELL_MIN_WIDTH_MAX = 400
+    const val CELL_MIN_WIDTH_MAX = 480
+    const val TRANSLATION_CHUNK_WORD_LIMIT_DEFAULT = 1024
+    const val TRANSLATION_CHUNK_WORD_LIMIT_MIN = 50
+    const val TRANSLATION_CHUNK_WORD_LIMIT_MAX = 10000
+    const val TRANSLATION_MAX_CONCURRENCY_DEFAULT = 3
+    const val TRANSLATION_MAX_CONCURRENCY_MIN = 1
+    const val TRANSLATION_MAX_CONCURRENCY_MAX = 8
+    const val DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT = "{post_id}-{title}"
+
+    val supportedThemeModes = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
+    val supportedLanguages = listOf(AppLanguage.SYSTEM, AppLanguage.ZH_HANS, AppLanguage.EN)
+    val supportedDownloadSubfolderModes =
+        listOf(DownloadSubfolderMode.FLAT, DownloadSubfolderMode.BY_USERNAME)
+    val supportedDownloadFileNameModes =
+        listOf(
+            DownloadFileNameMode.ID_TITLE,
+            DownloadFileNameMode.USERNAME_ID,
+            DownloadFileNameMode.USERNAME_ID_TITLE,
+            DownloadFileNameMode.CUSTOM,
+        )
   }
 
   val activePlatformFlow: StateFlow<Platform> =
@@ -49,24 +75,52 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
 
   private var _cellMinWidthDp: Int = CELL_MIN_WIDTH_DEFAULT
   private var _downloadSavePath: String = ""
+  private var _downloadAllowMediaIndexing: Boolean = true
+  private var _downloadSubfolderMode: DownloadSubfolderMode = DownloadSubfolderMode.FLAT
+  private var _downloadFileNameMode: DownloadFileNameMode = DownloadFileNameMode.ID_TITLE
+  private var _downloadCustomFileNameTemplate: String = DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT
   private var _themeMode: ThemeMode = ThemeMode.SYSTEM
   private var _language: AppLanguage = AppLanguage.SYSTEM
   private var _translationSettings: TranslationSettings = TranslationSettings()
 
   suspend fun init() {
     val prefs = dataStore.data.first()
-    prefs[CELL_MIN_WIDTH_DP]?.let { _cellMinWidthDp = it }
+    prefs[CELL_MIN_WIDTH_DP]?.let {
+      _cellMinWidthDp = it.coerceIn(CELL_MIN_WIDTH_MIN, CELL_MIN_WIDTH_MAX)
+    }
     prefs[DOWNLOAD_SAVE_PATH]?.let { _downloadSavePath = it.trim() }
+    prefs[DOWNLOAD_ALLOW_MEDIA_INDEXING]?.let { _downloadAllowMediaIndexing = it }
+    prefs[DOWNLOAD_SUBFOLDER_MODE]?.let {
+      _downloadSubfolderMode = DownloadSubfolderMode.fromPersistedValue(it)
+    }
+    prefs[DOWNLOAD_FILE_NAME_MODE]?.let {
+      _downloadFileNameMode = DownloadFileNameMode.fromPersistedValue(it)
+    }
+    prefs[DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE]?.let {
+      _downloadCustomFileNameTemplate =
+          it.trim().ifBlank { DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT }
+    }
     prefs[THEME_MODE]?.let { _themeMode = ThemeMode.fromPersistedValue(it) ?: ThemeMode.SYSTEM }
     prefs[UI_LANGUAGE]?.let { _language = AppLanguage.fromPersistedValue(it) }
     _translationSettings =
         TranslationSettings(
+            enabled = prefs[TRANSLATION_ENABLED] ?: true,
             provider = TranslationProvider.fromPersistedValue(prefs[TRANSLATION_PROVIDER]),
             targetLanguageCode =
                 TranslationTargetLanguage.fromPersistedValue(prefs[TRANSLATION_TARGET_LANG])
                     .languageCode,
-            chunkWordLimit = prefs[TRANSLATION_CHUNK_WORD_LIMIT] ?: 1024,
-            maxConcurrency = prefs[TRANSLATION_MAX_CONCURRENCY] ?: 3,
+            chunkWordLimit =
+                (prefs[TRANSLATION_CHUNK_WORD_LIMIT] ?: TRANSLATION_CHUNK_WORD_LIMIT_DEFAULT)
+                    .coerceIn(
+                        TRANSLATION_CHUNK_WORD_LIMIT_MIN,
+                        TRANSLATION_CHUNK_WORD_LIMIT_MAX,
+                    ),
+            maxConcurrency =
+                (prefs[TRANSLATION_MAX_CONCURRENCY] ?: TRANSLATION_MAX_CONCURRENCY_DEFAULT)
+                    .coerceIn(
+                        TRANSLATION_MAX_CONCURRENCY_MIN,
+                        TRANSLATION_MAX_CONCURRENCY_MAX,
+                    ),
             openAiConfig =
                 OpenAiTranslationConfig(
                     baseUrl =
@@ -94,7 +148,9 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
 
   fun cellMinWidthDpFlow() =
       dataStore.data.map { prefs ->
-        (prefs[CELL_MIN_WIDTH_DP] ?: CELL_MIN_WIDTH_DEFAULT).also { _cellMinWidthDp = it }
+        (prefs[CELL_MIN_WIDTH_DP] ?: CELL_MIN_WIDTH_DEFAULT)
+            .coerceIn(CELL_MIN_WIDTH_MIN, CELL_MIN_WIDTH_MAX)
+            .also { _cellMinWidthDp = it }
       }
 
   suspend fun setCellMinWidthDp(value: Int) {
@@ -116,6 +172,62 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
     dataStore.edit { prefs -> prefs[DOWNLOAD_SAVE_PATH] = normalized }
   }
 
+  fun downloadAllowMediaIndexing(): Boolean = _downloadAllowMediaIndexing
+
+  fun downloadAllowMediaIndexingFlow() =
+      dataStore.data.map { prefs ->
+        (prefs[DOWNLOAD_ALLOW_MEDIA_INDEXING] ?: true).also { _downloadAllowMediaIndexing = it }
+      }
+
+  suspend fun setDownloadAllowMediaIndexing(allow: Boolean) {
+    _downloadAllowMediaIndexing = allow
+    dataStore.edit { it[DOWNLOAD_ALLOW_MEDIA_INDEXING] = allow }
+  }
+
+  fun downloadSubfolderMode(): DownloadSubfolderMode = _downloadSubfolderMode
+
+  fun downloadSubfolderModeFlow() =
+      dataStore.data.map { prefs ->
+        DownloadSubfolderMode.fromPersistedValue(prefs[DOWNLOAD_SUBFOLDER_MODE]).also {
+          _downloadSubfolderMode = it
+        }
+      }
+
+  suspend fun setDownloadSubfolderMode(mode: DownloadSubfolderMode) {
+    _downloadSubfolderMode = mode
+    dataStore.edit { it[DOWNLOAD_SUBFOLDER_MODE] = mode.persistedValue }
+  }
+
+  fun downloadFileNameMode(): DownloadFileNameMode = _downloadFileNameMode
+
+  fun downloadFileNameModeFlow() =
+      dataStore.data.map { prefs ->
+        DownloadFileNameMode.fromPersistedValue(prefs[DOWNLOAD_FILE_NAME_MODE]).also {
+          _downloadFileNameMode = it
+        }
+      }
+
+  suspend fun setDownloadFileNameMode(mode: DownloadFileNameMode) {
+    _downloadFileNameMode = mode
+    dataStore.edit { it[DOWNLOAD_FILE_NAME_MODE] = mode.persistedValue }
+  }
+
+  fun downloadCustomFileNameTemplate(): String = _downloadCustomFileNameTemplate
+
+  fun downloadCustomFileNameTemplateFlow() =
+      dataStore.data.map { prefs ->
+        (prefs[DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE] ?: DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT)
+            .trim()
+            .ifBlank { DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT }
+            .also { _downloadCustomFileNameTemplate = it }
+      }
+
+  suspend fun setDownloadCustomFileNameTemplate(template: String) {
+    val normalized = template.trim().ifBlank { DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT }
+    _downloadCustomFileNameTemplate = normalized
+    dataStore.edit { it[DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE] = normalized }
+  }
+
   fun themeMode(): ThemeMode = _themeMode
 
   fun themeModeFlow() =
@@ -131,17 +243,67 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
 
   fun translationSettings(): TranslationSettings = _translationSettings
 
+  fun translationSettingsFlow() =
+      dataStore.data.map { prefs ->
+        TranslationSettings(
+                enabled = prefs[TRANSLATION_ENABLED] ?: true,
+                provider = TranslationProvider.fromPersistedValue(prefs[TRANSLATION_PROVIDER]),
+                targetLanguageCode =
+                    TranslationTargetLanguage.fromPersistedValue(prefs[TRANSLATION_TARGET_LANG])
+                        .languageCode,
+                chunkWordLimit =
+                    (prefs[TRANSLATION_CHUNK_WORD_LIMIT] ?: TRANSLATION_CHUNK_WORD_LIMIT_DEFAULT)
+                        .coerceIn(
+                            TRANSLATION_CHUNK_WORD_LIMIT_MIN,
+                            TRANSLATION_CHUNK_WORD_LIMIT_MAX,
+                        ),
+                maxConcurrency =
+                    (prefs[TRANSLATION_MAX_CONCURRENCY] ?: TRANSLATION_MAX_CONCURRENCY_DEFAULT)
+                        .coerceIn(
+                            TRANSLATION_MAX_CONCURRENCY_MIN,
+                            TRANSLATION_MAX_CONCURRENCY_MAX,
+                        ),
+                openAiConfig =
+                    OpenAiTranslationConfig(
+                        baseUrl =
+                            prefs[OPENAI_TRANSLATION_BASE_URL]
+                                ?: OpenAiTranslationConfig.defaultBaseUrl,
+                        apiKey = prefs[OPENAI_TRANSLATION_API_KEY] ?: "",
+                        model =
+                            prefs[OPENAI_TRANSLATION_MODEL] ?: OpenAiTranslationConfig.defaultModel,
+                        promptTemplate =
+                            prefs[OPENAI_TRANSLATION_PROMPT]
+                                ?: OpenAiTranslationConfig.defaultPromptTemplate,
+                    ),
+            )
+            .also { _translationSettings = it }
+      }
+
   suspend fun setTranslationSettings(settings: TranslationSettings) {
-    _translationSettings = settings
+    val normalized =
+        settings.copy(
+            chunkWordLimit =
+                settings.chunkWordLimit.coerceIn(
+                    TRANSLATION_CHUNK_WORD_LIMIT_MIN,
+                    TRANSLATION_CHUNK_WORD_LIMIT_MAX,
+                ),
+            maxConcurrency =
+                settings.maxConcurrency.coerceIn(
+                    TRANSLATION_MAX_CONCURRENCY_MIN,
+                    TRANSLATION_MAX_CONCURRENCY_MAX,
+                ),
+        )
+    _translationSettings = normalized
     dataStore.edit { prefs ->
-      prefs[TRANSLATION_PROVIDER] = settings.provider.persistedValue
-      prefs[TRANSLATION_TARGET_LANG] = settings.targetLanguageCode
-      prefs[TRANSLATION_CHUNK_WORD_LIMIT] = settings.chunkWordLimit
-      prefs[TRANSLATION_MAX_CONCURRENCY] = settings.maxConcurrency
-      prefs[OPENAI_TRANSLATION_BASE_URL] = settings.openAiConfig.baseUrl
-      prefs[OPENAI_TRANSLATION_API_KEY] = settings.openAiConfig.apiKey
-      prefs[OPENAI_TRANSLATION_MODEL] = settings.openAiConfig.model
-      prefs[OPENAI_TRANSLATION_PROMPT] = settings.openAiConfig.promptTemplate
+      prefs[TRANSLATION_ENABLED] = normalized.enabled
+      prefs[TRANSLATION_PROVIDER] = normalized.provider.persistedValue
+      prefs[TRANSLATION_TARGET_LANG] = normalized.targetLanguageCode
+      prefs[TRANSLATION_CHUNK_WORD_LIMIT] = normalized.chunkWordLimit
+      prefs[TRANSLATION_MAX_CONCURRENCY] = normalized.maxConcurrency
+      prefs[OPENAI_TRANSLATION_BASE_URL] = normalized.openAiConfig.baseUrl
+      prefs[OPENAI_TRANSLATION_API_KEY] = normalized.openAiConfig.apiKey
+      prefs[OPENAI_TRANSLATION_MODEL] = normalized.openAiConfig.model
+      prefs[OPENAI_TRANSLATION_PROMPT] = normalized.openAiConfig.promptTemplate
     }
   }
 

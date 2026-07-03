@@ -10,11 +10,11 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
 import coil3.gif.GifDecoder
-import ddd.kc.KcApp
 import ddd.kc.data.media.installKcCoilImageProgressSupport
 import ddd.kc.data.model.Platform
 import ddd.kc.data.settings.AppSettings
-import ddd.kc.platform.EXTRA_PLATFORM
+import ddd.kc.ui.app.KcApp
+import ddd.kc.ui.platform.EXTRA_PLATFORM
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import okio.Path.Companion.toPath

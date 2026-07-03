@@ -8,7 +8,7 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import ddd.kc.data.local.AppDatabase
 import ddd.kc.data.local.AppDatabaseBuilderFactory
 import ddd.kc.di.KOIN_QUALIFIER_SESSION_VAULT
-import ddd.kc.platform.PlatformShortcutManager
+import ddd.kc.ui.platform.PlatformShortcutManager
 import eu.anifantakis.lib.ksafe.KSafe
 import java.io.File
 import okio.Path.Companion.toPath

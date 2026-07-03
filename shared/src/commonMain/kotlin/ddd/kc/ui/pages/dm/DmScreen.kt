@@ -28,11 +28,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
-import ddd.kc.LocalActivePlatform
-import ddd.kc.application.translation.TranslationService
 import ddd.kc.data.model.DM
-import ddd.kc.domain.translation.TranslationBlock
-import ddd.kc.domain.translation.TranslationBlockResult
+import ddd.kc.data.translation.TranslationBlock
+import ddd.kc.data.translation.TranslationBlockResult
+import ddd.kc.data.translation.TranslationEngine
+import ddd.kc.ui.app.LocalActivePlatform
 import ddd.kc.ui.components.AutoLoadEffect
 import ddd.kc.ui.components.AutoLoadPreviousEffect
 import ddd.kc.ui.components.DmCard
@@ -62,7 +62,7 @@ class DmScreen(
     val platform = LocalActivePlatform.current
     val searchModel = koinInject<DmSearchScreenModel>()
     val recentModel = koinInject<RecentDMsScreenModel>()
-    val translationService = koinInject<TranslationService>()
+    val translationService = koinInject<TranslationEngine>()
     val searchState by searchModel.state.collectAsState()
     val recentState by recentModel.state.collectAsState()
     val listState = rememberLazyListState()
@@ -115,6 +115,7 @@ class DmScreen(
     ErrorToastEffect(searchState.prependErrorMessage)
 
     val translateDm: (DM) -> Unit = translateDm@{ dm ->
+      if (!translationService.isEnabled()) return@translateDm
       val content = dm.content?.takeIf { it.isNotBlank() } ?: return@translateDm
       val key = dm.translationKey()
       val existing = dmTranslations[key]

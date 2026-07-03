@@ -16,10 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.thumbnailUrl
+import ddd.kc.ui.app.LocalAppSettings
 
 @Composable
 fun CreatorCard(

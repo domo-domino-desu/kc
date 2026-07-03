@@ -7,7 +7,7 @@ import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.Tag
 import ddd.kc.data.model.preserveRefreshUi
 import ddd.kc.data.repository.TagRepository
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
 data class TagsLayoutCacheKey(

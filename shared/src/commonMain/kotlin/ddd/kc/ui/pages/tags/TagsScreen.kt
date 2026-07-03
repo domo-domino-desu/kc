@@ -46,10 +46,10 @@ import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabOptions
-import ddd.kc.LocalActivePlatform
 import ddd.kc.data.model.Tag
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
+import ddd.kc.ui.app.LocalActivePlatform
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.SkeletonBlock

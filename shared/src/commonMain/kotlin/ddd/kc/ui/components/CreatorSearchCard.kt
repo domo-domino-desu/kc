@@ -29,13 +29,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.bannerUrl
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.icons.rememberServiceIconDefinition
 import ddd.kc.ui.icons.serviceIconVector
 

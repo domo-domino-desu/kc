@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.LocalAppSettings
 import ddd.kc.generated.AboutMetadata
 import ddd.kc.generated.symbols.icons.fontawesomebrands.Icons as FontAwesomeBrandIcons
 import ddd.kc.generated.symbols.icons.fontawesomebrands.icons.GithubFontawesomebrands
@@ -53,6 +52,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.CodeW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.OutputCircleW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ReceiptLongW400Outlined
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.platform.PlatformTextFileDestination
@@ -61,7 +61,7 @@ import ddd.kc.ui.components.platform.PlatformTextFileWriteResult
 import ddd.kc.ui.components.platform.rememberPlatformFileSavePicker
 import ddd.kc.ui.components.platform.rememberPlatformTextCopier
 import ddd.kc.ui.components.platform.rememberPlatformTextFileWriter
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.about
 import kc.shared.generated.resources.about_acknowledgements_anthropic_claude

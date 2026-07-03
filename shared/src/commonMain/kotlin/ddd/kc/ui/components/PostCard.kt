@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.allFiles
@@ -29,6 +28,7 @@ import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.AttachFileW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
+import ddd.kc.ui.app.LocalAppSettings
 
 @Composable
 fun PostCard(

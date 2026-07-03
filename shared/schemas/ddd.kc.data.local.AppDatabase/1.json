@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "3a5a5135ed174919fbfb0b378a021fac",
+    "identityHash": "09afa7a17976d12efd6d82a56fcd07d3",
     "entities": [
       {
         "tableName": "kc_cache",
@@ -31,11 +31,109 @@
           "autoGenerate": false,
           "columnNames": ["cacheKey"]
         }
+      },
+      {
+        "tableName": "kc_creator_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`historyKey` TEXT NOT NULL, `platform` TEXT NOT NULL, `service` TEXT NOT NULL, `creatorId` TEXT NOT NULL, `creatorJson` TEXT NOT NULL, `visitedAtMs` INTEGER NOT NULL, PRIMARY KEY(`historyKey`))",
+        "fields": [
+          {
+            "fieldPath": "historyKey",
+            "columnName": "historyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "platform",
+            "columnName": "platform",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "service",
+            "columnName": "service",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creatorId",
+            "columnName": "creatorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creatorJson",
+            "columnName": "creatorJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "visitedAtMs",
+            "columnName": "visitedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": ["historyKey"]
+        }
+      },
+      {
+        "tableName": "kc_post_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`historyKey` TEXT NOT NULL, `platform` TEXT NOT NULL, `service` TEXT NOT NULL, `creatorId` TEXT NOT NULL, `postId` TEXT NOT NULL, `postJson` TEXT NOT NULL, `visitedAtMs` INTEGER NOT NULL, PRIMARY KEY(`historyKey`))",
+        "fields": [
+          {
+            "fieldPath": "historyKey",
+            "columnName": "historyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "platform",
+            "columnName": "platform",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "service",
+            "columnName": "service",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creatorId",
+            "columnName": "creatorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "postId",
+            "columnName": "postId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "postJson",
+            "columnName": "postJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "visitedAtMs",
+            "columnName": "visitedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": ["historyKey"]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3a5a5135ed174919fbfb0b378a021fac')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '09afa7a17976d12efd6d82a56fcd07d3')"
     ]
   }
 }

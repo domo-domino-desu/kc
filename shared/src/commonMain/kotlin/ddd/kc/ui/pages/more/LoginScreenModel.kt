@@ -4,7 +4,7 @@ import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Platform
 import ddd.kc.data.network.KcApiClient
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
 data class LoginState(

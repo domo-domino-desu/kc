@@ -17,8 +17,8 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Platform
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
@@ -27,8 +27,8 @@ import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
-import ddd.kc.util.logging.KcLog
-import ddd.kc.util.logging.summarizePost
+import ddd.kc.utils.logging.KcLog
+import ddd.kc.utils.logging.summarizePost
 import org.koin.core.parameter.parametersOf
 
 private val log = KcLog.withTag("TagPostsScreen")

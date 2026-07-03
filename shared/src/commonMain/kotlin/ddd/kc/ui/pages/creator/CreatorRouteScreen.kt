@@ -68,7 +68,6 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Announcement
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.DiscordChannel
@@ -77,9 +76,11 @@ import ddd.kc.data.model.Post
 import ddd.kc.data.model.bannerUrl
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.thumbnailUrl
+import ddd.kc.data.repository.ActivityHistoryRepository
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlinedfill1
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.CreatorBannerFallback
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
@@ -103,9 +104,9 @@ import ddd.kc.ui.pages.tagposts.TagPostsScreen
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
-import ddd.kc.util.collapseConsecutiveBlankLines
-import ddd.kc.util.logging.KcLog
-import ddd.kc.util.logging.summarizePost
+import ddd.kc.utils.collapseConsecutiveBlankLines
+import ddd.kc.utils.logging.KcLog
+import ddd.kc.utils.logging.summarizePost
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.add_favorite
 import kc.shared.generated.resources.creator_tab_announcements
@@ -120,6 +121,7 @@ import kc.shared.generated.resources.remove_favorite
 import kc.shared.generated.resources.similar_accounts
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 
 private val log = KcLog.withTag("CreatorRouteScreen")
@@ -138,6 +140,7 @@ class CreatorRouteScreen(
     val navigator = LocalNavigator.currentOrThrow
     val screenModel =
         koinScreenModel<CreatorScreenModel> { parametersOf(platform, creators, startIndex) }
+    val historyRepository = koinInject<ActivityHistoryRepository>()
     val state by screenModel.state.collectAsState()
 
     val focusRequester = remember { FocusRequester() }
@@ -176,6 +179,9 @@ class CreatorRouteScreen(
     ) {
       HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
         val creator = state.creators.getOrNull(page) ?: return@HorizontalPager
+        LaunchedEffect(platform, creator.service, creator.id) {
+          historyRepository.recordCreatorVisit(platform, creator)
+        }
         CreatorDetailPage(
             creator = creator,
             platform = platform,

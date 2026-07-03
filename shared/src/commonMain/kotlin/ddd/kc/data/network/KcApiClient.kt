@@ -13,8 +13,8 @@ import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostFile
 import ddd.kc.data.model.Tag
 import ddd.kc.data.settings.AppSettings
-import ddd.kc.util.logging.KcLog
-import ddd.kc.util.logging.summarizePost
+import ddd.kc.utils.logging.KcLog
+import ddd.kc.utils.logging.summarizePost
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete

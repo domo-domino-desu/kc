@@ -2,7 +2,6 @@ package ddd.kc.ui.pages.post
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import ddd.kc.application.translation.TranslationService
 import ddd.kc.data.model.Comment
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Platform
@@ -14,16 +13,17 @@ import ddd.kc.data.network.AuthRequiredException
 import ddd.kc.data.network.PageInfo
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.data.repository.PostRepository
-import ddd.kc.domain.translation.TranslationBlockResult
+import ddd.kc.data.translation.TranslationBlockResult
+import ddd.kc.data.translation.TranslationEngine
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.PAGER_NEXT_PREFETCH_COUNT
 import ddd.kc.ui.state.PAGER_PREFETCH_DEBOUNCE_MS
 import ddd.kc.ui.state.PAGER_PREVIOUS_PREFETCH_COUNT
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
-import ddd.kc.util.logging.KcLog
-import ddd.kc.util.logging.summarizePost
-import ddd.kc.util.logging.summarizePostFiles
+import ddd.kc.utils.logging.KcLog
+import ddd.kc.utils.logging.summarizePost
+import ddd.kc.utils.logging.summarizePostFiles
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -39,7 +39,7 @@ private data class DetailPagingPage(
 class PostScreenModel(
     private val postRepo: PostRepository,
     private val creatorRepo: CreatorRepository,
-    private val translationService: TranslationService,
+    private val translationService: TranslationEngine,
     private val platform: Platform,
     initialPosts: List<Post>,
     startIndex: Int,
@@ -360,6 +360,7 @@ class PostScreenModel(
       mutableState.value.postCreators["${post.service}:${post.creatorId}"]
 
   fun translateContent(post: Post) {
+    if (!translationService.isEnabled()) return
     val content = post.content?.takeIf { it.isNotBlank() } ?: return
     val existing = mutableState.value.postTranslations[post.id]
     if (existing?.showTranslation == true) {

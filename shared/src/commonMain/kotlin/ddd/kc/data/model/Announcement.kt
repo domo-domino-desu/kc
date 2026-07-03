@@ -10,4 +10,4 @@ data class Announcement(
     val hash: String = "",
     val content: String = "",
     val added: String? = null,
-)
+) : PlatformSerializable

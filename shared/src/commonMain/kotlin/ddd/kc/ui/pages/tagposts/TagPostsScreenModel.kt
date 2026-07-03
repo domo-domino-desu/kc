@@ -7,7 +7,7 @@ import ddd.kc.data.model.Post
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.ui.state.PaginationReducer
 import ddd.kc.ui.state.PaginationSnapshot
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = 50

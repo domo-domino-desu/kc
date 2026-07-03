@@ -12,7 +12,7 @@ import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.data.repository.awaitData
 import ddd.kc.ui.state.pageInfoForOffset
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

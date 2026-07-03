@@ -14,4 +14,4 @@ data class DM(
     val file: PostFile? = null,
     val embeds: List<PostEmbed>? = null,
     val artist: Creator? = null,
-)
+) : PlatformSerializable

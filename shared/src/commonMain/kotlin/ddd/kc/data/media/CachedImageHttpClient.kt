@@ -4,7 +4,7 @@ import coil3.ImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import ddd.kc.di.KOIN_QUALIFIER_CACHED_IMAGE_CLIENT
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import io.ktor.client.HttpClient
 import io.ktor.client.call.HttpClientCall
 import io.ktor.client.call.save

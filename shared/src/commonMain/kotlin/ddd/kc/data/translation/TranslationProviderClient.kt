@@ -1,7 +1,5 @@
 package ddd.kc.data.translation
 
-import ddd.kc.domain.translation.TranslationRequest
-
 internal interface TranslationProviderClient {
   suspend fun translate(request: TranslationRequest): String
 }

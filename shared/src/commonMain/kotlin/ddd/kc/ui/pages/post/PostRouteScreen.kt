@@ -69,7 +69,6 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Comment
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Platform
@@ -82,6 +81,7 @@ import ddd.kc.data.model.imageFiles
 import ddd.kc.data.model.isImage
 import ddd.kc.data.model.isVideo
 import ddd.kc.data.model.thumbnailUrl
+import ddd.kc.data.repository.ActivityHistoryRepository
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.AttachFileW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CalendarAddOnW400Outlined
@@ -94,6 +94,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400Outlinedfill1
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.LinkW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.ImageLoadLifecycleState
@@ -105,6 +106,7 @@ import ddd.kc.ui.components.TopLinearImageLoadingProgress
 import ddd.kc.ui.components.platform.PlatformBinaryFileDestination
 import ddd.kc.ui.components.platform.PlatformBinaryFileWriteRequest
 import ddd.kc.ui.components.platform.PlatformBinaryFileWriteResult
+import ddd.kc.ui.components.platform.buildPostDownloadTarget
 import ddd.kc.ui.components.platform.rememberPlatformBinaryFileWriter
 import ddd.kc.ui.components.rememberImageLoadProgressState
 import ddd.kc.ui.navigation.nextRouteInstanceKey
@@ -114,10 +116,10 @@ import ddd.kc.ui.pages.tagposts.TagPostsScreen
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
-import ddd.kc.util.collapseConsecutiveBlankLines
-import ddd.kc.util.logging.KcLog
-import ddd.kc.util.logging.summarizePost
-import ddd.kc.util.logging.summarizePostFiles
+import ddd.kc.utils.collapseConsecutiveBlankLines
+import ddd.kc.utils.logging.KcLog
+import ddd.kc.utils.logging.summarizePost
+import ddd.kc.utils.logging.summarizePostFiles
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.comments_count
 import kc.shared.generated.resources.download_failed
@@ -126,6 +128,7 @@ import kc.shared.generated.resources.download_saved
 import kc.shared.generated.resources.no_comments
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 
 private val log = KcLog.withTag("PostRouteScreen")
@@ -151,6 +154,7 @@ class PostRouteScreen(
         koinScreenModel<PostScreenModel> {
           parametersOf(platform, posts, startIndex, initialOffset, initialHasMore, pagingContext)
         }
+    val historyRepository = koinInject<ActivityHistoryRepository>()
     val state by screenModel.state.collectAsState()
 
     val focusRequester = remember { FocusRequester() }
@@ -212,6 +216,9 @@ class PostRouteScreen(
       HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
         val post = state.posts.getOrNull(page) ?: return@HorizontalPager
         val listState = rememberLazyListState()
+        LaunchedEffect(platform, post.service, post.creatorId, post.id) {
+          historyRepository.recordPostVisit(platform, post)
+        }
         LaunchedEffect(page) { pageListStates.value = pageListStates.value + (page to listState) }
         PostDetailPage(
             post = post,
@@ -286,16 +293,22 @@ class PostRouteScreen(
                     downloadingUrls[url] = true
                     try {
                       val bytes = screenModel.downloadFile(url)
-                      val fileName = file.downloadFileName()
+                      val downloadTarget = buildPostDownloadTarget(appSettings, post, file)
                       when (
                           val result =
                               writeBinaryFile(
                                   PlatformBinaryFileWriteRequest(
                                       destination =
-                                          PlatformBinaryFileDestination.Directory(savePath),
-                                      fileName = fileName,
+                                          PlatformBinaryFileDestination.Directory(
+                                              path = savePath,
+                                              relativeDirectories =
+                                                  downloadTarget.relativeDirectories,
+                                              allowMediaIndexing =
+                                                  appSettings.downloadAllowMediaIndexing(),
+                                          ),
+                                      fileName = downloadTarget.fileName,
                                       bytes = bytes,
-                                      mimeType = fileName.guessMimeType(),
+                                      mimeType = downloadTarget.fileName.guessMimeType(),
                                   )
                               )
                       ) {

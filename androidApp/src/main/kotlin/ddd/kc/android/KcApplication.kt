@@ -5,7 +5,7 @@ import co.touchlab.kermit.Severity
 import ddd.kc.androidPlatformModule
 import ddd.kc.di.startAppKoin
 import ddd.kc.ui.pages.about.AboutLibrariesAndroidContextHolder
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 
 class KcApplication : Application() {
   override fun onCreate() {

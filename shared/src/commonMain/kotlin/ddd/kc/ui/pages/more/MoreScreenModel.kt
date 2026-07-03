@@ -6,7 +6,7 @@ import ddd.kc.data.model.Platform
 import ddd.kc.data.network.KcApiClient
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.data.repository.PostRepository
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
 private val log = KcLog.withTag("MoreScreenModel")

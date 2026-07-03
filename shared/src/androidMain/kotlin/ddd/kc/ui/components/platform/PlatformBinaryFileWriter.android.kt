@@ -43,6 +43,10 @@ private fun writeBinaryFileIntoDirectory(
   if (rootDirectory == null || !rootDirectory.isDirectory) {
     return PlatformBinaryFileWriteResult.Failure("Cannot access directory")
   }
+  runCatching { syncNoMediaFlag(rootDirectory, destination.allowMediaIndexing) }
+      .onFailure {
+        return PlatformBinaryFileWriteResult.Failure(it.message ?: "Cannot sync .nomedia")
+      }
   val targetDirectory =
       destination.relativeDirectories.fold(rootDirectory) { current, segment ->
         current.findFile(segment)?.takeIf { file -> file.isDirectory }
@@ -79,5 +83,15 @@ private fun writeBinaryFileToDocumentUri(
     PlatformBinaryFileWriteResult.Saved(savedPath = uriPath)
   } else {
     PlatformBinaryFileWriteResult.Failure("Cannot write target file")
+  }
+}
+
+private fun syncNoMediaFlag(rootDirectory: DocumentFile, allowMediaIndexing: Boolean) {
+  val marker = rootDirectory.findFile(".nomedia")
+  if (allowMediaIndexing) {
+    if (marker != null && !marker.delete()) error("Cannot delete .nomedia")
+  } else if (marker == null) {
+    rootDirectory.createFile("application/octet-stream", ".nomedia")
+        ?: error("Cannot create .nomedia")
   }
 }

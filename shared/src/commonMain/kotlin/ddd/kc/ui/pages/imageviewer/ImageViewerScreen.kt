@@ -45,21 +45,26 @@ import ddd.kc.ui.components.ImageLoadLifecycleState
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.rememberImageLoadProgressState
 import ddd.kc.ui.navigation.nextRouteInstanceKey
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.close
 import org.jetbrains.compose.resources.stringResource
 
 private val log = KcLog.withTag("ImageViewerScreen")
+private val imageViewedCallbacks = mutableMapOf<String, (String) -> Unit>()
 
 class ImageViewerScreen(
     private val imageUrls: List<String>,
     private val thumbnailUrls: List<String> = emptyList(),
     private val startIndex: Int = 0,
-    private val onImageViewed: ((String) -> Unit)? = null,
     private val routeKey: String = nextRouteInstanceKey("image-viewer"),
+    onImageViewed: ((String) -> Unit)? = null,
 ) : Screen {
   override val key: String = routeKey
+
+  init {
+    if (onImageViewed != null) imageViewedCallbacks[routeKey] = onImageViewed
+  }
 
   @OptIn(ExperimentalFoundationApi::class)
   @Composable
@@ -73,7 +78,9 @@ class ImageViewerScreen(
       focusRequester.requestFocus()
     }
     LaunchedEffect(pagerState.currentPage) {
-      imageUrls.getOrNull(pagerState.currentPage)?.let { onImageViewed?.invoke(it) }
+      imageUrls.getOrNull(pagerState.currentPage)?.let {
+        imageViewedCallbacks[routeKey]?.invoke(it)
+      }
     }
 
     Box(

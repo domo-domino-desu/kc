@@ -6,17 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-
-enum class ThemeMode(val persistedValue: String) {
-  SYSTEM("system"),
-  LIGHT("light"),
-  DARK("dark");
-
-  companion object {
-    fun fromPersistedValue(raw: String?): ThemeMode? =
-        entries.firstOrNull { it.persistedValue == raw?.trim() }
-  }
-}
+import ddd.kc.data.settings.ThemeMode
 
 @Composable
 fun KcTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {

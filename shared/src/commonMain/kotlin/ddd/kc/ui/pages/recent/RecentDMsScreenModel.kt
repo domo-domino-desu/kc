@@ -8,7 +8,7 @@ import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.data.repository.awaitData
 import ddd.kc.ui.state.PaginationReducer
 import ddd.kc.ui.state.PaginationSnapshot
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = 50

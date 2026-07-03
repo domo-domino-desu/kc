@@ -57,7 +57,6 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.DiscordChannel
 import ddd.kc.data.model.DiscordPost
 import ddd.kc.data.model.Platform
@@ -67,6 +66,7 @@ import ddd.kc.data.model.isImage
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.AttachFileW400Outlined
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.AutoLoadEffect
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.KcPullRefreshBox
@@ -77,7 +77,7 @@ import ddd.kc.ui.components.loadingFooter
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.imageviewer.ImageViewerScreen
 import ddd.kc.ui.state.PaginationSnapshot
-import ddd.kc.util.collapseConsecutiveBlankLines
+import ddd.kc.utils.collapseConsecutiveBlankLines
 import kotlinx.coroutines.launch
 import org.koin.core.parameter.parametersOf
 

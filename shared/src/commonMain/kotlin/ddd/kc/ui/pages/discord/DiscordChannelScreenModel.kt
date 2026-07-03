@@ -8,7 +8,7 @@ import ddd.kc.data.model.Platform
 import ddd.kc.data.repository.DiscordRepository
 import ddd.kc.ui.state.PaginationReducer
 import ddd.kc.ui.state.PaginationSnapshot
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = 150

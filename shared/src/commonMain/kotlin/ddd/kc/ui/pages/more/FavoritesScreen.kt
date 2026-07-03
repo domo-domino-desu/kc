@@ -27,8 +27,8 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.LocalAppSettings
 import ddd.kc.data.model.Platform
+import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.BackAppBar
 import ddd.kc.ui.components.CreatorSearchCard
 import ddd.kc.ui.components.ErrorToastEffect

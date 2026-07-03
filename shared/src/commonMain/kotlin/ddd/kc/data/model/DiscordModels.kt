@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 data class DiscordChannel(
     val id: String,
     val name: String,
-)
+) : PlatformSerializable
 
 @Serializable
 data class DiscordAuthor(
@@ -16,13 +16,13 @@ data class DiscordAuthor(
     val username: String = "",
     val discriminator: String? = null,
     @SerialName("public_flags") val publicFlags: Int? = null,
-)
+) : PlatformSerializable
 
 @Serializable
 data class DiscordAttachment(
     val name: String? = null,
     val path: String? = null,
-)
+) : PlatformSerializable
 
 @Serializable
 data class DiscordPost(
@@ -35,7 +35,7 @@ data class DiscordPost(
     val published: String? = null,
     val edited: String? = null,
     val attachments: List<DiscordAttachment> = emptyList(),
-)
+) : PlatformSerializable
 
 private val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "webp", "avif", "jxl", "bmp")
 private val videoExtensions =

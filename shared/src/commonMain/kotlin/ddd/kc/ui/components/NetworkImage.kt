@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 
 private val networkImageLog = KcLog.withTag("NetworkImage")
 

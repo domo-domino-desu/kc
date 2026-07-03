@@ -7,7 +7,7 @@ data class CreatorLink(
     val url: String = "",
     val service: String? = null,
     val name: String? = null,
-) {
+) : PlatformSerializable {
   val displayName: String
     get() =
         name ?: service ?: url.removePrefix("https://").removePrefix("http://").substringBefore("/")

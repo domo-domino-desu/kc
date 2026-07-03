@@ -2,7 +2,6 @@ package ddd.kc.ui.pages.creator
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import ddd.kc.application.translation.TranslationService
 import ddd.kc.data.model.Announcement
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.DiscordChannel
@@ -13,14 +12,15 @@ import ddd.kc.data.network.AuthRequiredException
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.data.repository.DiscordRepository
 import ddd.kc.data.repository.PostRepository
-import ddd.kc.domain.translation.TranslationBlockResult
+import ddd.kc.data.translation.TranslationBlockResult
+import ddd.kc.data.translation.TranslationEngine
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.PAGER_NEXT_PREFETCH_COUNT
 import ddd.kc.ui.state.PaginationReducer
 import ddd.kc.ui.state.PaginationSnapshot
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = 50
@@ -30,7 +30,7 @@ class CreatorScreenModel(
     private val postRepo: PostRepository,
     private val creatorRepo: CreatorRepository,
     private val discordRepo: DiscordRepository,
-    private val translationService: TranslationService,
+    private val translationService: TranslationEngine,
     private val platform: Platform,
     initialCreators: List<Creator>,
     startIndex: Int,
@@ -120,6 +120,7 @@ class CreatorScreenModel(
       mutableState.value.creatorAnnouncements[creator.id] ?: emptyList()
 
   fun translateAnnouncement(creator: Creator, announcement: Announcement) {
+    if (!translationService.isEnabled()) return
     if (announcement.content.isBlank()) return
     val key = announcement.translationKey()
     val existing = mutableState.value.announcementTranslations[creator.id]?.get(key)
@@ -187,6 +188,7 @@ class CreatorScreenModel(
   }
 
   fun translateAnnouncements(creator: Creator) {
+    if (!translationService.isEnabled()) return
     val announcements = getCreatorAnnouncements(creator).filter { it.content.isNotBlank() }
     if (announcements.isEmpty()) return
     val keys = announcements.map { it.translationKey() }

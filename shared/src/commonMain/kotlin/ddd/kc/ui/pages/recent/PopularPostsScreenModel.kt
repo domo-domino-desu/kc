@@ -13,7 +13,7 @@ import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.data.repository.awaitData
 import ddd.kc.ui.state.pageInfoForOffset
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlin.time.Clock
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit

@@ -1,7 +1,6 @@
 package ddd.kc.data.translation
 
-import ddd.kc.domain.translation.TranslationRequest
-import ddd.kc.util.renderBraceTemplate
+import ddd.kc.utils.renderBraceTemplate
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import kotlinx.serialization.json.Json
@@ -124,7 +123,9 @@ internal class OpenAiCompatibleTranslationClient(
                 put("role", JsonPrimitive("system"))
                 put(
                     "content",
-                    JsonPrimitive("You are a professional translator. Return translated text only."),
+                    JsonPrimitive(
+                        "You are a professional translator. Return translated text only."
+                    ),
                 )
               }
           )

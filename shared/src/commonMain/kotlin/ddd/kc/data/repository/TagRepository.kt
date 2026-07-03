@@ -7,7 +7,7 @@ import ddd.kc.data.model.Tag
 import ddd.kc.data.network.KcApiClient
 import ddd.kc.data.store.CacheNamespace
 import ddd.kc.data.store.rawBodyQueryStore
-import ddd.kc.util.logging.KcLog
+import ddd.kc.utils.logging.KcLog
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll

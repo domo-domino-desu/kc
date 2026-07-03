@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.vector.ImageVector
+import ddd.kc.data.model.Platform
 import ddd.kc.generated.symbols.icons.arcticons.Icons as ArcticonsIcons
 import ddd.kc.generated.symbols.icons.arcticons.icons.FanslyArcticons
 import ddd.kc.generated.symbols.icons.fontawesomebrands.Icons as FontAwesomeBrandIcons
@@ -83,6 +84,15 @@ object ServiceIconCatalogRepository {
       mutableCatalog.value = loaded
     }
   }
+}
+
+private val pawchiveServices = listOf("patreon", "fanbox")
+
+fun Platform.services(): List<String> {
+  val catalog = ServiceIconCatalogRepository.catalog.value
+  val key = name.lowercase()
+  val fromJson = catalog?.servicesForPlatform(key)
+  return if (!fromJson.isNullOrEmpty()) fromJson else pawchiveServices
 }
 
 @Composable
