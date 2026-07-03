@@ -37,6 +37,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.github.panpf.zoomimage.CoilZoomAsyncImage
+import com.github.panpf.zoomimage.rememberCoilZoomState
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CloseW400Outlined
 import ddd.kc.ui.components.CenterCircularWavyImageLoadingProgress
@@ -152,6 +153,9 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -
   var loadLifecycleState by remember(fullUrl) { mutableStateOf(ImageLoadLifecycleState.Idle) }
   val progressState =
       rememberImageLoadProgressState(progressKey = fullUrl, lifecycleState = loadLifecycleState)
+  val zoomState = rememberCoilZoomState()
+
+  LaunchedEffect(zoomState) { zoomState.zoomable.setThreeStepScale(false) }
 
   Box(modifier = Modifier.fillMaxSize()) {
     if (isGif) {
@@ -203,6 +207,7 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -
             "图片查看器 -> 大图加载失败(url=${fullUrl.orEmpty()},thumbnailUrl=${thumbnailUrl.orEmpty()})"
           }
         },
+        zoomState = zoomState,
         onTap = { onClick() },
     )
 
