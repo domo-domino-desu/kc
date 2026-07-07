@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import ddd.kc.data.model.Platform
 import ddd.kc.data.settings.AppSettings
 import ddd.kc.data.settings.DownloadFileNameMode
 import ddd.kc.data.translation.TranslationProvider
@@ -55,6 +56,7 @@ import kc.shared.generated.resources.cancel
 import kc.shared.generated.resources.card_width
 import kc.shared.generated.resources.chunk_word_limit
 import kc.shared.generated.resources.close_without_saving
+import kc.shared.generated.resources.custom
 import kc.shared.generated.resources.download_allow_media_indexing
 import kc.shared.generated.resources.download_allow_media_indexing_desc
 import kc.shared.generated.resources.download_file_name_mode
@@ -74,6 +76,9 @@ import kc.shared.generated.resources.openai_api_key_desc
 import kc.shared.generated.resources.openai_base_url_desc
 import kc.shared.generated.resources.openai_model_desc
 import kc.shared.generated.resources.openai_prompt_template_desc
+import kc.shared.generated.resources.pawchive_base_url
+import kc.shared.generated.resources.pawchive_base_url_desc
+import kc.shared.generated.resources.pawchive_settings
 import kc.shared.generated.resources.prompt_template
 import kc.shared.generated.resources.provider
 import kc.shared.generated.resources.reset
@@ -98,6 +103,33 @@ private enum class PendingExitAction {
   Home,
 }
 
+private enum class PawchiveBaseUrlOption {
+  St,
+  Pw,
+  Custom,
+}
+
+private val PawchiveBaseUrlOption.fixedBaseUrl: String?
+  get() =
+      when (this) {
+        PawchiveBaseUrlOption.St -> "https://pawchive.st"
+        PawchiveBaseUrlOption.Pw -> AppSettings.PAWCHIVE_ALT_BASE_URL
+        PawchiveBaseUrlOption.Custom -> null
+      }
+
+private fun pawchiveBaseUrlOptionFor(baseUrl: String): PawchiveBaseUrlOption {
+  val normalized = baseUrl.trim().trimEnd('/')
+  return when (normalized) {
+    "https://pawchive.st" -> PawchiveBaseUrlOption.St
+    AppSettings.PAWCHIVE_ALT_BASE_URL -> PawchiveBaseUrlOption.Pw
+    else -> PawchiveBaseUrlOption.Custom
+  }
+}
+
+@Composable
+private fun pawchiveBaseUrlOptionLabel(option: PawchiveBaseUrlOption): String =
+    option.fixedBaseUrl ?: stringResource(Res.string.custom)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -109,6 +141,8 @@ fun SettingsScreen(
   val listState = rememberLazyListState()
 
   val cardWidth by appSettings.cellMinWidthDpFlow().collectAsState(appSettings.cellMinWidthDp())
+  val pawchiveBaseUrl by
+      appSettings.baseUrlFlow(Platform.PAWCHIVE).collectAsState(appSettings.baseUrl())
   val language by appSettings.languageFlow().collectAsState(appSettings.language())
   val themeMode by appSettings.themeModeFlow().collectAsState(appSettings.themeMode())
   val translationSettings by
@@ -131,6 +165,7 @@ fun SettingsScreen(
   val persisted =
       remember(
           cardWidth,
+          pawchiveBaseUrl,
           language,
           themeMode,
           translationSettings,
@@ -144,6 +179,7 @@ fun SettingsScreen(
             themeMode = themeMode,
             language = language,
             cardWidthInput = cardWidth.toString(),
+            pawchiveBaseUrl = pawchiveBaseUrl,
             translationEnabled = translationSettings.enabled,
             translationProvider = translationSettings.provider,
             translationTargetLanguage =
@@ -211,6 +247,7 @@ fun SettingsScreen(
             appSettings.setThemeMode(draft.themeMode)
             appSettings.setLanguage(draft.language)
             appSettings.setCellMinWidthDp(draft.cardWidthInput.toInt())
+            appSettings.setBaseUrl(Platform.PAWCHIVE, draft.pawchiveBaseUrl)
             appSettings.setTranslationSettings(draft.toTranslationSettings())
             appSettings.setDownloadSavePath(draft.downloadSavePath)
             appSettings.setDownloadAllowMediaIndexing(draft.downloadAllowMediaIndexing)
@@ -270,6 +307,7 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       item { AppearanceSettingsSection(draft = draft, onDraftChange = { draft = it }) }
+      item { PawchiveSettingsSection(draft = draft, onDraftChange = { draft = it }) }
       item {
         TranslationSettingsSection(
             draft = draft,
@@ -343,6 +381,43 @@ fun SettingsScreen(
           }
         },
     )
+  }
+}
+
+@Composable
+private fun PawchiveSettingsSection(
+    draft: SettingsDraft,
+    onDraftChange: (SettingsDraft) -> Unit,
+) {
+  val selectedOption = pawchiveBaseUrlOptionFor(draft.pawchiveBaseUrl)
+  SettingsGroup(title = stringResource(Res.string.pawchive_settings), framed = false) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+      SettingsDropdownField(
+          label = stringResource(Res.string.pawchive_base_url),
+          supportingText = stringResource(Res.string.pawchive_base_url_desc),
+          selected = selectedOption,
+          options = PawchiveBaseUrlOption.entries,
+          optionLabel = { pawchiveBaseUrlOptionLabel(it) },
+          onSelect = { option ->
+            val nextBaseUrl =
+                option.fixedBaseUrl
+                    ?: draft.pawchiveBaseUrl
+                        .takeUnless {
+                          it.trim().trimEnd('/') in AppSettings.supportedPawchiveBaseUrls
+                        }
+                        .orEmpty()
+            onDraftChange(draft.copy(pawchiveBaseUrl = nextBaseUrl))
+          },
+      )
+      if (selectedOption == PawchiveBaseUrlOption.Custom) {
+        SettingsStackedInputRow(
+            value = draft.pawchiveBaseUrl,
+            onValueChange = { onDraftChange(draft.copy(pawchiveBaseUrl = it)) },
+            label = stringResource(Res.string.base_url),
+            supportingText = stringResource(Res.string.pawchive_base_url_desc),
+        )
+      }
+    }
   }
 }
 

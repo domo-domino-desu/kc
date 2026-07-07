@@ -36,6 +36,8 @@ data class Post(
     @SerialName("embed") val embed: PostEmbed? = null,
     val poll: PostPoll? = null,
     val captions: List<PostCaption>? = null,
+    @SerialName("preview_state") val previewState: String? = null,
+    @SerialName("has_full") val hasFull: Boolean? = null,
     @Serializable(with = FlexibleTagsSerializer::class) val tags: List<String>? = null,
 ) : PlatformSerializable
 

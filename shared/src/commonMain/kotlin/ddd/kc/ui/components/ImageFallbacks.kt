@@ -44,8 +44,7 @@ fun PostTitleCoverFallback(
                       start = Offset.Zero,
                       end = Offset.Infinite,
                   )
-              )
-              .padding(18.dp),
+              ),
       contentAlignment = Alignment.Center,
   ) {
     Canvas(Modifier.fillMaxSize().clipToBounds()) {
@@ -62,6 +61,7 @@ fun PostTitleCoverFallback(
     }
     Text(
         text = displayTitle,
+        modifier = Modifier.padding(18.dp),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
         color = Color.White,

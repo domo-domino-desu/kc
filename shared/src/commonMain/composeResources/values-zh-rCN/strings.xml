@@ -118,6 +118,7 @@
   <string name="favorite_label">收藏</string>
   <string name="comments_count">评论 (%1$d)</string>
   <string name="no_comments">暂无评论</string>
+  <string name="post_not_archived">我们还没有归档这个帖子。</string>
   <!-- Tags screen -->
   <string name="filter_tags_hint">筛选标签…</string>
   <!-- Image viewer -->
@@ -162,6 +163,10 @@
   <string name="app_language">界面语言</string>
   <string name="app_language_desc">选择界面语言</string>
   <string name="card_width">卡片宽度</string>
+  <string name="pawchive_settings">Pawchive</string>
+  <string name="pawchive_base_url">Pawchive Base URL</string>
+  <string name="pawchive_base_url_desc">选择 Pawchive 站点地址</string>
+  <string name="custom">自定义</string>
   <string name="enable_translation">启用翻译功能</string>
   <string name="enable_translation_desc">为支持的内容显示翻译操作</string>
   <string name="provider">翻译服务</string>

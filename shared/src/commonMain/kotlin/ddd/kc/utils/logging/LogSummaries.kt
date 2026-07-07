@@ -12,7 +12,8 @@ fun summarizePostFiles(post: Post): String {
   val files = post.allFiles()
   val missingPath = files.count { it.path.isNullOrBlank() }
   val missingName = files.count { it.name.isNullOrBlank() }
-  return "files=${files.size},images=${post.imageFiles().size},missingPath=$missingPath,missingName=$missingName"
+  val deferred = files.count { it.deferred }
+  return "files=${files.size},images=${post.imageFiles().size},missingPath=$missingPath,missingName=$missingName,deferred=$deferred"
 }
 
 fun summarizeThrowable(throwable: Throwable): String =

@@ -310,7 +310,7 @@ private fun CreatorDetailPage(
     screenModel.loadRecommendedCreators(creator)
   }
 
-  val shareUrl = "${platform.defaultBaseUrl}/${creator.service}/user/${creator.id}"
+  val shareUrl = "$baseUrl/${creator.service}/user/${creator.id}"
   if (!isDiscord && selectedTab == 0) {
     LaunchedEffect(gridState, creator.id, selectedTab) {
       snapshotFlow { gridState.firstVisibleItemIndex }

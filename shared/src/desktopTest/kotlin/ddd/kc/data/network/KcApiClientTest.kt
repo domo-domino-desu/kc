@@ -2,8 +2,10 @@ package ddd.kc.data.network
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import ddd.kc.data.model.Platform
+import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostFile
 import ddd.kc.data.model.allFiles
+import ddd.kc.data.model.canLoadFullImage
 import ddd.kc.data.model.fullUrl
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.data.settings.AppSettings
@@ -49,6 +51,7 @@ class KcApiClientTest {
   }
 
   private fun client(
+      settings: AppSettings = settings(),
       handler: (HttpRequestData) -> Pair<HttpStatusCode, String>,
   ): Pair<KcApiClient, List<HttpRequestData>> {
     val requests = mutableListOf<HttpRequestData>()
@@ -67,7 +70,7 @@ class KcApiClientTest {
             KSafe(fileName = "kc_test_${UUID.randomUUID().toString().replace("-", "_")}")
         )
     sessionStore.saveSession(Platform.PAWCHIVE, "session=test_session; path=/")
-    return KcApiClient(httpClient, settings(), sessionStore, json) to requests
+    return KcApiClient(httpClient, settings, sessionStore, json) to requests
   }
 
   @Test
@@ -158,6 +161,18 @@ class KcApiClientTest {
   }
 
   @Test
+  fun usesConfiguredBaseUrl() = runBlocking {
+    val settings = settings()
+    settings.setBaseUrl(Platform.PAWCHIVE, "https://pawchive.pw/")
+    val (api, requests) = client(settings) { HttpStatusCode.OK to creatorsJson }
+
+    api.getCreators()
+
+    assertEquals("pawchive.pw", requests.single().url.host)
+    assertEquals("https", requests.single().url.protocol.name)
+  }
+
+  @Test
   fun favorites401BecomesAuthRequired() = runBlocking {
     val (api, _) = client { HttpStatusCode.Unauthorized to "{}" }
     assertFailsWith<AuthRequiredException> { api.getFavorites(type = "artist") }
@@ -186,6 +201,36 @@ class KcApiClientTest {
         "https://img.pawchive.st/thumbnail/data/6c/15/6c1582a2125bb308c8226ff469f22d1343f9de8881a2028295f6fe9585e7eeb1.jpeg",
         file.thumbnailUrl("https://img.pawchive.st"),
     )
+  }
+
+  @Test
+  fun parsesArchiveStateAndDisablesFullImageLoading() {
+    val post =
+        json.decodeFromString<Post>(
+            """{
+              "id":"p",
+              "user":"u",
+              "service":"patreon",
+              "preview_state":"scraped",
+              "has_full":false,
+              "file":{"name":"cover.png","path":"/cover.png"},
+              "attachments":[
+                {"name":"ready.png","path":"/ready.png"},
+                {"name":"missing.png","path":"/missing.png","deferred":true}
+              ]
+            }"""
+        )
+
+    assertEquals("scraped", post.previewState)
+    assertEquals(false, post.hasFull)
+    assertEquals(true, post.attachments[1].deferred)
+    assertEquals(false, post.file!!.canLoadFullImage(post))
+    assertEquals(false, post.attachments[0].canLoadFullImage(post))
+    assertEquals(false, post.attachments[1].canLoadFullImage(post))
+
+    val normalPost = post.copy(hasFull = true)
+    assertEquals(true, normalPost.attachments[0].canLoadFullImage(normalPost))
+    assertEquals(false, normalPost.attachments[1].canLoadFullImage(normalPost))
   }
 
   @Test

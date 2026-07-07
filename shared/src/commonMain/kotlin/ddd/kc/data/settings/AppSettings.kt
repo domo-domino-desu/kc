@@ -14,7 +14,6 @@ import ddd.kc.data.translation.TranslationSettings
 import ddd.kc.data.translation.TranslationTargetLanguage
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 class AppSettings(private val dataStore: DataStore<Preferences>) {
@@ -28,6 +27,7 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
     private val DOWNLOAD_FILE_NAME_MODE = stringPreferencesKey("download_file_name_mode")
     private val DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE =
         stringPreferencesKey("download_custom_file_name_template")
+    private val PAWCHIVE_BASE_URL = stringPreferencesKey("pawchive_base_url")
     private val THEME_MODE = stringPreferencesKey("theme_mode")
     private val UI_LANGUAGE = stringPreferencesKey("ui_language")
     private val TRANSLATION_ENABLED = booleanPreferencesKey("translation_enabled")
@@ -50,7 +50,9 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
     const val TRANSLATION_MAX_CONCURRENCY_MIN = 1
     const val TRANSLATION_MAX_CONCURRENCY_MAX = 8
     const val DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT = "{post_id}-{title}"
+    const val PAWCHIVE_ALT_BASE_URL = "https://pawchive.pw"
 
+    val supportedPawchiveBaseUrls = listOf(Platform.PAWCHIVE.defaultBaseUrl, PAWCHIVE_ALT_BASE_URL)
     val supportedThemeModes = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
     val supportedLanguages = listOf(AppLanguage.SYSTEM, AppLanguage.ZH_HANS, AppLanguage.EN)
     val supportedDownloadSubfolderModes =
@@ -79,6 +81,7 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
   private var _downloadSubfolderMode: DownloadSubfolderMode = DownloadSubfolderMode.FLAT
   private var _downloadFileNameMode: DownloadFileNameMode = DownloadFileNameMode.ID_TITLE
   private var _downloadCustomFileNameTemplate: String = DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT
+  private var _pawchiveBaseUrl: String = Platform.PAWCHIVE.defaultBaseUrl
   private var _themeMode: ThemeMode = ThemeMode.SYSTEM
   private var _language: AppLanguage = AppLanguage.SYSTEM
   private var _translationSettings: TranslationSettings = TranslationSettings()
@@ -100,6 +103,7 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
       _downloadCustomFileNameTemplate =
           it.trim().ifBlank { DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE_DEFAULT }
     }
+    prefs[PAWCHIVE_BASE_URL]?.let { _pawchiveBaseUrl = normalizeBaseUrl(it) }
     prefs[THEME_MODE]?.let { _themeMode = ThemeMode.fromPersistedValue(it) ?: ThemeMode.SYSTEM }
     prefs[UI_LANGUAGE]?.let { _language = AppLanguage.fromPersistedValue(it) }
     _translationSettings =
@@ -135,14 +139,37 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
         )
   }
 
-  fun baseUrl(platform: Platform = Platform.PAWCHIVE): String = Platform.PAWCHIVE.defaultBaseUrl
+  fun baseUrl(platform: Platform = Platform.PAWCHIVE): String =
+      when (platform) {
+        Platform.PAWCHIVE -> _pawchiveBaseUrl
+      }
 
   fun cdnUrl(platform: Platform = Platform.PAWCHIVE): String =
       baseUrl(platform).replace("://", "://img.")
 
-  suspend fun setBaseUrl(platform: Platform, url: String) {}
+  suspend fun setBaseUrl(platform: Platform, url: String) {
+    val normalized = normalizeBaseUrl(url)
+    when (platform) {
+      Platform.PAWCHIVE -> _pawchiveBaseUrl = normalized
+    }
+    dataStore.edit { prefs ->
+      when (platform) {
+        Platform.PAWCHIVE -> prefs[PAWCHIVE_BASE_URL] = normalized
+      }
+    }
+  }
 
-  fun baseUrlFlow(platform: Platform) = flowOf(Platform.PAWCHIVE.defaultBaseUrl)
+  fun baseUrlFlow(platform: Platform) =
+      dataStore.data.map { prefs ->
+        val url =
+            when (platform) {
+              Platform.PAWCHIVE -> prefs[PAWCHIVE_BASE_URL]
+            }?.let(::normalizeBaseUrl) ?: platform.defaultBaseUrl
+        when (platform) {
+          Platform.PAWCHIVE -> _pawchiveBaseUrl = url
+        }
+        url
+      }
 
   fun cellMinWidthDp(): Int = _cellMinWidthDp
 
@@ -317,5 +344,10 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
   suspend fun setLanguage(language: AppLanguage) {
     _language = language
     dataStore.edit { it[UI_LANGUAGE] = language.persistedValue }
+  }
+
+  private fun normalizeBaseUrl(url: String): String {
+    val trimmed = url.trim().trimEnd('/')
+    return trimmed.ifBlank { Platform.PAWCHIVE.defaultBaseUrl }
   }
 }

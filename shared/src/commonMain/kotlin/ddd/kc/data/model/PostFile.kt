@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 data class PostFile(
     val name: String? = null,
     val path: String? = null,
+    val deferred: Boolean = false,
 ) : PlatformSerializable
 
 private val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "webp", "avif", "jxl", "bmp")
@@ -16,6 +17,8 @@ private val audioExtensions = setOf("mp3", "m4a", "aac", "wav", "ogg", "flac", "
 private fun PostFile.ext(): String = (name ?: path)?.substringAfterLast('.')?.lowercase() ?: ""
 
 fun PostFile.hasPath(): Boolean = !path.isNullOrBlank()
+
+fun PostFile.canLoadFullImage(post: Post): Boolean = hasPath() && !deferred && post.hasFull != false
 
 fun PostFile.isImage(): Boolean = ext() in imageExtensions
 

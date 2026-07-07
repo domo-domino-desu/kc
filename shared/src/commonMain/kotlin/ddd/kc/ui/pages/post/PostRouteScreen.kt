@@ -75,6 +75,7 @@ import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostFile
 import ddd.kc.data.model.allFiles
+import ddd.kc.data.model.canLoadFullImage
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.fullUrl
 import ddd.kc.data.model.imageFiles
@@ -126,6 +127,7 @@ import kc.shared.generated.resources.download_failed
 import kc.shared.generated.resources.download_save_path_required
 import kc.shared.generated.resources.download_saved
 import kc.shared.generated.resources.no_comments
+import kc.shared.generated.resources.post_not_archived
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -251,13 +253,17 @@ class PostRouteScreen(
               val images = post.imageFiles()
               val viewableImages =
                   images.mapNotNull { file ->
+                    if (!file.canLoadFullImage(post)) return@mapNotNull null
                     file.fullUrl(cdnUrl)?.let { fullUrl ->
                       fullUrl to file.thumbnailUrl(cdnUrl).orEmpty()
                     }
                   }
               val urls = viewableImages.map { it.first }
               val thumbs = viewableImages.map { it.second }
-              val startIndex = images.take(imageIndex).count { !it.fullUrl(cdnUrl).isNullOrBlank() }
+              val startIndex =
+                  images.take(imageIndex).count {
+                    it.canLoadFullImage(post) && !it.fullUrl(cdnUrl).isNullOrBlank()
+                  }
               log.i {
                 "打开图片 -> 点击Post图片(platform=${platform.name},service=${post.service},creator=${post.user},post=${post.id},index=$startIndex,count=${urls.size})"
               }
@@ -382,22 +388,24 @@ private fun PostDetailPage(
   val imageAspectRatios = remember(post.id) { mutableStateMapOf<String, Float>() }
   val imageFiles = remember(post) { post.imageFiles() }
   val loadableFullImageUrls =
-      remember(imageFiles, cdnUrl) {
+      remember(post, imageFiles, cdnUrl) {
         imageFiles.mapNotNull { file ->
+          if (!file.canLoadFullImage(post)) return@mapNotNull null
           val thumbnailUrl = file.thumbnailUrl(cdnUrl)
           val fullUrl = file.fullUrl(cdnUrl)
           fullUrl?.takeIf { it.isNotBlank() && it != thumbnailUrl }
         }
       }
+  val hasImages = imageFiles.isNotEmpty()
   val hasLoadableFullImages = remember(loadableFullImageUrls) { loadableFullImageUrls.isNotEmpty() }
   val allFullImagesRequested =
       hasLoadableFullImages && requestedFullImageUrls.containsAll(loadableFullImageUrls)
+  val showPostNotArchivedPrompt = hasImages && !hasLoadableFullImages
   ErrorToastEffect(favoriteErrorMessage)
 
   Scaffold(
       topBar = {
-        val shareUrl =
-            "${platform.defaultBaseUrl}/${post.service}/user/${post.creatorId}/post/${post.id}"
+        val shareUrl = "$baseUrl/${post.service}/user/${post.creatorId}/post/${post.id}"
         DetailAppBar(
             title = if (showTitleInAppBar) postTitle else "",
             shareUrl = shareUrl,
@@ -406,9 +414,10 @@ private fun PostDetailPage(
             isTranslateActive = translationState.showTranslation,
             onScrollToTop = onScrollToTop,
             leadingActions = {
-              if (hasLoadableFullImages) {
+              if (hasImages) {
                 LoadFullSizeImagesIconButton(
                     isActive = allFullImagesRequested,
+                    enabled = hasLoadableFullImages && !allFullImagesRequested,
                     onClick = { onFullImagesRequested(loadableFullImageUrls) },
                 )
               }
@@ -626,18 +635,31 @@ private fun PostDetailPage(
       }
 
       // ── Images ────────────────────────────────────────────────────
+      if (showPostNotArchivedPrompt) {
+        item {
+          PostNotArchivedNotice(
+              modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+              shape = cardShape,
+              border = cardBorder,
+          )
+        }
+      }
+
       itemsIndexed(imageFiles, key = { idx, _ -> "img-$idx" }) { idx, file ->
         val fullUrl = file.fullUrl(cdnUrl)
+        val fullImageEnabled = file.canLoadFullImage(post)
         PostAttachmentImage(
             thumbnailUrl = file.thumbnailUrl(cdnUrl),
             fullUrl = fullUrl,
             contentDescription = file.name,
             aspectRatioCache = imageAspectRatios,
-            loadFullSizeImage = !fullUrl.isNullOrBlank() && fullUrl in requestedFullImageUrls,
+            fullImageEnabled = fullImageEnabled,
+            loadFullSizeImage =
+                fullImageEnabled && !fullUrl.isNullOrBlank() && fullUrl in requestedFullImageUrls,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
             shape = cardShape,
             onFullSizeImageRequested = {
-              if (!fullUrl.isNullOrBlank()) {
+              if (fullImageEnabled && !fullUrl.isNullOrBlank()) {
                 onFullImageRequested(fullUrl)
               }
             },
@@ -1035,13 +1057,35 @@ private fun CommentRow(comment: Comment, onParentClick: (() -> Unit)?) {
 }
 
 @Composable
+private fun PostNotArchivedNotice(
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape,
+    border: BorderStroke,
+) {
+  Surface(
+      shape = shape,
+      border = border,
+      color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
+      modifier = modifier.fillMaxWidth(),
+  ) {
+    Text(
+        text = stringResource(Res.string.post_not_archived),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+    )
+  }
+}
+
+@Composable
 private fun LoadFullSizeImagesIconButton(
     isActive: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
   IconButton(
       onClick = onClick,
-      enabled = !isActive,
+      enabled = enabled,
       modifier = Modifier.size(32.dp),
   ) {
     Icon(
@@ -1049,8 +1093,11 @@ private fun LoadFullSizeImagesIconButton(
         contentDescription = "加载大图",
         modifier = Modifier.size(18.dp),
         tint =
-            if (isActive) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            when {
+              isActive -> MaterialTheme.colorScheme.primary
+              enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+              else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+            },
     )
   }
 }
@@ -1063,6 +1110,7 @@ private fun PostAttachmentImage(
     fullUrl: String?,
     contentDescription: String?,
     aspectRatioCache: MutableMap<String, Float>,
+    fullImageEnabled: Boolean,
     loadFullSizeImage: Boolean,
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(14.dp),
@@ -1074,8 +1122,8 @@ private fun PostAttachmentImage(
   var fullImageLoaded by remember(thumbnailUrl, fullUrl) { mutableStateOf(!hasDistinctFullUrl) }
   var loadLifecycleState by
       remember(thumbnailUrl, fullUrl) { mutableStateOf(ImageLoadLifecycleState.Idle) }
-  LaunchedEffect(loadFullSizeImage, hasDistinctFullUrl) {
-    if (loadFullSizeImage && hasDistinctFullUrl) {
+  LaunchedEffect(loadFullSizeImage, hasDistinctFullUrl, fullImageEnabled) {
+    if (fullImageEnabled && loadFullSizeImage && hasDistinctFullUrl) {
       showFullImage = true
     }
   }
@@ -1088,7 +1136,9 @@ private fun PostAttachmentImage(
       )
   val aspectRatio = aspectRatioCache[url] ?: thumbnailUrl?.let { aspectRatioCache[it] }
   val clickAction = {
-    if (hasDistinctFullUrl && !loadFullSizeImage && !fullImageLoaded) {
+    if (!fullImageEnabled) {
+      Unit
+    } else if (hasDistinctFullUrl && !loadFullSizeImage && !fullImageLoaded) {
       onFullSizeImageRequested()
     } else {
       onClick()
@@ -1103,7 +1153,7 @@ private fun PostAttachmentImage(
               .fillMaxWidth()
               .aspectRatio(aspectRatio ?: 1f)
               .clip(shape)
-              .clickable(onClick = clickAction),
+              .then(if (fullImageEnabled) Modifier.clickable(onClick = clickAction) else Modifier),
       onLoading = { loadLifecycleState = ImageLoadLifecycleState.Loading },
       onSuccess = { state ->
         loadLifecycleState = ImageLoadLifecycleState.Success

@@ -21,8 +21,12 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="https" android:host="pawchive.st" android:pathPattern="/.*/user/.*"/>
         <data android:scheme="https" android:host="www.pawchive.st" android:pathPattern="/.*/user/.*"/>
+        <data android:scheme="https" android:host="pawchive.pw" android:pathPattern="/.*/user/.*"/>
+        <data android:scheme="https" android:host="www.pawchive.pw" android:pathPattern="/.*/user/.*"/>
         <data android:scheme="http" android:host="pawchive.st" android:pathPattern="/.*/user/.*"/>
         <data android:scheme="http" android:host="www.pawchive.st" android:pathPattern="/.*/user/.*"/>
+        <data android:scheme="http" android:host="pawchive.pw" android:pathPattern="/.*/user/.*"/>
+        <data android:scheme="http" android:host="www.pawchive.pw" android:pathPattern="/.*/user/.*"/>
       </intent-filter>
     </activity>
   </application>

@@ -154,8 +154,9 @@ private fun DiscordChannelPage(
     onRefresh: () -> Unit,
 ) {
   val navigator = LocalNavigator.currentOrThrow
-  val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
-  val shareUrl = "${platform.defaultBaseUrl}/discord/channel/${channel.id}"
+  val appSettings = LocalAppSettings.current
+  val cdnUrl = appSettings.cdnUrl(platform)
+  val shareUrl = "${appSettings.baseUrl(platform)}/discord/channel/${channel.id}"
   val scope = rememberCoroutineScope()
   val listState = rememberLazyListState()
   val imageAspectRatios = remember(channel.id) { mutableStateMapOf<String, Float>() }

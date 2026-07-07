@@ -118,6 +118,7 @@
   <string name="favorite_label">Favorite</string>
   <string name="comments_count">Comments (%1$d)</string>
   <string name="no_comments">No comments yet</string>
+  <string name="post_not_archived">We haven't archived this post yet.</string>
   <!-- Tags screen -->
   <string name="filter_tags_hint">Filter tags…</string>
   <!-- Image viewer -->
@@ -162,6 +163,10 @@
   <string name="app_language">Interface Language</string>
   <string name="app_language_desc">Choose interface language</string>
   <string name="card_width">Card Width</string>
+  <string name="pawchive_settings">Pawchive</string>
+  <string name="pawchive_base_url">Pawchive Base URL</string>
+  <string name="pawchive_base_url_desc">Choose the Pawchive site endpoint</string>
+  <string name="custom">Custom</string>
   <string name="enable_translation">Enable translation</string>
   <string name="enable_translation_desc">Show translation actions for supported content</string>
   <string name="provider">Provider</string>

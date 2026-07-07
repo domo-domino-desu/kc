@@ -85,7 +85,8 @@ private fun parseKcRoute(url: String): KcRoute? {
   val platform =
       when {
         scheme == "kc" && host == "pawchive" -> Platform.PAWCHIVE
-        scheme in setOf("http", "https") && host in setOf("pawchive.st", "www.pawchive.st") ->
+        scheme in setOf("http", "https") &&
+            host in setOf("pawchive.st", "www.pawchive.st", "pawchive.pw", "www.pawchive.pw") ->
             Platform.PAWCHIVE
         else -> return null
       }

@@ -2,6 +2,7 @@ package ddd.kc.data.settings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import ddd.kc.data.i18n.AppLanguage
+import ddd.kc.data.model.Platform
 import ddd.kc.data.translation.TranslationProvider
 import ddd.kc.data.translation.TranslationSettings
 import java.io.File
@@ -23,6 +24,7 @@ class AppSettingsTest {
     settings.setDownloadSubfolderMode(DownloadSubfolderMode.BY_USERNAME)
     settings.setDownloadFileNameMode(DownloadFileNameMode.USERNAME_ID_TITLE)
     settings.setDownloadCustomFileNameTemplate("{username}-{post_id}")
+    settings.setBaseUrl(Platform.PAWCHIVE, "https://pawchive.pw/")
     settings.setTranslationSettings(
         TranslationSettings(
             enabled = false,
@@ -41,6 +43,7 @@ class AppSettingsTest {
         settings.downloadFileNameModeFlow().first(),
     )
     assertEquals("{username}-{post_id}", settings.downloadCustomFileNameTemplateFlow().first())
+    assertEquals("https://pawchive.pw", settings.baseUrlFlow(Platform.PAWCHIVE).first())
     val translation = settings.translationSettingsFlow().first()
     assertFalse(translation.enabled)
     assertEquals(TranslationProvider.MICROSOFT, translation.provider)

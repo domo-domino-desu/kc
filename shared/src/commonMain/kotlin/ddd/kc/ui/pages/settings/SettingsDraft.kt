@@ -14,6 +14,7 @@ internal data class SettingsDraft(
     val themeMode: ThemeMode,
     val language: AppLanguage,
     val cardWidthInput: String,
+    val pawchiveBaseUrl: String,
     val translationEnabled: Boolean,
     val translationProvider: TranslationProvider,
     val translationTargetLanguage: TranslationTargetLanguage,
@@ -37,6 +38,14 @@ internal data class SettingsDraft(
         maxConcurrencyInput.toIntOrNull() ?: return "Max concurrency must be a number"
     if (cardWidth !in AppSettings.CELL_MIN_WIDTH_MIN..AppSettings.CELL_MIN_WIDTH_MAX) {
       return "Card width must be ${AppSettings.CELL_MIN_WIDTH_MIN}-${AppSettings.CELL_MIN_WIDTH_MAX} dp"
+    }
+    val normalizedPawchiveBaseUrl = pawchiveBaseUrl.trim()
+    if (normalizedPawchiveBaseUrl.isBlank()) return "Pawchive Base URL cannot be empty"
+    if (
+        !normalizedPawchiveBaseUrl.startsWith("http://") &&
+            !normalizedPawchiveBaseUrl.startsWith("https://")
+    ) {
+      return "Pawchive Base URL must start with http:// or https://"
     }
     if (
         chunkWordLimit !in
@@ -88,6 +97,7 @@ internal data class SettingsDraft(
             themeMode = settings.themeMode(),
             language = settings.language(),
             cardWidthInput = settings.cellMinWidthDp().toString(),
+            pawchiveBaseUrl = settings.baseUrl(),
             translationEnabled = translationSettings.enabled,
             translationProvider = translationSettings.provider,
             translationTargetLanguage =
