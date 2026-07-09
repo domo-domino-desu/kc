@@ -386,6 +386,7 @@ private fun PostDetailPage(
       }
   // page 级别缓存，key=url，避免 item 出屏后状态丢失导致滚动跳动
   val imageAspectRatios = remember(post.id) { mutableStateMapOf<String, Float>() }
+  val imageLoadStates = remember(post.id) { mutableStateMapOf<String, PostAttachmentImageState>() }
   val imageFiles = remember(post) { post.imageFiles() }
   val loadableFullImageUrls =
       remember(post, imageFiles, cdnUrl) {
@@ -646,13 +647,22 @@ private fun PostDetailPage(
       }
 
       itemsIndexed(imageFiles, key = { idx, _ -> "img-$idx" }) { idx, file ->
+        val thumbnailUrl = file.thumbnailUrl(cdnUrl)
         val fullUrl = file.fullUrl(cdnUrl)
         val fullImageEnabled = file.canLoadFullImage(post)
+        val imageStateKey = fullUrl ?: thumbnailUrl ?: "img-$idx"
+        val imageState =
+            remember(imageStateKey) {
+              imageLoadStates.getOrPut(imageStateKey) {
+                createPostAttachmentImageState(thumbnailUrl = thumbnailUrl, fullUrl = fullUrl)
+              }
+            }
         PostAttachmentImage(
-            thumbnailUrl = file.thumbnailUrl(cdnUrl),
+            thumbnailUrl = thumbnailUrl,
             fullUrl = fullUrl,
             contentDescription = file.name,
             aspectRatioCache = imageAspectRatios,
+            imageState = imageState,
             fullImageEnabled = fullImageEnabled,
             loadFullSizeImage =
                 fullImageEnabled && !fullUrl.isNullOrBlank() && fullUrl in requestedFullImageUrls,
@@ -1102,6 +1112,27 @@ private fun LoadFullSizeImagesIconButton(
   }
 }
 
+private class PostAttachmentImageState(
+    showFullImage: Boolean,
+    fullImageLoaded: Boolean,
+    loadLifecycleState: ImageLoadLifecycleState = ImageLoadLifecycleState.Idle,
+) {
+  var showFullImage by mutableStateOf(showFullImage)
+  var fullImageLoaded by mutableStateOf(fullImageLoaded)
+  var loadLifecycleState by mutableStateOf(loadLifecycleState)
+}
+
+private fun createPostAttachmentImageState(
+    thumbnailUrl: String?,
+    fullUrl: String?,
+): PostAttachmentImageState {
+  val hasDistinctFullUrl = !fullUrl.isNullOrBlank() && fullUrl != thumbnailUrl
+  return PostAttachmentImageState(
+      showFullImage = !hasDistinctFullUrl,
+      fullImageLoaded = !hasDistinctFullUrl,
+  )
+}
+
 // 加载中显示 1:1 骨架屏；加载成功后切换为图片真实 aspect ratio。
 // aspectRatioCache 由调用方持有（page 级别），避免 item 出屏销毁 remember 后滚回来时跳动。
 @Composable
@@ -1110,6 +1141,7 @@ private fun PostAttachmentImage(
     fullUrl: String?,
     contentDescription: String?,
     aspectRatioCache: MutableMap<String, Float>,
+    imageState: PostAttachmentImageState,
     fullImageEnabled: Boolean,
     loadFullSizeImage: Boolean,
     modifier: Modifier = Modifier,
@@ -1118,27 +1150,23 @@ private fun PostAttachmentImage(
     onClick: () -> Unit,
 ) {
   val hasDistinctFullUrl = !fullUrl.isNullOrBlank() && fullUrl != thumbnailUrl
-  var showFullImage by remember(thumbnailUrl, fullUrl) { mutableStateOf(!hasDistinctFullUrl) }
-  var fullImageLoaded by remember(thumbnailUrl, fullUrl) { mutableStateOf(!hasDistinctFullUrl) }
-  var loadLifecycleState by
-      remember(thumbnailUrl, fullUrl) { mutableStateOf(ImageLoadLifecycleState.Idle) }
   LaunchedEffect(loadFullSizeImage, hasDistinctFullUrl, fullImageEnabled) {
     if (fullImageEnabled && loadFullSizeImage && hasDistinctFullUrl) {
-      showFullImage = true
+      imageState.showFullImage = true
     }
   }
-  val url = if (showFullImage) fullUrl ?: thumbnailUrl else thumbnailUrl ?: fullUrl
+  val url = if (imageState.showFullImage) fullUrl ?: thumbnailUrl else thumbnailUrl ?: fullUrl
   if (url.isNullOrBlank()) return
   val progressState =
       rememberImageLoadProgressState(
           progressKey = if (url == fullUrl) fullUrl else null,
-          lifecycleState = loadLifecycleState,
+          lifecycleState = imageState.loadLifecycleState,
       )
   val aspectRatio = aspectRatioCache[url] ?: thumbnailUrl?.let { aspectRatioCache[it] }
   val clickAction = {
     if (!fullImageEnabled) {
       Unit
-    } else if (hasDistinctFullUrl && !loadFullSizeImage && !fullImageLoaded) {
+    } else if (hasDistinctFullUrl && !loadFullSizeImage && !imageState.fullImageLoaded) {
       onFullSizeImageRequested()
     } else {
       onClick()
@@ -1154,22 +1182,22 @@ private fun PostAttachmentImage(
               .aspectRatio(aspectRatio ?: 1f)
               .clip(shape)
               .then(if (fullImageEnabled) Modifier.clickable(onClick = clickAction) else Modifier),
-      onLoading = { loadLifecycleState = ImageLoadLifecycleState.Loading },
+      onLoading = { imageState.loadLifecycleState = ImageLoadLifecycleState.Loading },
       onSuccess = { state ->
-        loadLifecycleState = ImageLoadLifecycleState.Success
+        imageState.loadLifecycleState = ImageLoadLifecycleState.Success
         val size = state.painter.intrinsicSize
         if (
             size.width > 0f && size.height > 0f && size.width.isFinite() && size.height.isFinite()
         ) {
           aspectRatioCache[url] = size.width / size.height
         }
-        fullImageLoaded = !hasDistinctFullUrl || url == fullUrl
+        imageState.fullImageLoaded = !hasDistinctFullUrl || url == fullUrl
       },
       onError = {
-        loadLifecycleState = ImageLoadLifecycleState.Error
+        imageState.loadLifecycleState = ImageLoadLifecycleState.Error
         if (url == fullUrl && hasDistinctFullUrl) {
-          showFullImage = false
-          fullImageLoaded = false
+          imageState.showFullImage = false
+          imageState.fullImageLoaded = false
         }
       },
       loading = {

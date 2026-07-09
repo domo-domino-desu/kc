@@ -8,7 +8,6 @@ data class PaginationSnapshot<Item>(
     val offset: Int = 0,
     val pageInfo: PageInfo? = null,
     val visibleOffset: Int = startOffset,
-    val autoPrependArmed: Boolean = startOffset <= 0,
     val loading: Boolean = false,
     val refreshing: Boolean = false,
     val isLoadingPrevious: Boolean = false,
@@ -22,14 +21,13 @@ data class PaginationSnapshot<Item>(
     get() = startOffset > 0
 
   val canAutoLoadPrevious: Boolean
-    get() = hasPrevious && autoPrependArmed
+    get() = hasPrevious
 
   val visiblePageInfo: PageInfo?
     get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
 }
 
 private const val PAGE_SIZE = 50
-private const val AUTO_PREPEND_ARM_INDEX = 3
 
 fun pageInfoForOffset(
     pageInfo: PageInfo?,
@@ -90,7 +88,6 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
     return snapshot.copy(
         startOffset = targetOffset.coerceAtLeast(0),
         visibleOffset = targetOffset.coerceAtLeast(0),
-        autoPrependArmed = targetOffset <= 0,
         loading = !hasExisting,
         refreshing = hasExisting,
         isLoadingPrevious = false,
@@ -121,7 +118,6 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
           offset = nextOffset,
           pageInfo = pageInfo,
           visibleOffset = startOffset,
-          autoPrependArmed = startOffset <= 0,
           loading = false,
           refreshing = false,
           isLoadingPrevious = false,
@@ -169,7 +165,6 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
         startOffset = startOffset,
         pageInfo = pageInfo ?: snapshot.pageInfo,
         visibleOffset = snapshot.visibleOffset,
-        autoPrependArmed = true,
         isLoadingPrevious = false,
         hasMore = hasMore,
         prependErrorMessage = null,
@@ -222,10 +217,8 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
     val relativeIndex =
         firstVisibleItemIndex.coerceAtLeast(0).coerceAtMost(snapshot.items.lastIndex)
     val absoluteOffset = snapshot.startOffset + relativeIndex
-    val autoPrependArmed = snapshot.autoPrependArmed || relativeIndex > AUTO_PREPEND_ARM_INDEX
-    if (snapshot.visibleOffset == absoluteOffset && snapshot.autoPrependArmed == autoPrependArmed)
-        return snapshot
-    return snapshot.copy(visibleOffset = absoluteOffset, autoPrependArmed = autoPrependArmed)
+    if (snapshot.visibleOffset == absoluteOffset) return snapshot
+    return snapshot.copy(visibleOffset = absoluteOffset)
   }
 
   private fun mergeByKey(existing: List<Item>, incoming: List<Item>): List<Item> {

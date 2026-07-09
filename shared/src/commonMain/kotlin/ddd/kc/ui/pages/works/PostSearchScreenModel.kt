@@ -20,7 +20,6 @@ import kotlinx.coroutines.launch
 
 private val log = KcLog.withTag("PostSearchScreenModel")
 private const val PAGE_SIZE = 50
-private const val AUTO_PREPEND_ARM_INDEX = 3
 
 data class PostSearchState(
     val query: String = "",
@@ -48,7 +47,7 @@ data class PostSearchState(
     get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
 
   val canAutoLoadPrevious: Boolean
-    get() = startOffset > 0 && autoPrependArmed
+    get() = startOffset > 0
 }
 
 class PostSearchScreenModel(
@@ -254,10 +253,8 @@ class PostSearchScreenModel(
     if (state.posts.isEmpty()) return
     val relativeIndex = firstVisiblePostIndex.coerceAtLeast(0).coerceAtMost(state.posts.lastIndex)
     val absoluteOffset = state.startOffset + relativeIndex
-    val autoPrependArmed = state.autoPrependArmed || relativeIndex > AUTO_PREPEND_ARM_INDEX
-    if (state.visibleOffset == absoluteOffset && state.autoPrependArmed == autoPrependArmed) return
-    mutableState.value =
-        state.copy(visibleOffset = absoluteOffset, autoPrependArmed = autoPrependArmed)
+    if (state.visibleOffset == absoluteOffset) return
+    mutableState.value = state.copy(visibleOffset = absoluteOffset)
   }
 
   private suspend fun fetchPage(

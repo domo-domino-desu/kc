@@ -26,7 +26,6 @@ import kotlinx.datetime.todayIn
 import kotlinx.datetime.yearMonth
 
 private const val PAGE_SIZE = 50
-private const val AUTO_PREPEND_ARM_INDEX = 3
 private const val SERVER_WEEK_START_ISO_DAY_NUMBER = 2
 private val popularLog = KcLog.withTag("PopularPostsScreenModel")
 
@@ -64,7 +63,7 @@ data class PopularPostsState(
     get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
 
   val canAutoLoadPrevious: Boolean
-    get() = startOffset > 0 && autoPrependArmed
+    get() = startOffset > 0
 
   val canShiftPrevious: Boolean
     get() = canShiftPopularDate(this, delta = -1)
@@ -154,10 +153,8 @@ class PopularPostsScreenModel(
     if (state.posts.isEmpty()) return
     val relativeIndex = firstVisiblePostIndex.coerceAtLeast(0).coerceAtMost(state.posts.lastIndex)
     val absoluteOffset = state.startOffset + relativeIndex
-    val autoPrependArmed = state.autoPrependArmed || relativeIndex > AUTO_PREPEND_ARM_INDEX
-    if (state.visibleOffset == absoluteOffset && state.autoPrependArmed == autoPrependArmed) return
-    mutableState.value =
-        state.copy(visibleOffset = absoluteOffset, autoPrependArmed = autoPrependArmed)
+    if (state.visibleOffset == absoluteOffset) return
+    mutableState.value = state.copy(visibleOffset = absoluteOffset)
   }
 
   fun selectPeriod(period: PopularPeriod) {

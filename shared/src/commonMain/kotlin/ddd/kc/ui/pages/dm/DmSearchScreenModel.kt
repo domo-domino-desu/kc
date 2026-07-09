@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
 
 private val log = KcLog.withTag("DmSearchScreenModel")
 private const val PAGE_SIZE = 50
-private const val AUTO_PREPEND_ARM_INDEX = 3
 
 data class DmSearchState(
     val query: String = "",
@@ -46,7 +45,7 @@ data class DmSearchState(
     get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
 
   val canAutoLoadPrevious: Boolean
-    get() = startOffset > 0 && autoPrependArmed
+    get() = startOffset > 0
 }
 
 class DmSearchScreenModel(
@@ -186,10 +185,8 @@ class DmSearchScreenModel(
     if (state.dms.isEmpty()) return
     val relativeIndex = firstVisibleItemIndex.coerceAtLeast(0).coerceAtMost(state.dms.lastIndex)
     val absoluteOffset = state.startOffset + relativeIndex
-    val autoPrependArmed = state.autoPrependArmed || relativeIndex > AUTO_PREPEND_ARM_INDEX
-    if (state.visibleOffset == absoluteOffset && state.autoPrependArmed == autoPrependArmed) return
-    mutableState.value =
-        state.copy(visibleOffset = absoluteOffset, autoPrependArmed = autoPrependArmed)
+    if (state.visibleOffset == absoluteOffset) return
+    mutableState.value = state.copy(visibleOffset = absoluteOffset)
   }
 
   private suspend fun fetchPage(

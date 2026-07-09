@@ -57,7 +57,6 @@ fun sortOrderLabel(order: SortOrder): String =
 
 private val log = KcLog.withTag("CreatorSearchScreenModel")
 private const val PAGE_SIZE = 50
-private const val AUTO_PREPEND_ARM_INDEX = 3
 
 data class CreatorSearchState(
     val query: String = "",
@@ -88,7 +87,7 @@ data class CreatorSearchState(
     get() = offset < filteredCount
 
   val canAutoLoadPrevious: Boolean
-    get() = startOffset > 0 && autoPrependArmed
+    get() = startOffset > 0
 
   val visiblePageInfo: PageInfo?
     get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
@@ -181,10 +180,8 @@ class CreatorSearchScreenModel(
     val relativeIndex =
         firstVisibleCreatorIndex.coerceAtLeast(0).coerceAtMost(state.creators.lastIndex)
     val absoluteOffset = state.startOffset + relativeIndex
-    val autoPrependArmed = state.autoPrependArmed || relativeIndex > AUTO_PREPEND_ARM_INDEX
-    if (state.visibleOffset == absoluteOffset && state.autoPrependArmed == autoPrependArmed) return
-    mutableState.value =
-        state.copy(visibleOffset = absoluteOffset, autoPrependArmed = autoPrependArmed)
+    if (state.visibleOffset == absoluteOffset) return
+    mutableState.value = state.copy(visibleOffset = absoluteOffset)
   }
 
   private fun reload(delayMs: Long = 300, forceRefresh: Boolean = false) {

@@ -27,7 +27,7 @@ class PaginationReducerTest {
         )
 
     assertEquals(4, jumped.visiblePageInfo?.currentPage)
-    assertFalse(jumped.canAutoLoadPrevious)
+    assertTrue(jumped.canAutoLoadPrevious)
 
     val appended =
         reducer.reduceAppend(
@@ -58,7 +58,7 @@ class PaginationReducerTest {
   }
 
   @Test
-  fun beginJumpDisarmsPreviousAutoloadBeforeReplacementArrives() {
+  fun beginJumpKeepsPreviousAvailabilityButLoadingStillBlocksRequests() {
     val page4 =
         reducer.reduceFirstPage(
             snapshot = PaginationSnapshot(),
@@ -84,7 +84,7 @@ class PaginationReducerTest {
     val jumpingToPage4 = reducer.beginJump(page4And5, targetOffset = 150)
 
     assertEquals(4, jumpingToPage4.visiblePageInfo?.currentPage)
-    assertFalse(jumpingToPage4.canAutoLoadPrevious)
+    assertTrue(jumpingToPage4.canAutoLoadPrevious)
     assertFalse(reducer.canLoadPrevious(jumpingToPage4))
   }
 
