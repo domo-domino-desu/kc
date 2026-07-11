@@ -1,6 +1,6 @@
 package ddd.kc.fake
 
-import ddd.kc.data.security.SecretStore
+import ddd.kc.data.local.security.SecretStore
 
 class TestSecretStore : SecretStore {
   private val values = mutableMapOf<String, String>()

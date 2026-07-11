@@ -25,13 +25,13 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import ddd.kc.data.local.ActivityHistoryRepository
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.key
-import ddd.kc.data.repository.ActivityHistoryRepository
-import ddd.kc.ui.navigation.LocalNavigationWindowStore
-import ddd.kc.ui.navigation.nextRouteInstanceKey
+import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
+import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.ui.pages.tagposts.TagPostsScreen

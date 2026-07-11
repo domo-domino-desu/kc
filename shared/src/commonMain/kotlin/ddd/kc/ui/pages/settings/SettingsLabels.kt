@@ -1,12 +1,12 @@
 package ddd.kc.ui.pages.settings
 
 import androidx.compose.runtime.Composable
-import ddd.kc.data.i18n.AppLanguage
-import ddd.kc.data.settings.DownloadFileNameMode
-import ddd.kc.data.settings.DownloadSubfolderMode
-import ddd.kc.data.settings.ThemeMode
-import ddd.kc.data.translation.TranslationProvider
-import ddd.kc.data.translation.TranslationTargetLanguage
+import ddd.kc.data.local.settings.AppLanguage
+import ddd.kc.data.local.settings.DownloadFileNameMode
+import ddd.kc.data.local.settings.DownloadSubfolderMode
+import ddd.kc.data.local.settings.ThemeMode
+import ddd.kc.data.model.TranslationProvider
+import ddd.kc.data.model.TranslationTargetLanguage
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.download_file_name_mode_custom
 import kc.shared.generated.resources.download_file_name_mode_id_title

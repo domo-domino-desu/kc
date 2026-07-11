@@ -6,8 +6,8 @@ import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.QueryError
 import ddd.kc.data.model.Tag
-import ddd.kc.ui.state.ContentTranslationState
-import ddd.kc.ui.state.PaginationSnapshot
+import ddd.kc.ui.components.state.ContentTranslationState
+import ddd.kc.ui.components.state.PaginationSnapshot
 
 data class CreatorPagerUiState(
     val creators: List<Creator> = emptyList(),

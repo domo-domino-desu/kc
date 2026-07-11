@@ -15,10 +15,10 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.data.model.key
+import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
+import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.BackAppBar
 import ddd.kc.ui.components.CreatorSearchCard
-import ddd.kc.ui.navigation.LocalNavigationWindowStore
-import ddd.kc.ui.navigation.nextRouteInstanceKey
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.navigation_content_expired
 import org.jetbrains.compose.resources.stringResource

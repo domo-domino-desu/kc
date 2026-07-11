@@ -1,11 +1,11 @@
 package ddd.kc.ui.components.platform
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.local.settings.DownloadFileNameMode
+import ddd.kc.data.local.settings.DownloadSubfolderMode
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostFile
-import ddd.kc.data.settings.AppSettings
-import ddd.kc.data.settings.DownloadFileNameMode
-import ddd.kc.data.settings.DownloadSubfolderMode
 import ddd.kc.fake.TestSecretStore
 import java.io.File
 import kotlin.test.Test

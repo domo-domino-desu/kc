@@ -63,12 +63,12 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.DateRangeW400Outline
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlinedfill1
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
+import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.SkeletonBlock
-import ddd.kc.ui.i18n.localizedMessage
-import ddd.kc.ui.state.ContentTranslationState
+import ddd.kc.ui.components.state.ContentTranslationState
 import ddd.kc.utils.collapseConsecutiveBlankLines
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.comments_count

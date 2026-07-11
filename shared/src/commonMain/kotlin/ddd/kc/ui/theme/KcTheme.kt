@@ -6,7 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import ddd.kc.data.settings.ThemeMode
+import ddd.kc.data.local.settings.ThemeMode
 
 @Composable
 fun KcTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {

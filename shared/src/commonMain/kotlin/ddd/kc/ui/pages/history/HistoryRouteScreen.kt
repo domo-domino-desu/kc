@@ -16,8 +16,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -25,20 +23,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import ddd.kc.data.local.ActivityHistoryRepository
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.key
 import ddd.kc.ui.app.LocalAppSettings
+import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
+import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.BackAppBar
 import ddd.kc.ui.components.CreatorSearchCard
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.GridLoadingSkeleton
 import ddd.kc.ui.components.PostCard
-import ddd.kc.ui.i18n.localizedMessage
-import ddd.kc.ui.navigation.LocalNavigationWindowStore
-import ddd.kc.ui.navigation.nextRouteInstanceKey
+import ddd.kc.ui.components.rememberQuery
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.post.PostRouteScreen
 import kc.shared.generated.resources.Res
@@ -47,6 +46,7 @@ import kc.shared.generated.resources.history
 import kc.shared.generated.resources.history_tab_posts
 import kc.shared.generated.resources.history_tab_users
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 
 class HistoryRouteScreen(
     private val routeKey: String = nextRouteInstanceKey("history"),
@@ -58,24 +58,24 @@ class HistoryRouteScreen(
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
     val navigationWindows = LocalNavigationWindowStore.current
-    val screenModel = koinScreenModel<HistoryScreenModel>()
-    val state by screenModel.state.collectAsState()
+    val repository = koinInject<ActivityHistoryRepository>()
+    val query = rememberQuery { repository.observeHistory() }
+    val state = query.state
     val cellWidth = LocalAppSettings.current.cellMinWidthDp()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val creators = state.creators
-    val posts = state.posts
+    val creators = state.data?.creators.orEmpty()
+    val posts = state.data?.posts.orEmpty()
     val tabLabels =
         listOf(
             stringResource(Res.string.history_tab_users),
             stringResource(Res.string.history_tab_posts),
         )
 
-    LaunchedEffect(Unit) { screenModel.load() }
     ErrorToastEffect(state.error?.localizedMessage())
 
     Scaffold(topBar = { BackAppBar(stringResource(Res.string.history)) }) { paddingValues ->
       Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        if (state.loading && creators.isEmpty() && posts.isEmpty()) {
+        if (state.isLoading && creators.isEmpty() && posts.isEmpty()) {
           GridLoadingSkeleton(minCardWidthDp = cellWidth)
           return@Column
         }

@@ -5,7 +5,7 @@ import androidx.compose.ui.window.application
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
-import ddd.kc.data.media.installKcCoilImageProgressSupport
+import ddd.kc.data.remote.media.installKcCoilImageProgressSupport
 import ddd.kc.di.startAppKoin
 import ddd.kc.di.stopAppKoin
 import ddd.kc.ui.app.KcApp

@@ -1,7 +1,7 @@
 package ddd.kc.ui.pages.settings
 
 import androidx.compose.runtime.Composable
-import ddd.kc.data.settings.AppSettings
+import ddd.kc.data.local.settings.AppSettings
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.settings_error_api_key_empty
 import kc.shared.generated.resources.settings_error_card_width_number

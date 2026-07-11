@@ -49,6 +49,8 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.DateRangeW400Outline
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowLeftW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW400Outlined
 import ddd.kc.ui.app.LocalAppSettings
+import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
 import ddd.kc.ui.components.PostGridPagingActions
@@ -56,8 +58,7 @@ import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.components.fullWidthItem
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
-import ddd.kc.ui.i18n.localizedMessage
-import ddd.kc.ui.navigation.LocalNavigationWindowStore
+import ddd.kc.ui.components.state.ScrollPosition
 import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.ui.pages.recent.PopularDateBoundary
@@ -66,7 +67,6 @@ import ddd.kc.ui.pages.recent.PopularPeriod
 import ddd.kc.ui.pages.recent.PopularPostsScreenModel
 import ddd.kc.ui.pages.recent.PopularPostsState
 import ddd.kc.ui.pages.tags.TagsContent
-import ddd.kc.ui.state.ScrollPosition
 import ddd.kc.utils.logging.KcLog
 import ddd.kc.utils.logging.summarizePost
 import kc.shared.generated.resources.Res
@@ -135,19 +135,19 @@ class WorksScreen(
             0 ->
                 PopularWorksContent(
                     onReselectHandlerChanged = onReselectHandlerChanged,
-                    initialScrollPosition = worksModel.popularScroll,
+                    initialScrollPosition = worksState.popularScroll,
                     onScrollPositionChanged = worksModel::onPopularScrollChanged,
                 )
             1 ->
                 PostSearchContent(
                     onReselectHandlerChanged = onReselectHandlerChanged,
-                    initialScrollPosition = worksModel.searchScroll,
+                    initialScrollPosition = worksState.searchScroll,
                     onScrollPositionChanged = worksModel::onSearchScrollChanged,
                 )
             2 ->
                 TagsContent(
                     onReselectHandlerChanged = onReselectHandlerChanged,
-                    initialScrollPosition = worksModel.tagsScroll,
+                    initialScrollPosition = worksState.tagsScroll,
                     onScrollPositionChanged = worksModel::onTagsScrollChanged,
                 )
           }

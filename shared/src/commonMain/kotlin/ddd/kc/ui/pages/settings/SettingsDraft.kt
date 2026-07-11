@@ -1,15 +1,15 @@
 package ddd.kc.ui.pages.settings
 
-import ddd.kc.data.i18n.AppLanguage
-import ddd.kc.data.settings.AppPreferences
-import ddd.kc.data.settings.AppSettings
-import ddd.kc.data.settings.DownloadFileNameMode
-import ddd.kc.data.settings.DownloadSubfolderMode
-import ddd.kc.data.settings.ThemeMode
-import ddd.kc.data.translation.OpenAiTranslationConfig
-import ddd.kc.data.translation.TranslationProvider
-import ddd.kc.data.translation.TranslationSettings
-import ddd.kc.data.translation.TranslationTargetLanguage
+import ddd.kc.data.local.settings.AppLanguage
+import ddd.kc.data.local.settings.AppPreferences
+import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.local.settings.DownloadFileNameMode
+import ddd.kc.data.local.settings.DownloadSubfolderMode
+import ddd.kc.data.local.settings.ThemeMode
+import ddd.kc.data.model.OpenAiTranslationConfig
+import ddd.kc.data.model.TranslationProvider
+import ddd.kc.data.model.TranslationSettings
+import ddd.kc.data.model.TranslationTargetLanguage
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 

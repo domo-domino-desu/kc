@@ -5,9 +5,9 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.QueryError
-import ddd.kc.data.network.toQueryError
-import ddd.kc.data.repository.CreatorRepository
-import ddd.kc.data.repository.PostRepository
+import ddd.kc.data.remote.network.toQueryError
+import ddd.kc.data.remote.repository.CreatorRepository
+import ddd.kc.data.remote.repository.PostRepository
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.Job

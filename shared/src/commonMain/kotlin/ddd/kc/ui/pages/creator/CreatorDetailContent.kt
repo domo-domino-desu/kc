@@ -64,6 +64,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlinedfill1
 import ddd.kc.ui.app.LocalAppSettings
+import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.components.CreatorBannerFallback
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
@@ -76,13 +77,12 @@ import ddd.kc.ui.components.PostGridPagingControls
 import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.components.TranslateIconButton
 import ddd.kc.ui.components.gridSkeletonItems
+import ddd.kc.ui.components.icons.rememberServiceIconDefinition
+import ddd.kc.ui.components.icons.serviceIconVector
 import ddd.kc.ui.components.loadingFooter
-import ddd.kc.ui.i18n.localizedMessage
-import ddd.kc.ui.icons.rememberServiceIconDefinition
-import ddd.kc.ui.icons.serviceIconVector
-import ddd.kc.ui.state.ContentTranslationState
-import ddd.kc.ui.state.TranslationBlockState
-import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.ui.components.state.ContentTranslationState
+import ddd.kc.ui.components.state.TranslationBlockState
+import ddd.kc.ui.components.state.TranslationStatus
 import ddd.kc.utils.collapseConsecutiveBlankLines
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.add_favorite

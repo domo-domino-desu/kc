@@ -41,16 +41,13 @@ ui -> domain -> data
 
 ### commonMain 主要包
 
-- `data/network`：Pawchive gateway、API facade、HTML parser、session transport 与 typed network error。
-- `data/cache`、`data/local`：Room SWR cache、DAO、entity 和 database contract。
-- `data/repository`：面向 UI 的 Pawchive resource repository。
-- `data/settings`、`data/security`：设置 snapshot/store 与 secret contract。
-- `data/translation`：translation engine、严格对齐器和 provider client。
 - `data/model`：共享资源模型、强类型 key、分页模型和查询结果。
-- `ui/navigation`：root/main navigator、link routing 和 navigator-scoped transient window。
+- `data/local`：Room、历史仓储、DataStore/KSafe 设置与 secret contract。
+- `data/remote`：Pawchive transport/parser、Room-backed SWR cache、远程资源仓储、媒体下载与 translation provider。
+- `ui/app`：应用根节点、navigation、locale 与应用级 CompositionLocal。
 - `ui/pages`：按 feature 组织的 route、ScreenModel、内容组件与局部 state。
-- `ui/components`：跨 feature 复用的 Compose 组件和平台文件 contract。
-- `ui/i18n`：locale actual contract 和 typed error 的资源映射。
+- `ui/components`：跨 feature Compose 组件、分页/query state、图标与平台文件 contract。
+- `ui/theme`：Material theme 与平台动态配色 contract。
 
 不要仅为了“架构感”新增 Gradle module。先在 package 和依赖方向上形成稳定边界；只有边界成熟、编译隔离或所有权确有收益时再拆模块。
 

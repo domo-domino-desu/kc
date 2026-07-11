@@ -24,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,15 +46,17 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import ddd.kc.data.model.Tag
+import ddd.kc.data.remote.repository.TagRepository
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
+import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.SkeletonBlock
 import ddd.kc.ui.components.isAtTop
-import ddd.kc.ui.i18n.localizedMessage
+import ddd.kc.ui.components.rememberQuery
+import ddd.kc.ui.components.state.ScrollPosition
 import ddd.kc.ui.pages.tagposts.TagPostsScreen
-import ddd.kc.ui.state.ScrollPosition
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.filter_tags_hint
 import kc.shared.generated.resources.tags
@@ -117,15 +118,18 @@ fun TagsContent(
     onScrollPositionChanged: (Int, Int) -> Unit = { _, _ -> },
 ) {
   val navigator = LocalNavigator.currentOrThrow
-  val screenModel = koinInject<TagsScreenModel>()
-  val state by screenModel.state.collectAsState()
+  val repository = koinInject<TagRepository>()
+  val query = rememberQuery { forceRefresh -> repository.observeTags(forceRefresh) }
+  val state = query.state
+  var filter by remember { mutableStateOf("") }
+  val tags = state.data.orEmpty()
   val listState =
       rememberLazyListState(
           initialFirstVisibleItemIndex = initialScrollPosition.index,
           initialFirstVisibleItemScrollOffset = initialScrollPosition.offset,
       )
   val scope = rememberCoroutineScope()
-  val refresh = { screenModel.load(forceRefresh = true) }
+  val refresh = query.refresh
   val latestOnReselect by
       rememberUpdatedState<() -> Unit> {
         if (listState.isAtTop) {
@@ -135,7 +139,6 @@ fun TagsContent(
         }
       }
 
-  LaunchedEffect(Unit) { screenModel.load() }
   LaunchedEffect(listState) {
     snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
         .distinctUntilChanged()
@@ -151,7 +154,7 @@ fun TagsContent(
   Scaffold(contentWindowInsets = WindowInsets(0.dp)) { paddingValues ->
     KcPullRefreshBox(
         enabled = !state.isLoading,
-        refreshing = state.result.isRefreshing,
+        refreshing = state.isRefreshing,
         onRefresh = refresh,
         modifier = Modifier.fillMaxSize().padding(paddingValues),
     ) {
@@ -159,7 +162,9 @@ fun TagsContent(
         val density = LocalDensity.current
         val textMeasurer = rememberTextMeasurer()
         val chipTextStyle = MaterialTheme.typography.labelLarge
-        val filteredTags = state.filteredTags
+        val filteredTags =
+            if (filter.isBlank()) tags
+            else tags.filter { it.tag.contains(filter, ignoreCase = true) }
         val rowWidthPx =
             with(density) {
               (maxWidth - TagListHorizontalPadding * 2).coerceAtLeast(0.dp).roundToPx()
@@ -238,8 +243,8 @@ fun TagsContent(
               FilterSkeleton()
             } else {
               OutlinedTextField(
-                  value = state.filter,
-                  onValueChange = { screenModel.onFilterChanged(it) },
+                  value = filter,
+                  onValueChange = { filter = it },
                   placeholder = { Text(stringResource(Res.string.filter_tags_hint)) },
                   singleLine = true,
                   modifier = Modifier.fillMaxWidth(),

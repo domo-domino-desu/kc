@@ -56,8 +56,8 @@ import ddd.kc.ui.components.PlatformVideoPlayer
 import ddd.kc.ui.components.SkeletonBlock
 import ddd.kc.ui.components.TopLinearImageLoadingProgress
 import ddd.kc.ui.components.rememberImageLoadProgressState
-import ddd.kc.ui.state.TranslationBlockState
-import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.ui.components.state.TranslationBlockState
+import ddd.kc.ui.components.state.TranslationStatus
 import ddd.kc.utils.collapseConsecutiveBlankLines
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.load_full_size_images

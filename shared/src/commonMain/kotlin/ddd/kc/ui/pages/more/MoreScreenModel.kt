@@ -3,11 +3,11 @@ package ddd.kc.ui.pages.more
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.QueryError
-import ddd.kc.data.network.KcSessionStore
-import ddd.kc.data.network.PawchiveApi
-import ddd.kc.data.network.toQueryError
-import ddd.kc.data.repository.CreatorRepository
-import ddd.kc.data.repository.PostRepository
+import ddd.kc.data.remote.network.KcSessionStore
+import ddd.kc.data.remote.network.PawchiveApi
+import ddd.kc.data.remote.network.toQueryError
+import ddd.kc.data.remote.repository.CreatorRepository
+import ddd.kc.data.remote.repository.PostRepository
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch

@@ -5,15 +5,16 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.DmKey
 import ddd.kc.data.model.key
-import ddd.kc.data.repository.CreatorRepository
-import ddd.kc.data.repository.awaitData
-import ddd.kc.ui.state.PaginationReducer
-import ddd.kc.ui.state.PaginationSnapshot
+import ddd.kc.data.remote.repository.CreatorRepository
+import ddd.kc.data.remote.repository.awaitData
+import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.state.PaginationReducer
+import ddd.kc.ui.components.state.PaginationSnapshot
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
-private const val PAGE_SIZE = 50
+private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 class RecentDMsScreenModel(
     private val creatorRepo: CreatorRepository,

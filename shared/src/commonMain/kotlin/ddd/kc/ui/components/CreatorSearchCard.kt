@@ -35,8 +35,8 @@ import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
 import ddd.kc.ui.app.LocalAppSettings
-import ddd.kc.ui.icons.rememberServiceIconDefinition
-import ddd.kc.ui.icons.serviceIconVector
+import ddd.kc.ui.components.icons.rememberServiceIconDefinition
+import ddd.kc.ui.components.icons.serviceIconVector
 
 @Composable
 fun CreatorSearchCard(

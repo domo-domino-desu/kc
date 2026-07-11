@@ -6,16 +6,12 @@ import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.QueryError
-import ddd.kc.ui.state.ContentTranslationState
+import ddd.kc.ui.components.state.ContentTranslationState
+import ddd.kc.ui.components.state.PaginationSnapshot
 
 data class PostPagerUiState(
-    val posts: List<Post> = emptyList(),
+    val paging: PaginationSnapshot<Post> = PaginationSnapshot(),
     val currentIndex: Int = 0,
-    val startOffset: Int = 0,
-    val offset: Int = 0,
-    val isLoadingPrevious: Boolean = false,
-    val isLoadingMore: Boolean = false,
-    val hasMore: Boolean = true,
     val favoritePostIds: Set<PostKey> = emptySet(),
     val favoriteError: QueryError? = null,
     val loadingDetailPostIds: Set<PostKey> = emptySet(),
@@ -29,6 +25,24 @@ data class PostPagerUiState(
     /** postId → full image URLs requested from thumbnail state */
     val requestedFullImageUrls: Map<PostKey, Set<String>> = emptyMap(),
 ) {
+  val posts
+    get() = paging.items
+
+  val startOffset
+    get() = paging.startOffset
+
+  val offset
+    get() = paging.offset
+
+  val isLoadingPrevious
+    get() = paging.isLoadingPrevious
+
+  val isLoadingMore
+    get() = paging.isLoadingMore
+
+  val hasMore
+    get() = paging.hasMore
+
   val hasPrevious: Boolean
     get() = currentIndex > 0 || startOffset > 0
 

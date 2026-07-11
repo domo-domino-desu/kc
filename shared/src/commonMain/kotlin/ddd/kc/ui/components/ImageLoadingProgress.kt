@@ -13,9 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import ddd.kc.data.media.ImageDownloadProgressSnapshot
-import ddd.kc.data.media.ImageProgressTracker
-import ddd.kc.data.media.normalizeProgressKey
+import ddd.kc.data.remote.media.ImageDownloadProgressSnapshot
+import ddd.kc.data.remote.media.ImageProgressTracker
+import ddd.kc.data.remote.media.normalizeProgressKey
 import kotlinx.coroutines.flow.flowOf
 import org.koin.compose.koinInject
 

@@ -12,11 +12,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import ddd.kc.data.settings.AppSettings
-import ddd.kc.data.settings.SettingsLoadState
+import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.local.settings.SettingsLoadState
+import ddd.kc.ui.app.i18n.ProvideAppLocale
+import ddd.kc.ui.app.navigation.RootNavigator
 import ddd.kc.ui.components.AppFeedbackHost
-import ddd.kc.ui.i18n.ProvideAppLocale
-import ddd.kc.ui.navigation.RootNavigator
 import ddd.kc.ui.theme.KcTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow

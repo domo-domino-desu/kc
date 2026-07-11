@@ -9,22 +9,23 @@ import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.Tag
 import ddd.kc.data.model.key
-import ddd.kc.data.network.toQueryError
-import ddd.kc.data.repository.CreatorRepository
-import ddd.kc.data.repository.PostRepository
-import ddd.kc.data.translation.TranslationBlockResult
-import ddd.kc.data.translation.TranslationEngine
-import ddd.kc.ui.state.ContentTranslationState
-import ddd.kc.ui.state.PAGER_NEXT_PREFETCH_COUNT
-import ddd.kc.ui.state.PaginationReducer
-import ddd.kc.ui.state.PaginationSnapshot
-import ddd.kc.ui.state.TranslationBlockState
-import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.data.remote.network.toQueryError
+import ddd.kc.data.remote.repository.CreatorRepository
+import ddd.kc.data.remote.repository.PostRepository
+import ddd.kc.data.remote.translation.TranslationBlockResult
+import ddd.kc.data.remote.translation.TranslationEngine
+import ddd.kc.ui.components.state.ContentTranslationState
+import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.state.PAGER_NEXT_PREFETCH_COUNT
+import ddd.kc.ui.components.state.PaginationReducer
+import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.state.TranslationBlockState
+import ddd.kc.ui.components.state.TranslationStatus
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
-private const val PAGE_SIZE = 50
+private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 private val log = KcLog.withTag("CreatorScreenModel")
 
 class CreatorScreenModel(

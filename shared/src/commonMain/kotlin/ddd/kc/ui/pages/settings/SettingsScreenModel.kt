@@ -2,7 +2,7 @@ package ddd.kc.ui.pages.settings
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import ddd.kc.data.settings.AppSettings
+import ddd.kc.data.local.settings.AppSettings
 import ddd.kc.utils.coroutines.resultOfSuspend
 import kotlinx.coroutines.launch
 

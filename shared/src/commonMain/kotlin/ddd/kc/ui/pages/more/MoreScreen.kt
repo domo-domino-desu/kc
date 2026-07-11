@@ -37,10 +37,10 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.MenuW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.PersonW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ReceiptLongW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.SettingsW400Outlined
+import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.isAtTop
-import ddd.kc.ui.i18n.localizedMessage
 import ddd.kc.ui.pages.about.AboutRouteScreen
 import ddd.kc.ui.pages.history.HistoryRouteScreen
 import ddd.kc.ui.pages.settings.SettingsRouteScreen

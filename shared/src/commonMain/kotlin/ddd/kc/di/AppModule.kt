@@ -14,10 +14,8 @@ const val KOIN_QUALIFIER_CACHED_IMAGE_CLIENT = "cached_image_client"
 
 fun appModules(platformModule: Module): List<Module> =
     listOf(
-        networkModule(),
-        databaseModule(),
-        repositoryModule(),
-        screenModelModule(),
+        dataModule(),
+        uiModule(),
         platformModule,
     )
 

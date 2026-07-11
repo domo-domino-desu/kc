@@ -13,17 +13,20 @@ import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.creatorKey
 import ddd.kc.data.model.imageFiles
 import ddd.kc.data.model.key
-import ddd.kc.data.network.toQueryError
-import ddd.kc.data.repository.CreatorRepository
-import ddd.kc.data.repository.PostRepository
-import ddd.kc.data.translation.TranslationBlockResult
-import ddd.kc.data.translation.TranslationEngine
-import ddd.kc.ui.state.ContentTranslationState
-import ddd.kc.ui.state.PAGER_NEXT_PREFETCH_COUNT
-import ddd.kc.ui.state.PAGER_PREFETCH_DEBOUNCE_MS
-import ddd.kc.ui.state.PAGER_PREVIOUS_PREFETCH_COUNT
-import ddd.kc.ui.state.TranslationBlockState
-import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.data.remote.network.toQueryError
+import ddd.kc.data.remote.repository.CreatorRepository
+import ddd.kc.data.remote.repository.PostRepository
+import ddd.kc.data.remote.translation.TranslationBlockResult
+import ddd.kc.data.remote.translation.TranslationEngine
+import ddd.kc.ui.components.state.ContentTranslationState
+import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.state.PAGER_NEXT_PREFETCH_COUNT
+import ddd.kc.ui.components.state.PAGER_PREFETCH_DEBOUNCE_MS
+import ddd.kc.ui.components.state.PAGER_PREVIOUS_PREFETCH_COUNT
+import ddd.kc.ui.components.state.PaginationReducer
+import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.state.TranslationBlockState
+import ddd.kc.ui.components.state.TranslationStatus
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import ddd.kc.utils.logging.summarizePost
@@ -32,7 +35,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val PAGE_SIZE = 50
+private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 private val log = KcLog.withTag("PostScreenModel")
 
 private data class DetailPagingPage(
@@ -52,14 +55,18 @@ class PostScreenModel(
 ) :
     StateScreenModel<PostPagerUiState>(
         PostPagerUiState(
-            posts = initialPosts,
+            paging =
+                PaginationSnapshot(
+                    items = initialPosts,
+                    startOffset = initialOffset,
+                    offset = initialOffset + initialPosts.size,
+                    hasMore = pagingContext != PostPagingContext.None && initialHasMore,
+                ),
             currentIndex = startIndex,
-            startOffset = initialOffset,
-            offset = initialOffset + initialPosts.size,
-            hasMore = pagingContext != PostPagingContext.None && initialHasMore,
         )
     ) {
 
+  private val pagingReducer = PaginationReducer<Post, PostKey> { it.key }
   private var prefetchJob: Job? = null
   private val updatingFavoritePosts = mutableSetOf<PostKey>()
   private val loadedDetailIds = mutableSetOf<PostKey>()
@@ -116,35 +123,36 @@ class PostScreenModel(
 
   private fun loadMore() {
     val state = mutableState.value
-    if (state.isLoadingMore || state.isLoadingPrevious || !state.hasMore) return
+    if (!pagingReducer.canLoadMore(state.paging, force = true)) return
     if (pagingContext == PostPagingContext.None) return
     val nextOffset = state.offset
     log.i { "加载更多Post -> 开始(offset=$nextOffset)" }
-    mutableState.value = state.copy(isLoadingMore = true)
+    mutableState.value = state.copy(paging = pagingReducer.beginAppend(state.paging))
     screenModelScope.launch {
       resultOfSuspend { fetchPagingPage(nextOffset, forceRefresh = false) }
           .onSuccess { page ->
             val current = mutableState.value
-            val merged =
-                appendDetailPosts(
-                    currentPosts = current.posts,
-                    pagePosts = page.posts,
-                    nextOffset = nextOffset,
-                    pageInfo = page.pageInfo,
-                    pageSize = PAGE_SIZE,
-                )
             mutableState.value =
                 current.copy(
-                    posts = merged.posts,
-                    offset = merged.offset,
-                    hasMore = merged.hasMore,
-                    isLoadingMore = false,
+                    paging =
+                        pagingReducer.reduceAppend(
+                            current.paging,
+                            page.posts,
+                            page.pageInfo?.hasNext ?: (page.posts.size >= PAGE_SIZE),
+                            nextOffset + page.posts.size,
+                            page.pageInfo,
+                        )
                 )
-            log.i { "加载更多Post -> 成功(count=${page.posts.size},merged=${merged.posts.size})" }
+            log.i {
+              "加载更多Post -> 成功(count=${page.posts.size},merged=${mutableState.value.posts.size})"
+            }
           }
           .onFailure {
             log.e(it) { "加载更多Post -> 失败" }
-            mutableState.value = mutableState.value.copy(isLoadingMore = false)
+            mutableState.value =
+                mutableState.value.copy(
+                    paging = pagingReducer.reduceAppendError(mutableState.value.paging, it)
+                )
           }
     }
   }
@@ -152,38 +160,43 @@ class PostScreenModel(
   private fun loadPrevious() {
     val state = mutableState.value
     if (
-        state.isLoadingPrevious ||
-            state.isLoadingMore ||
-            state.startOffset <= 0 ||
+        !pagingReducer.canLoadPrevious(state.paging, force = true) ||
             pagingContext == PostPagingContext.None
     )
         return
     val previousOffset = (state.startOffset - PAGE_SIZE).coerceAtLeast(0)
     log.i { "加载上一页Post -> 开始(offset=$previousOffset)" }
-    mutableState.value = state.copy(isLoadingPrevious = true)
+    mutableState.value = state.copy(paging = pagingReducer.beginPrepend(state.paging))
     screenModelScope.launch {
       resultOfSuspend { fetchPagingPage(previousOffset, forceRefresh = false) }
           .onSuccess { page ->
             val current = mutableState.value
-            val merged =
-                prependDetailPosts(
-                    currentPosts = current.posts,
-                    currentIndex = current.currentIndex,
-                    previousOffset = previousOffset,
-                    pagePosts = page.posts,
+            val oldFirstKey = current.posts.firstOrNull()?.key
+            val paging =
+                pagingReducer.reducePrepend(
+                    current.paging,
+                    page.posts,
+                    current.paging.hasMore,
+                    previousOffset,
+                    page.pageInfo,
                 )
+            val prependedCount =
+                oldFirstKey?.let { key ->
+                  paging.items.indexOfFirst { it.key == key }.coerceAtLeast(0)
+                } ?: 0
             mutableState.value =
                 current.copy(
-                    posts = merged.posts,
-                    currentIndex = merged.currentIndex,
-                    startOffset = merged.startOffset,
-                    isLoadingPrevious = false,
+                    paging = paging,
+                    currentIndex = current.currentIndex + prependedCount,
                 )
-            log.i { "加载上一页Post -> 成功(count=${page.posts.size},merged=${merged.posts.size})" }
+            log.i { "加载上一页Post -> 成功(count=${page.posts.size},merged=${paging.items.size})" }
           }
           .onFailure {
             log.e(it) { "加载上一页Post -> 失败" }
-            mutableState.value = mutableState.value.copy(isLoadingPrevious = false)
+            mutableState.value =
+                mutableState.value.copy(
+                    paging = pagingReducer.reducePrependError(mutableState.value.paging, it)
+                )
           }
     }
   }
@@ -258,7 +271,7 @@ class PostScreenModel(
               updated[index] = detail
               mutableState.value =
                   current.copy(
-                      posts = updated,
+                      paging = current.paging.copy(items = updated),
                       loadingDetailPostIds = current.loadingDetailPostIds - post.key,
                   )
             } else {

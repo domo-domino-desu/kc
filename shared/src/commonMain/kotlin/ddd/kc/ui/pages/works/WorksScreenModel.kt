@@ -1,36 +1,30 @@
 package ddd.kc.ui.pages.works
 
 import cafe.adriel.voyager.core.model.StateScreenModel
-import ddd.kc.ui.state.ScrollPosition
+import ddd.kc.ui.components.state.ScrollPosition
 
 data class WorksScreenState(
     val selectedIndex: Int = 0,
+    val popularScroll: ScrollPosition = ScrollPosition(),
+    val searchScroll: ScrollPosition = ScrollPosition(),
+    val tagsScroll: ScrollPosition = ScrollPosition(),
 )
 
 class WorksScreenModel : StateScreenModel<WorksScreenState>(WorksScreenState()) {
-  var popularScroll: ScrollPosition = ScrollPosition()
-    private set
-
-  var searchScroll: ScrollPosition = ScrollPosition()
-    private set
-
-  var tagsScroll: ScrollPosition = ScrollPosition()
-    private set
-
   fun selectTab(index: Int) {
     if (index == mutableState.value.selectedIndex) return
     mutableState.value = mutableState.value.copy(selectedIndex = index)
   }
 
   fun onPopularScrollChanged(index: Int, offset: Int) {
-    popularScroll = ScrollPosition(index, offset)
+    mutableState.value = mutableState.value.copy(popularScroll = ScrollPosition(index, offset))
   }
 
   fun onSearchScrollChanged(index: Int, offset: Int) {
-    searchScroll = ScrollPosition(index, offset)
+    mutableState.value = mutableState.value.copy(searchScroll = ScrollPosition(index, offset))
   }
 
   fun onTagsScrollChanged(index: Int, offset: Int) {
-    tagsScroll = ScrollPosition(index, offset)
+    mutableState.value = mutableState.value.copy(tagsScroll = ScrollPosition(index, offset))
   }
 }

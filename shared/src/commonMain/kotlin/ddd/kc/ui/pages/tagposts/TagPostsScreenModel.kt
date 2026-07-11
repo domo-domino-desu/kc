@@ -5,14 +5,15 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.key
-import ddd.kc.data.repository.PostRepository
-import ddd.kc.ui.state.PaginationReducer
-import ddd.kc.ui.state.PaginationSnapshot
+import ddd.kc.data.remote.repository.PostRepository
+import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.state.PaginationReducer
+import ddd.kc.ui.components.state.PaginationSnapshot
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
-private const val PAGE_SIZE = 50
+private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 class TagPostsScreenModel(
     private val postRepo: PostRepository,

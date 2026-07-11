@@ -40,12 +40,12 @@ import com.github.panpf.zoomimage.CoilZoomAsyncImage
 import com.github.panpf.zoomimage.rememberCoilZoomState
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CloseW400Outlined
+import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
+import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.CenterCircularWavyImageLoadingProgress
 import ddd.kc.ui.components.ImageLoadLifecycleState
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.rememberImageLoadProgressState
-import ddd.kc.ui.navigation.LocalNavigationWindowStore
-import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.close

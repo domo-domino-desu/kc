@@ -29,10 +29,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import ddd.kc.data.settings.AppSettings
-import ddd.kc.data.settings.DownloadFileNameMode
-import ddd.kc.data.translation.TranslationProvider
-import ddd.kc.data.translation.TranslationTargetLanguage
+import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.local.settings.DownloadFileNameMode
+import ddd.kc.data.model.TranslationProvider
+import ddd.kc.data.model.TranslationTargetLanguage
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ArrowBackW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.HomeW400Outlined

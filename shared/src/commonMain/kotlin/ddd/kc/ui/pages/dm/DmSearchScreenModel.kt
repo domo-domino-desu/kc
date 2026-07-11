@@ -3,14 +3,13 @@ package ddd.kc.ui.pages.dm
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.DM
-import ddd.kc.data.model.PageInfo
-import ddd.kc.data.model.PagedResult
-import ddd.kc.data.model.QueryError
+import ddd.kc.data.model.DmKey
 import ddd.kc.data.model.QueryState
-import ddd.kc.data.model.preserveRefreshUi
-import ddd.kc.data.network.toQueryError
-import ddd.kc.data.repository.CreatorRepository
-import ddd.kc.ui.state.pageInfoForOffset
+import ddd.kc.data.model.key
+import ddd.kc.data.remote.repository.CreatorRepository
+import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.state.PaginationReducer
+import ddd.kc.ui.components.state.PaginationSnapshot
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
@@ -19,72 +18,71 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val log = KcLog.withTag("DmSearchScreenModel")
-private const val PAGE_SIZE = 50
+private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 data class DmSearchState(
     val query: String = "",
-    val result: QueryState<PagedResult<DM>> = QueryState(),
-    val dms: List<DM> = emptyList(),
-    val startOffset: Int = 0,
-    val offset: Int = 0,
-    val hasMore: Boolean = true,
-    val pageInfo: PageInfo? = null,
-    val visibleOffset: Int = startOffset,
-    val autoPrependArmed: Boolean = startOffset <= 0,
-    val isLoadingPrevious: Boolean = false,
-    val isLoadingMore: Boolean = false,
-    val prependError: QueryError? = null,
-    val appendError: QueryError? = null,
+    val paging: PaginationSnapshot<DM> = PaginationSnapshot(),
 ) {
-  val isLoading: Boolean
-    get() = result.isLoading
+  val dms
+    get() = paging.items
 
-  val error: ddd.kc.data.model.QueryError?
-    get() = result.error
+  val result
+    get() =
+        QueryState<Unit>(
+            isLoading = paging.loading,
+            isRefreshing = paging.refreshing,
+            error = paging.error,
+        )
 
-  val visiblePageInfo: PageInfo?
-    get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
+  val isLoading
+    get() = paging.loading
 
-  val canAutoLoadPrevious: Boolean
-    get() = startOffset > 0
+  val error
+    get() = paging.error
+
+  val visiblePageInfo
+    get() = paging.visiblePageInfo
+
+  val canAutoLoadPrevious
+    get() = paging.canAutoLoadPrevious
+
+  val isLoadingPrevious
+    get() = paging.isLoadingPrevious
+
+  val isLoadingMore
+    get() = paging.isLoadingMore
+
+  val prependError
+    get() = paging.prependError
+
+  val appendError
+    get() = paging.appendError
+
+  val hasMore
+    get() = paging.hasMore
 }
 
 class DmSearchScreenModel(
     private val creatorRepo: CreatorRepository,
 ) : StateScreenModel<DmSearchState>(DmSearchState()) {
+  private val reducer = PaginationReducer<DM, DmKey> { it.key }
   private var searchJob: Job? = null
-  private var generation: Long = 0
+  private var generation = 0L
 
   fun init() = Unit
 
   fun onQueryChanged(query: String) {
-    mutableState.value =
-        mutableState.value.copy(
-            query = query,
-            dms = emptyList(),
-            startOffset = 0,
-            offset = 0,
-            hasMore = true,
-            pageInfo = null,
-            visibleOffset = 0,
-            autoPrependArmed = true,
-            isLoadingPrevious = false,
-            isLoadingMore = false,
-            prependError = null,
-            appendError = null,
-        )
     searchJob?.cancel()
     generation++
-    if (query.isBlank()) {
-      mutableState.value = mutableState.value.copy(dms = emptyList(), result = QueryState())
-      return
-    }
+    mutableState.value = DmSearchState(query = query)
+    if (query.isBlank()) return
     val requestGeneration = generation
     searchJob =
         screenModelScope.launch {
           try {
             delay(300)
-            search(query, requestGeneration)
+            loadFirstPage(query, forceRefresh = true, requestGeneration)
           } catch (_: CancellationException) {
             return@launch
           }
@@ -92,192 +90,120 @@ class DmSearchScreenModel(
   }
 
   fun refresh() {
-    searchJob?.cancel()
-    generation++
     val query = mutableState.value.query
     if (query.isBlank()) return
-    val requestGeneration = generation
-    searchJob = screenModelScope.launch { search(query, requestGeneration) }
-  }
-
-  private suspend fun search(query: String, requestGeneration: Long) {
-    mutableState.value =
-        mutableState.value.copy(
-            result =
-                mutableState.value.result.copy(
-                    isLoading = mutableState.value.dms.isEmpty(),
-                    isRefreshing = mutableState.value.dms.isNotEmpty(),
-                    error = null,
-                )
-        )
-    creatorRepo.observeDmsPage(query = query, offset = 0, forceRefresh = true).collect { next ->
-      if (requestGeneration != generation || mutableState.value.query != query) return@collect
-      val dms = next.data?.items ?: mutableState.value.dms
-      val result = next.preserveRefreshUi(dms.isNotEmpty())
-      log.i { "DM搜索 -> 状态(queryLength=${query.length},count=${dms.size})" }
-      mutableState.value =
-          mutableState.value.copy(
-              result = result,
-              dms = dms,
-              startOffset = 0,
-              offset = dms.size,
-              hasMore = next.data?.pageInfo?.hasNext ?: (dms.size >= PAGE_SIZE),
-              pageInfo = next.data?.pageInfo,
-              visibleOffset = 0,
-              autoPrependArmed = true,
-              isLoadingPrevious = false,
-              prependError = null,
-              appendError = null,
-          )
-    }
+    searchJob?.cancel()
+    val requestGeneration = ++generation
+    searchJob = screenModelScope.launch { loadFirstPage(query, true, requestGeneration) }
   }
 
   fun loadMore() {
     val state = mutableState.value
-    if (state.query.isBlank() || state.isLoading || state.isLoadingMore || !state.hasMore) return
-    mutableState.value = state.copy(isLoadingMore = true, appendError = null)
-    screenModelScope.launch { fetchPage(state.offset, replace = false) }
+    if (state.query.isBlank() || !reducer.canLoadMore(state.paging)) return
+    screenModelScope.launch {
+      updatePaging(reducer.beginAppend(mutableState.value.paging))
+      fetchPage(state.query, mutableState.value.paging.offset)
+    }
   }
 
   fun loadPrevious() {
     val state = mutableState.value
-    if (
-        state.query.isBlank() ||
-            !state.canAutoLoadPrevious ||
-            state.isLoading ||
-            state.result.isRefreshing ||
-            state.isLoadingPrevious ||
-            state.isLoadingMore
-    )
-        return
-    mutableState.value = state.copy(isLoadingPrevious = true, prependError = null)
+    if (state.query.isBlank() || !reducer.canLoadPrevious(state.paging)) return
+    val offset = (state.paging.startOffset - PAGE_SIZE).coerceAtLeast(0)
     screenModelScope.launch {
-      fetchPage((state.startOffset - PAGE_SIZE).coerceAtLeast(0), replace = false, prepend = true)
+      updatePaging(reducer.beginPrepend(mutableState.value.paging))
+      fetchPage(state.query, offset, prepend = true)
     }
   }
 
   fun jumpToPage(page: Int) {
     val state = mutableState.value
     if (state.query.isBlank()) return
-    val targetPage = page.coerceIn(1, state.pageInfo?.lastPage ?: page.coerceAtLeast(1))
+    val targetPage = page.coerceIn(1, state.paging.pageInfo?.lastPage ?: page.coerceAtLeast(1))
     val offset = (targetPage - 1) * PAGE_SIZE
     searchJob?.cancel()
-    generation++
-    mutableState.value =
-        state.copy(
-            result =
-                state.result.copy(
-                    isLoading = state.dms.isEmpty(),
-                    isRefreshing = state.dms.isNotEmpty(),
-                    error = null,
-                ),
-            startOffset = offset,
-            visibleOffset = offset,
-            autoPrependArmed = offset <= 0,
-            isLoadingMore = false,
-            isLoadingPrevious = false,
-            appendError = null,
-            prependError = null,
-        )
-    val requestGeneration = generation
+    val requestGeneration = ++generation
+    val previous = state.paging
+    updatePaging(reducer.beginJump(previous, offset))
     screenModelScope.launch {
       fetchPage(
+          state.query,
           offset,
           replace = true,
-          rollbackState = state,
+          rollback = previous,
           requestGeneration = requestGeneration,
       )
     }
   }
 
   fun onVisibleItemIndex(firstVisibleItemIndex: Int) {
-    val state = mutableState.value
-    if (state.dms.isEmpty()) return
-    val relativeIndex = firstVisibleItemIndex.coerceAtLeast(0).coerceAtMost(state.dms.lastIndex)
-    val absoluteOffset = state.startOffset + relativeIndex
-    if (state.visibleOffset == absoluteOffset) return
-    mutableState.value = state.copy(visibleOffset = absoluteOffset)
+    updatePaging(
+        reducer.updateVisiblePage(mutableState.value.paging, firstVisibleItemIndex, PAGE_SIZE)
+    )
+  }
+
+  private suspend fun loadFirstPage(query: String, forceRefresh: Boolean, requestGeneration: Long) {
+    updatePaging(reducer.beginLoad(mutableState.value.paging, forceRefresh))
+    fetchPage(query, 0, replace = true, requestGeneration = requestGeneration)
   }
 
   private suspend fun fetchPage(
+      query: String,
       offset: Int,
-      replace: Boolean,
+      replace: Boolean = false,
       prepend: Boolean = false,
-      rollbackState: DmSearchState? = null,
+      rollback: PaginationSnapshot<DM>? = null,
       requestGeneration: Long = generation,
   ) {
-    val query = mutableState.value.query
     resultOfSuspend { creatorRepo.searchDMsPage(query, offset, forceRefresh = true) }
         .onSuccess { page ->
           if (requestGeneration != generation || mutableState.value.query != query) return@onSuccess
-          val dms =
+          val hasMore = page.pageInfo?.hasNext ?: (page.items.size >= PAGE_SIZE)
+          val next =
               when {
-                replace -> page.items
+                replace ->
+                    reducer.reduceFirstPage(
+                        mutableState.value.paging,
+                        page.items,
+                        hasMore,
+                        offset + page.items.size,
+                        page.pageInfo,
+                        offset,
+                    )
                 prepend ->
-                    (page.items + mutableState.value.dms).distinctBy {
-                      it.hash ?: it.content.orEmpty()
-                    }
+                    reducer.reducePrepend(
+                        mutableState.value.paging,
+                        page.items,
+                        mutableState.value.paging.hasMore,
+                        offset,
+                    )
                 else ->
-                    (mutableState.value.dms + page.items).distinctBy {
-                      it.hash ?: it.content.orEmpty()
-                    }
+                    reducer.reduceAppend(
+                        mutableState.value.paging,
+                        page.items,
+                        hasMore,
+                        offset + page.items.size,
+                    )
               }
-          mutableState.value =
-              mutableState.value.copy(
-                  result = QueryState(data = page),
-                  dms = dms,
-                  startOffset = if (replace || prepend) offset else mutableState.value.startOffset,
-                  offset = if (prepend) mutableState.value.offset else offset + page.items.size,
-                  hasMore = page.pageInfo?.hasNext ?: (page.items.size >= PAGE_SIZE),
-                  pageInfo = if (replace) page.pageInfo else mutableState.value.pageInfo,
-                  visibleOffset =
-                      when {
-                        replace -> offset
-                        prepend -> mutableState.value.visibleOffset
-                        else -> mutableState.value.visibleOffset
-                      },
-                  autoPrependArmed =
-                      when {
-                        replace -> offset <= 0
-                        prepend -> true
-                        else -> mutableState.value.autoPrependArmed
-                      },
-                  isLoadingPrevious = false,
-                  isLoadingMore = false,
-                  prependError = null,
-                  appendError = null,
-              )
+          log.i {
+            "DM搜索 -> 成功(queryLength=${query.length},offset=$offset,count=${page.items.size})"
+          }
+          updatePaging(next)
         }
         .onFailure { error ->
           if (requestGeneration != generation || mutableState.value.query != query) return@onFailure
-          mutableState.value =
-              if (replace && rollbackState != null) {
-                rollbackState.copy(
-                    result =
-                        rollbackState.result.copy(
-                            isLoading = false,
-                            isRefreshing = false,
-                            error = error.toQueryError(),
-                        ),
-                    isLoadingPrevious = false,
-                    isLoadingMore = false,
-                    prependError = null,
-                    appendError = null,
-                )
-              } else {
-                mutableState.value.copy(
-                    result =
-                        mutableState.value.result.copy(
-                            isLoading = false,
-                            isRefreshing = false,
-                            error = error.toQueryError(),
-                        ),
-                    isLoadingPrevious = false,
-                    isLoadingMore = false,
-                    prependError = if (prepend) error.toQueryError() else null,
-                    appendError = if (!prepend && offset != 0) error.toQueryError() else null,
-                )
+          updatePaging(
+              when {
+                replace && rollback != null -> reducer.reduceJumpError(rollback, error)
+                replace -> reducer.reduceFirstPageError(mutableState.value.paging, error)
+                prepend -> reducer.reducePrependError(mutableState.value.paging, error)
+                else -> reducer.reduceAppendError(mutableState.value.paging, error)
               }
+          )
         }
+  }
+
+  private fun updatePaging(paging: PaginationSnapshot<DM>) {
+    mutableState.value = mutableState.value.copy(paging = paging)
   }
 }
