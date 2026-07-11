@@ -1,5 +1,10 @@
 package ddd.kc.data.translation
 
+import io.ktor.client.HttpClient
+import io.ktor.client.request.accept
+import io.ktor.client.request.get
+import io.ktor.client.request.parameter
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -8,31 +13,24 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 internal class GoogleTranslationClient(
-    private val transport: TranslationHttpTransport,
+    private val client: HttpClient,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : TranslationProviderClient {
   override suspend fun translate(request: TranslationRequest): String {
     val response =
-        transport.get(
-            url = endpoint,
-            request =
-                TranslationHttpRequest(
-                    parameters =
-                        listOf(
-                            "client" to "gtx",
-                            "sl" to mapSourceLanguage(request.sourceLanguageCode),
-                            "tl" to mapTargetLanguage(request.targetLanguageCode),
-                            "dt" to "t",
-                            "strip" to "1",
-                            "nonced" to "1",
-                            "q" to request.sourceText,
-                        ),
-                    accept = ContentType.Application.Json,
-                ),
-        )
-    ensureTranslationSuccess(response.statusCode, provider = "Google")
+        client.get(endpoint) {
+          parameter("client", "gtx")
+          parameter("sl", mapSourceLanguage(request.sourceLanguageCode))
+          parameter("tl", mapTargetLanguage(request.targetLanguageCode))
+          parameter("dt", "t")
+          parameter("strip", "1")
+          parameter("nonced", "1")
+          parameter("q", request.sourceText)
+          accept(ContentType.Application.Json)
+        }
+    ensureTranslationSuccess(response.status.value, provider = "Google")
 
-    val root = json.parseToJsonElement(response.body).jsonArray
+    val root = json.parseToJsonElement(response.bodyAsText()).jsonArray
     val chunks = root.getOrNull(0)?.jsonArray.orEmpty()
     val translated =
         chunks

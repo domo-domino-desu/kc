@@ -1,8 +1,15 @@
 package ddd.kc.data.translation
 
 import ddd.kc.utils.renderBraceTemplate
+import io.ktor.client.HttpClient
+import io.ktor.client.request.accept
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -15,7 +22,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 internal class OpenAiCompatibleTranslationClient(
-    private val transport: TranslationHttpTransport,
+    private val client: HttpClient,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : TranslationProviderClient {
   override suspend fun translate(request: TranslationRequest): String {
@@ -27,35 +34,28 @@ internal class OpenAiCompatibleTranslationClient(
     if (apiKey.isBlank()) throw IllegalArgumentException("OpenAI compatible apiKey is blank")
 
     val response =
-        transport.post(
-            url = "${normalizeBaseUrl(config.baseUrl)}/chat/completions",
-            request =
-                TranslationHttpRequest(
-                    headers = listOf(HttpHeaders.Authorization to "Bearer $apiKey"),
-                    accept = ContentType.Application.Json,
-                    contentType = ContentType.Application.Json,
-                    body =
-                        buildChatCompletionsPayload(
-                                model =
-                                    config.model.trim().ifBlank {
-                                      OpenAiTranslationConfig.defaultModel
-                                    },
-                                userPrompt =
-                                    resolvePromptTemplate(
-                                        template = config.promptTemplate,
-                                        input = request.sourceText,
-                                        targetLanguage =
-                                            mapTargetDisplayName(request.targetLanguageCode),
-                                    ),
-                            )
-                            .toString(),
-                ),
-        )
-    ensureTranslationSuccess(response.statusCode, provider = "OpenAI compatible")
+        client.post("${normalizeBaseUrl(config.baseUrl)}/chat/completions") {
+          header(HttpHeaders.Authorization, "Bearer $apiKey")
+          accept(ContentType.Application.Json)
+          contentType(ContentType.Application.Json)
+          setBody(
+              buildChatCompletionsPayload(
+                      model = config.model.trim().ifBlank { OpenAiTranslationConfig.defaultModel },
+                      userPrompt =
+                          resolvePromptTemplate(
+                              template = config.promptTemplate,
+                              input = request.sourceText,
+                              targetLanguage = mapTargetDisplayName(request.targetLanguageCode),
+                          ),
+                  )
+                  .toString()
+          )
+        }
+    ensureTranslationSuccess(response.status.value, provider = "OpenAI compatible")
 
     val contentElement =
         json
-            .parseToJsonElement(response.body)
+            .parseToJsonElement(response.bodyAsText())
             .jsonObject["choices"]
             ?.jsonArray
             ?.firstOrNull()

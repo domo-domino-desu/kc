@@ -1,7 +1,16 @@
 package ddd.kc.data.translation
 
+import io.ktor.client.HttpClient
+import io.ktor.client.request.accept
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -12,52 +21,40 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 internal class MicrosoftTranslationClient(
-    private val transport: TranslationHttpTransport,
+    private val client: HttpClient,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : TranslationProviderClient {
   override suspend fun translate(request: TranslationRequest): String {
-    val tokenResponse = transport.get(tokenEndpoint)
-    ensureTranslationSuccess(
-        tokenResponse.statusCode,
-        provider = "Microsoft token",
-    )
-    val token = tokenResponse.body.trim()
+    val tokenResponse = client.get(tokenEndpoint)
+    ensureTranslationSuccess(tokenResponse.status.value, provider = "Microsoft token")
+    val token = tokenResponse.bodyAsText().trim()
     if (token.isBlank()) throw IllegalStateException("Microsoft token is blank")
 
-    val parameters = buildList {
-      add("api-version" to "3.0")
-      add("to" to mapTargetLanguage(request.targetLanguageCode))
-      add("includeSentenceLength" to "true")
-      add("textType" to "html")
-      val source = request.sourceLanguageCode.trim()
-      if (!source.equals("auto", ignoreCase = true) && source.isNotBlank()) {
-        add("from" to source)
-      }
-    }
-
     val response =
-        transport.post(
-            url = translateEndpoint,
-            request =
-                TranslationHttpRequest(
-                    parameters = parameters,
-                    headers = listOf(HttpHeaders.Authorization to "Bearer $token"),
-                    accept = ContentType.Application.Json,
-                    contentType = ContentType.Application.Json,
-                    body =
-                        buildJsonArray {
-                              add(
-                                  buildJsonObject { put("Text", JsonPrimitive(request.sourceText)) }
-                              )
-                            }
-                            .toString(),
-                ),
-        )
-    ensureTranslationSuccess(response.statusCode, provider = "Microsoft")
+        client.post(translateEndpoint) {
+          parameter("api-version", "3.0")
+          parameter("to", mapTargetLanguage(request.targetLanguageCode))
+          parameter("includeSentenceLength", "true")
+          parameter("textType", "html")
+          val source = request.sourceLanguageCode.trim()
+          if (!source.equals("auto", ignoreCase = true) && source.isNotBlank()) {
+            parameter("from", source)
+          }
+          header(HttpHeaders.Authorization, "Bearer $token")
+          accept(ContentType.Application.Json)
+          contentType(ContentType.Application.Json)
+          setBody(
+              buildJsonArray {
+                    add(buildJsonObject { put("Text", JsonPrimitive(request.sourceText)) })
+                  }
+                  .toString()
+          )
+        }
+    ensureTranslationSuccess(response.status.value, provider = "Microsoft")
 
     val translated =
         json
-            .parseToJsonElement(response.body)
+            .parseToJsonElement(response.bodyAsText())
             .jsonArray
             .firstOrNull()
             ?.jsonObject
