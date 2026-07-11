@@ -88,7 +88,8 @@ fun NetworkImage(
         error = { error ->
           loadLifecycleState = ImageLoadLifecycleState.Error
           LaunchedEffect(url, fallbackUrl, error) {
-            val message = "图片加载失败(url=$url,fallbackUrl=${fallbackUrl.orEmpty()})"
+            val message =
+                "图片加载失败(urlLength=${url.length},hasFallback=${!fallbackUrl.isNullOrBlank()})"
             if (logFailureAsWarning) {
               networkImageLog.w(error.result.throwable) { message }
             } else {

@@ -12,15 +12,25 @@ import kotlinx.coroutines.flow.emptyFlow
 
 @Composable
 fun RootNavigator(externalKcLinkEvents: Flow<String> = emptyFlow()) {
+  val navigationWindows = remember { NavigationWindowStore() }
   Navigator(screen = MainScreen()) { navigator ->
     val defaultUriHandler = LocalUriHandler.current
     val kcLinkUriHandler =
         remember(navigator, defaultUriHandler) {
-          KcLinkUriHandler(navigator = navigator, fallback = defaultUriHandler)
+          KcLinkUriHandler(
+              navigator = navigator,
+              fallback = defaultUriHandler,
+              navigationWindows = navigationWindows,
+          )
         }
     LaunchedEffect(externalKcLinkEvents, kcLinkUriHandler) {
       externalKcLinkEvents.collect { uri -> kcLinkUriHandler.openUri(uri) }
     }
-    CompositionLocalProvider(LocalUriHandler provides kcLinkUriHandler) { CurrentScreen() }
+    CompositionLocalProvider(
+        LocalUriHandler provides kcLinkUriHandler,
+        LocalNavigationWindowStore provides navigationWindows,
+    ) {
+      CurrentScreen()
+    }
   }
 }

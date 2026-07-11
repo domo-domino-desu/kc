@@ -30,7 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ddd.kc.data.model.Creator
-import ddd.kc.data.model.Platform
 import ddd.kc.data.model.bannerUrl
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
@@ -42,12 +41,11 @@ import ddd.kc.ui.icons.serviceIconVector
 @Composable
 fun CreatorSearchCard(
     creator: Creator,
-    platform: Platform,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     showFavoriteCount: Boolean = true,
 ) {
-  val baseUrl = LocalAppSettings.current.baseUrl(platform)
+  val baseUrl = LocalAppSettings.current.baseUrl()
   val bannerUrl = creator.bannerUrl(baseUrl)
   val avatarUrl = creator.thumbnailUrl(baseUrl)
   Surface(

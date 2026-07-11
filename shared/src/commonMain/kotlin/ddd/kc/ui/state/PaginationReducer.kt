@@ -1,6 +1,8 @@
 package ddd.kc.ui.state
 
-import ddd.kc.data.network.PageInfo
+import ddd.kc.data.model.PageInfo
+import ddd.kc.data.model.QueryError
+import ddd.kc.data.network.toQueryError
 
 data class PaginationSnapshot<Item>(
     val items: List<Item> = emptyList(),
@@ -13,9 +15,9 @@ data class PaginationSnapshot<Item>(
     val isLoadingPrevious: Boolean = false,
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = true,
-    val errorMessage: String? = null,
-    val prependErrorMessage: String? = null,
-    val appendErrorMessage: String? = null,
+    val error: QueryError? = null,
+    val prependError: QueryError? = null,
+    val appendError: QueryError? = null,
 ) {
   val hasPrevious: Boolean
     get() = startOffset > 0
@@ -54,16 +56,16 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
         refreshing = hasExisting || forceRefresh,
         isLoadingPrevious = false,
         isLoadingMore = false,
-        errorMessage = null,
-        prependErrorMessage = null,
-        appendErrorMessage = null,
+        error = null,
+        prependError = null,
+        appendError = null,
     )
   }
 
   fun canLoadMore(snapshot: PaginationSnapshot<Item>, force: Boolean = false): Boolean {
     if (!snapshot.hasMore) return false
     if (snapshot.isLoadingMore || snapshot.loading || snapshot.refreshing) return false
-    if (!force && !snapshot.appendErrorMessage.isNullOrBlank()) return false
+    if (!force && snapshot.appendError != null) return false
     return true
   }
 
@@ -76,7 +78,7 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
             snapshot.refreshing
     )
         return false
-    if (!force && !snapshot.prependErrorMessage.isNullOrBlank()) return false
+    if (!force && snapshot.prependError != null) return false
     return true
   }
 
@@ -92,17 +94,17 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
         refreshing = hasExisting,
         isLoadingPrevious = false,
         isLoadingMore = false,
-        errorMessage = null,
-        prependErrorMessage = null,
-        appendErrorMessage = null,
+        error = null,
+        prependError = null,
+        appendError = null,
     )
   }
 
   fun beginPrepend(snapshot: PaginationSnapshot<Item>): PaginationSnapshot<Item> =
-      snapshot.copy(isLoadingPrevious = true, prependErrorMessage = null)
+      snapshot.copy(isLoadingPrevious = true, prependError = null)
 
   fun beginAppend(snapshot: PaginationSnapshot<Item>): PaginationSnapshot<Item> =
-      snapshot.copy(isLoadingMore = true, appendErrorMessage = null)
+      snapshot.copy(isLoadingMore = true, appendError = null)
 
   fun reduceFirstPage(
       snapshot: PaginationSnapshot<Item>,
@@ -123,9 +125,9 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
           isLoadingPrevious = false,
           isLoadingMore = false,
           hasMore = hasMore,
-          errorMessage = null,
-          prependErrorMessage = null,
-          appendErrorMessage = null,
+          error = null,
+          prependError = null,
+          appendError = null,
       )
 
   fun reduceFirstPageError(
@@ -137,7 +139,7 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
           refreshing = false,
           isLoadingPrevious = false,
           isLoadingMore = false,
-          errorMessage = error.message ?: error.toString(),
+          error = error.toQueryError(),
       )
 
   fun reduceJumpError(
@@ -149,7 +151,7 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
           refreshing = false,
           isLoadingPrevious = false,
           isLoadingMore = false,
-          errorMessage = error.message ?: error.toString(),
+          error = error.toQueryError(),
       )
 
   fun reducePrepend(
@@ -167,7 +169,7 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
         visibleOffset = snapshot.visibleOffset,
         isLoadingPrevious = false,
         hasMore = hasMore,
-        prependErrorMessage = null,
+        prependError = null,
     )
   }
 
@@ -185,7 +187,7 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
         pageInfo = pageInfo ?: snapshot.pageInfo,
         isLoadingMore = false,
         hasMore = hasMore,
-        appendErrorMessage = null,
+        appendError = null,
     )
   }
 
@@ -195,7 +197,7 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
   ): PaginationSnapshot<Item> =
       snapshot.copy(
           isLoadingMore = false,
-          appendErrorMessage = error.message ?: error.toString(),
+          appendError = error.toQueryError(),
       )
 
   fun reducePrependError(
@@ -204,7 +206,7 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
   ): PaginationSnapshot<Item> =
       snapshot.copy(
           isLoadingPrevious = false,
-          prependErrorMessage = error.message ?: error.toString(),
+          prependError = error.toQueryError(),
       )
 
   fun updateVisiblePage(

@@ -2,22 +2,13 @@ package ddd.kc.ui.pages.tags
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import ddd.kc.data.model.Platform
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.Tag
 import ddd.kc.data.model.preserveRefreshUi
 import ddd.kc.data.repository.TagRepository
 import ddd.kc.utils.logging.KcLog
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-
-data class TagsLayoutCacheKey(
-    val tagsSize: Int,
-    val tagsSignature: Long,
-    val rowWidthPx: Int,
-    val horizontalSpacingPx: Int,
-    val chipHorizontalPaddingPx: Int,
-    val textStyleHash: Int,
-)
 
 data class TagsState(
     val result: QueryState<List<Tag>> = QueryState(isLoading = true),
@@ -27,8 +18,8 @@ data class TagsState(
   val isLoading: Boolean
     get() = result.isLoading
 
-  val errorMessage: String?
-    get() = result.error?.message
+  val error: ddd.kc.data.model.QueryError?
+    get() = result.error
 
   val filteredTags: List<Tag>
     get() =
@@ -40,18 +31,21 @@ class TagsScreenModel(
     private val tagRepo: TagRepository,
 ) : StateScreenModel<TagsState>(TagsState()) {
   private val log = KcLog.withTag("TagsScreenModel")
-  private var loadedPlatform: Platform? = null
-  private var cachedLayoutKey: TagsLayoutCacheKey? = null
-  private var cachedTagRows: List<List<Tag>> = emptyList()
+  private var loaded = false
+  private var loadJob: Job? = null
+  private var generation: Long = 0
 
-  fun load(platform: Platform, forceRefresh: Boolean = false) {
+  fun load(forceRefresh: Boolean = false) {
     if (
         !forceRefresh &&
-            loadedPlatform == platform &&
+            loaded &&
             mutableState.value.result.data != null &&
             !mutableState.value.result.isStale
     )
         return
+    loadJob?.cancel()
+    generation++
+    val requestGeneration = generation
     val filter = mutableState.value.filter
     mutableState.value =
         mutableState.value.copy(
@@ -63,29 +57,23 @@ class TagsScreenModel(
                     error = null,
                 ),
         )
-    screenModelScope.launch {
-      log.i { "Tags页面 -> 加载开始(platform=${platform.name},forceRefresh=$forceRefresh)" }
-      tagRepo.observeTags(forceRefresh).collect {
-        val tags = it.data ?: mutableState.value.allTags
-        val result = it.preserveRefreshUi(tags.isNotEmpty())
-        if (it.data != null) {
-          log.i { "Tags页面 -> 加载成功(platform=${platform.name},count=${tags.size})" }
-          loadedPlatform = platform
+    loadJob =
+        screenModelScope.launch {
+          log.i { "Tags页面 -> 加载开始(forceRefresh=$forceRefresh)" }
+          tagRepo.observeTags(forceRefresh).collect {
+            if (requestGeneration != generation) return@collect
+            val tags = it.data ?: mutableState.value.allTags
+            val result = it.preserveRefreshUi(tags.isNotEmpty())
+            if (it.data != null) {
+              log.i { "Tags页面 -> 加载成功(count=${tags.size})" }
+              loaded = true
+            }
+            mutableState.value = mutableState.value.copy(result = result, allTags = tags)
+          }
         }
-        mutableState.value = mutableState.value.copy(result = result, allTags = tags)
-      }
-    }
   }
 
   fun onFilterChanged(filter: String) {
     mutableState.value = mutableState.value.copy(filter = filter)
-  }
-
-  fun cachedTagRows(key: TagsLayoutCacheKey): List<List<Tag>>? =
-      cachedTagRows.takeIf { cachedLayoutKey == key }
-
-  fun cacheTagRows(key: TagsLayoutCacheKey, rows: List<List<Tag>>) {
-    cachedLayoutKey = key
-    cachedTagRows = rows
   }
 }

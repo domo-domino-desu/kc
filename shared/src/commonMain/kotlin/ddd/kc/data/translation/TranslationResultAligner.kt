@@ -1,5 +1,10 @@
 package ddd.kc.data.translation
 
+internal class TranslationAlignmentException(expected: Int, actual: Int) :
+    IllegalArgumentException(
+        "Translation block alignment failed: expected=$expected, actual=$actual"
+    )
+
 internal class TranslationResultAligner {
   fun parseChunkTranslation(translated: String, expectedBlockCount: Int): List<String> {
     val normalizedTranslation = translated.replace(fullWidthPercentChar, asciiPercentChar)
@@ -9,24 +14,8 @@ internal class TranslationResultAligner {
     val byMarkerLine = splitBySeparatorLine(normalizedTranslation)
     if (byMarkerLine.size == expectedBlockCount) return byMarkerLine
 
-    val byLineBreak = normalizedTranslation.replace("\r\n", "\n").split('\n')
-    if (byLineBreak.size == expectedBlockCount) return byLineBreak
-
     if (expectedBlockCount == 1) return listOf(normalizedTranslation)
-    if (byLineBreak.isEmpty()) return List(expectedBlockCount) { "" }
-
-    if (byLineBreak.size < expectedBlockCount) {
-      return buildList {
-        addAll(byLineBreak)
-        repeat(expectedBlockCount - byLineBreak.size) { add("") }
-      }
-    }
-
-    return List(expectedBlockCount) { bucket ->
-      val start = bucket * byLineBreak.size / expectedBlockCount
-      val end = (bucket + 1) * byLineBreak.size / expectedBlockCount
-      byLineBreak.subList(start, end).joinToString("\n")
-    }
+    throw TranslationAlignmentException(expectedBlockCount, byMarkerLine.size)
   }
 
   fun normalizeTranslationText(text: String): String =

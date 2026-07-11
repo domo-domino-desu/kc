@@ -1,6 +1,6 @@
 package ddd.kc.ui.components
 
-import ddd.kc.data.network.PageInfo
+import ddd.kc.data.model.PageInfo
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

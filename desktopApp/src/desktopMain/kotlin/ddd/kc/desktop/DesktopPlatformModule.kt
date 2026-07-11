@@ -8,7 +8,6 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import ddd.kc.data.local.AppDatabase
 import ddd.kc.data.local.AppDatabaseBuilderFactory
 import ddd.kc.di.KOIN_QUALIFIER_SESSION_VAULT
-import ddd.kc.ui.platform.PlatformShortcutManager
 import eu.anifantakis.lib.ksafe.KSafe
 import java.io.File
 import okio.Path.Companion.toPath
@@ -19,7 +18,7 @@ import org.koin.dsl.module
 fun desktopPlatformModule(): Module = module {
   single<AppDatabaseBuilderFactory> {
     AppDatabaseBuilderFactory {
-      val dbFile = File(System.getProperty("user.home"), ".cache/kc/room-cache/kc-cache.db")
+      val dbFile = File(applicationDataDirectory(), "kc.db")
       dbFile.parentFile?.mkdirs()
       Room.databaseBuilder<AppDatabase>(name = dbFile.absolutePath).setDriver(BundledSQLiteDriver())
     }
@@ -35,5 +34,14 @@ fun desktopPlatformModule(): Module = module {
     )
   }
   single(named(KOIN_QUALIFIER_SESSION_VAULT)) { KSafe(fileName = KOIN_QUALIFIER_SESSION_VAULT) }
-  single { PlatformShortcutManager() }
+}
+
+private fun applicationDataDirectory(): File {
+  val home = System.getProperty("user.home")
+  val os = System.getProperty("os.name").lowercase()
+  return when {
+    os.contains("win") -> File(System.getenv("APPDATA") ?: home, "kc")
+    os.contains("mac") -> File(home, "Library/Application Support/kc")
+    else -> File(System.getenv("XDG_DATA_HOME") ?: "$home/.local/share", "kc")
+  }
 }

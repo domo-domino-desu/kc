@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.allFiles
 import ddd.kc.data.model.thumbnailUrl
@@ -33,11 +32,10 @@ import ddd.kc.ui.app.LocalAppSettings
 @Composable
 fun PostCard(
     post: Post,
-    platform: Platform,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-  val cdnUrl = LocalAppSettings.current.cdnUrl(platform)
+  val cdnUrl = LocalAppSettings.current.cdnUrl()
   val fileCount = post.attachmentCount ?: post.allFiles().size
   val favCount = post.favoriteCount
   val date = post.published?.take(10)?.takeIf { it.isNotBlank() } ?: post.added?.take(10).orEmpty()

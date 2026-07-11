@@ -17,18 +17,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ddd.kc.data.model.Creator
-import ddd.kc.data.model.Platform
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.ui.app.LocalAppSettings
 
 @Composable
 fun CreatorCard(
     creator: Creator,
-    platform: Platform,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-  val baseUrl = LocalAppSettings.current.baseUrl(platform)
+  val baseUrl = LocalAppSettings.current.baseUrl()
   Row(
       modifier =
           modifier

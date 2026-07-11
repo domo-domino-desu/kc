@@ -29,10 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import ddd.kc.data.model.DM
+import ddd.kc.data.model.DmKey
+import ddd.kc.data.model.key
 import ddd.kc.data.translation.TranslationBlock
 import ddd.kc.data.translation.TranslationBlockResult
 import ddd.kc.data.translation.TranslationEngine
-import ddd.kc.ui.app.LocalActivePlatform
 import ddd.kc.ui.components.AutoLoadEffect
 import ddd.kc.ui.components.AutoLoadPreviousEffect
 import ddd.kc.ui.components.DmCard
@@ -43,10 +44,12 @@ import ddd.kc.ui.components.PageJumpFabMenu
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.loadingFooter
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
+import ddd.kc.ui.i18n.localizedMessage
 import ddd.kc.ui.pages.recent.RecentDMsScreenModel
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.utils.coroutines.resultOfSuspend
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.search_dms_hint
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -59,7 +62,6 @@ class DmScreen(
 ) : Screen {
   @Composable
   override fun Content() {
-    val platform = LocalActivePlatform.current
     val searchModel = koinInject<DmSearchScreenModel>()
     val recentModel = koinInject<RecentDMsScreenModel>()
     val translationService = koinInject<TranslationEngine>()
@@ -67,10 +69,10 @@ class DmScreen(
     val recentState by recentModel.state.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val dmTranslations = remember(platform) { mutableStateMapOf<String, ContentTranslationState>() }
+    val dmTranslations = remember { mutableStateMapOf<DmKey, ContentTranslationState>() }
     val refresh = {
       if (searchState.query.isBlank()) {
-        recentModel.load(platform, forceRefresh = true)
+        recentModel.load(forceRefresh = true)
       } else {
         searchModel.refresh()
       }
@@ -90,9 +92,9 @@ class DmScreen(
           }
         }
 
-    LaunchedEffect(platform) {
-      searchModel.init(platform)
-      recentModel.load(platform)
+    LaunchedEffect(Unit) {
+      searchModel.init()
+      recentModel.load()
     }
     LaunchedEffect(listState, searchState.query.isBlank()) {
       snapshotFlow { listState.firstVisibleItemIndex }
@@ -110,9 +112,11 @@ class DmScreen(
       onReselectHandlerChanged(handler)
       onDispose { onReselectHandlerChanged(null) }
     }
-    ErrorToastEffect(searchState.errorMessage)
-    ErrorToastEffect(searchState.appendErrorMessage)
-    ErrorToastEffect(searchState.prependErrorMessage)
+    ErrorToastEffect(searchState.error?.localizedMessage())
+    ErrorToastEffect(searchState.appendError?.localizedMessage())
+    ErrorToastEffect(searchState.prependError?.localizedMessage())
+    val recentAppendErrorMessage = recentState.appendError?.localizedMessage()
+    val searchAppendErrorMessage = searchState.appendError?.localizedMessage()
 
     val translateDm: (DM) -> Unit = translateDm@{ dm ->
       if (!translationService.isEnabled()) return@translateDm
@@ -142,7 +146,7 @@ class DmScreen(
                 isTranslating = true,
                 showTranslation = true,
             )
-        runCatching {
+        resultOfSuspend {
               translationService.translateBlocks(blocks) { index, result ->
                 val current = dmTranslations[key] ?: return@translateBlocks
                 if (index !in current.blocks.indices) return@translateBlocks
@@ -212,28 +216,32 @@ class DmScreen(
               if (recentState.loading && recentState.items.isEmpty()) {
                 item(key = "recent-dms-skeleton") { ListLoadingSkeleton(itemHeightDp = 96) }
               } else {
-                items(recentState.items, key = { it.hash ?: it.content.orEmpty() }) { dm ->
+                items(recentState.items, key = { it.key }) { dm ->
                   DmCard(
                       dm = dm,
-                      platform = platform,
                       translationState = dmTranslations[dm.translationKey()],
                       onTranslate = { translateDm(dm) },
                   )
                 }
-                loadingFooter(recentState.isLoadingMore, recentState.appendErrorMessage)
+                loadingFooter(
+                    recentState.isLoadingMore,
+                    recentAppendErrorMessage,
+                )
               }
             } else if (searchState.isLoading && searchState.dms.isEmpty()) {
               item(key = "search-dms-skeleton") { ListLoadingSkeleton(itemHeightDp = 96) }
             } else {
-              items(searchState.dms, key = { it.hash ?: it.content.orEmpty() }) { dm ->
+              items(searchState.dms, key = { it.key }) { dm ->
                 DmCard(
                     dm = dm,
-                    platform = platform,
                     translationState = dmTranslations[dm.translationKey()],
                     onTranslate = { translateDm(dm) },
                 )
               }
-              loadingFooter(searchState.isLoadingMore, searchState.appendErrorMessage)
+              loadingFooter(
+                  searchState.isLoadingMore,
+                  searchAppendErrorMessage,
+              )
             }
           }
         }
@@ -258,8 +266,8 @@ class DmScreen(
       }
     }
 
-    ErrorToastEffect(recentState.errorMessage)
-    ErrorToastEffect(recentState.appendErrorMessage)
+    ErrorToastEffect(recentState.error?.localizedMessage())
+    ErrorToastEffect(recentState.appendError?.localizedMessage())
     if (searchState.query.isBlank()) {
       AutoLoadEffect(
           listState = listState,
@@ -294,10 +302,7 @@ class DmScreen(
   }
 }
 
-private fun DM.translationKey(): String =
-    hash
-        ?: id
-        ?: "${service.orEmpty()}:${user.orEmpty()}:${added.orEmpty()}:${content.orEmpty().hashCode()}"
+private fun DM.translationKey(): DmKey = key
 
 private fun buildDmTranslationBlocks(content: String): List<TranslationBlock> =
     content.split(Regex("""(?:\r?\n[ \t]*){2,}""")).mapNotNull { block ->

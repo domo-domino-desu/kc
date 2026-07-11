@@ -28,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ddd.kc.data.model.DM
-import ddd.kc.data.model.Platform
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.state.ContentTranslationState
 import ddd.kc.ui.state.TranslationBlockState
@@ -40,12 +39,11 @@ private val urlRegex = Regex("""https?://[^\s<>"']+""")
 @Composable
 fun DmCard(
     dm: DM,
-    platform: Platform,
     modifier: Modifier = Modifier,
     translationState: ContentTranslationState? = null,
     onTranslate: (() -> Unit)? = null,
 ) {
-  val baseUrl = LocalAppSettings.current.baseUrl(platform)
+  val baseUrl = LocalAppSettings.current.baseUrl()
   val userId = dm.user.orEmpty()
   val service = dm.service.orEmpty()
   val displayName = dm.artist?.name?.takeIf { it.isNotBlank() } ?: userId.ifBlank { "Unknown" }

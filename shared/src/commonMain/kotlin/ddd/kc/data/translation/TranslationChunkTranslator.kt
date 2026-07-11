@@ -1,5 +1,7 @@
 package ddd.kc.data.translation
 
+import ddd.kc.utils.coroutines.resultOfSuspend
+
 internal class TranslationChunkTranslator(
     private val translationPort: TranslationPort,
     private val resultAligner: TranslationResultAligner,
@@ -14,7 +16,7 @@ internal class TranslationChunkTranslator(
 
     val payload = chunk.sourceTexts.joinToString(TranslationResultAligner.batchSeparator)
     val translatedLines =
-        runCatching {
+        resultOfSuspend {
               translationPort
                   .translate(
                       TranslationRequest(
@@ -34,10 +36,14 @@ internal class TranslationChunkTranslator(
                   if (translated.isBlank()) {
                     List(chunk.sourceTexts.size) { "" }
                   } else {
-                    resultAligner.parseChunkTranslation(
-                        translated = translated,
-                        expectedBlockCount = chunk.sourceTexts.size,
-                    )
+                    try {
+                      resultAligner.parseChunkTranslation(
+                          translated = translated,
+                          expectedBlockCount = chunk.sourceTexts.size,
+                      )
+                    } catch (error: TranslationAlignmentException) {
+                      return List(chunk.sourceTexts.size) { TranslationBlockResult.Failure(error) }
+                    }
                   }
                 },
                 onFailure = { error ->

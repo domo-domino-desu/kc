@@ -3,11 +3,13 @@ package ddd.kc.ui.pages.recent
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.DM
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.DmKey
+import ddd.kc.data.model.key
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.data.repository.awaitData
 import ddd.kc.ui.state.PaginationReducer
 import ddd.kc.ui.state.PaginationSnapshot
+import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
@@ -18,24 +20,24 @@ class RecentDMsScreenModel(
 ) : StateScreenModel<PaginationSnapshot<DM>>(PaginationSnapshot()) {
 
   private val log = KcLog.withTag("RecentDMsScreenModel")
-  private val reducer = PaginationReducer<DM, String> { it.hash ?: it.content.orEmpty() }
-  private var platform = Platform.PAWCHIVE
+  private val reducer = PaginationReducer<DM, DmKey> { it.key }
+  private var generation: Long = 0
 
-  fun load(platform: Platform, forceRefresh: Boolean = false) {
-    val platformChanged = this.platform != platform
-    this.platform = platform
-    if (!forceRefresh && !platformChanged && mutableState.value.items.isNotEmpty()) return
+  fun load(forceRefresh: Boolean = false) {
+    if (!forceRefresh && mutableState.value.items.isNotEmpty()) return
+    generation++
+    val requestGeneration = generation
     screenModelScope.launch {
-      log.i { "最近DMs -> 首屏开始(platform=${platform.name},forceRefresh=$forceRefresh)" }
+      log.i { "最近DMs -> 首屏开始(forceRefresh=$forceRefresh)" }
       mutableState.value = reducer.beginLoad(mutableState.value, forceRefresh)
-      fetch(0, forceRefresh, firstPage = true)
+      fetch(0, forceRefresh, firstPage = true, requestGeneration = requestGeneration)
     }
   }
 
   fun loadMore() {
     if (!reducer.canLoadMore(mutableState.value)) return
     screenModelScope.launch {
-      log.i { "最近DMs -> 追加开始(platform=${platform.name},offset=${mutableState.value.offset})" }
+      log.i { "最近DMs -> 追加开始(offset=${mutableState.value.offset})" }
       mutableState.value = reducer.beginAppend(mutableState.value)
       fetch(mutableState.value.offset, false, firstPage = false)
     }
@@ -55,9 +57,17 @@ class RecentDMsScreenModel(
     val previous = mutableState.value
     val targetPage = page.coerceIn(1, previous.pageInfo?.lastPage ?: page.coerceAtLeast(1))
     val offset = (targetPage - 1) * PAGE_SIZE
+    generation++
+    val requestGeneration = generation
     screenModelScope.launch {
       mutableState.value = reducer.beginJump(mutableState.value, offset)
-      fetch(offset, forceRefresh = false, firstPage = true, rollbackSnapshot = previous)
+      fetch(
+          offset,
+          forceRefresh = false,
+          firstPage = true,
+          rollbackSnapshot = previous,
+          requestGeneration = requestGeneration,
+      )
     }
   }
 
@@ -76,17 +86,17 @@ class RecentDMsScreenModel(
       firstPage: Boolean,
       prepend: Boolean = false,
       rollbackSnapshot: PaginationSnapshot<DM>? = null,
+      requestGeneration: Long = generation,
   ) {
-    runCatching {
+    resultOfSuspend {
           creatorRepo.observeDmsPage(offset = offset, forceRefresh = forceRefresh).awaitData()
         }
         .onSuccess { page ->
+          if (requestGeneration != generation) return@onSuccess
           val dms = page.items
           val hasMore = page.pageInfo?.hasNext ?: (dms.size >= PAGE_SIZE)
           val nextOffset = offset + dms.size
-          log.i {
-            "最近DMs -> 加载成功(platform=${platform.name},offset=$offset,count=${dms.size},hasMore=$hasMore)"
-          }
+          log.i { "最近DMs -> 加载成功(offset=$offset,count=${dms.size},hasMore=$hasMore)" }
           mutableState.value =
               if (firstPage) {
                 reducer.reduceFirstPage(mutableState.value, dms, hasMore, nextOffset, page.pageInfo)
@@ -103,9 +113,8 @@ class RecentDMsScreenModel(
               }
         }
         .onFailure { error ->
-          log.e(error) {
-            "最近DMs -> 加载失败(platform=${platform.name},offset=$offset,firstPage=$firstPage)"
-          }
+          if (requestGeneration != generation) return@onFailure
+          log.e(error) { "最近DMs -> 加载失败(offset=$offset,firstPage=$firstPage)" }
           mutableState.value =
               if (firstPage) {
                 rollbackSnapshot?.let { reducer.reduceJumpError(it, error) }

@@ -24,6 +24,11 @@ import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ArrowBackW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.HomeW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TranslateW400Outlined
+import kc.shared.generated.resources.Res
+import kc.shared.generated.resources.back
+import kc.shared.generated.resources.home
+import kc.shared.generated.resources.translate_action
+import org.jetbrains.compose.resources.stringResource
 
 /** Simple top bar with only a back button. Used for tag posts and similar secondary pages. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,7 +39,10 @@ fun BackAppBar(title: String = "") {
       title = { if (title.isNotEmpty()) Text(title) },
       navigationIcon = {
         IconButton(onClick = { navigator.pop() }) {
-          Icon(imageVector = Icons.ArrowBackW400Outlined, contentDescription = "返回")
+          Icon(
+              imageVector = Icons.ArrowBackW400Outlined,
+              contentDescription = stringResource(Res.string.back),
+          )
         }
       },
   )
@@ -78,10 +86,16 @@ fun DetailAppBar(
       navigationIcon = {
         Row {
           IconButton(onClick = { navigator.pop() }) {
-            Icon(imageVector = Icons.ArrowBackW400Outlined, contentDescription = "返回")
+            Icon(
+                imageVector = Icons.ArrowBackW400Outlined,
+                contentDescription = stringResource(Res.string.back),
+            )
           }
           IconButton(onClick = { navigator.popUntilRoot() }) {
-            Icon(imageVector = Icons.HomeW400Outlined, contentDescription = "主页")
+            Icon(
+                imageVector = Icons.HomeW400Outlined,
+                contentDescription = stringResource(Res.string.home),
+            )
           }
         }
       },
@@ -118,7 +132,7 @@ fun TranslateIconButton(
     } else {
       Icon(
           imageVector = Icons.TranslateW400Outlined,
-          contentDescription = "翻译",
+          contentDescription = stringResource(Res.string.translate_action),
           modifier = Modifier.size(18.dp),
           tint =
               if (isActive) MaterialTheme.colorScheme.primary

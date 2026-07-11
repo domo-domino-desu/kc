@@ -34,7 +34,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import ddd.kc.data.network.PageInfo
+import ddd.kc.data.model.PageInfo
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CloseW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowLeftW400Outlined

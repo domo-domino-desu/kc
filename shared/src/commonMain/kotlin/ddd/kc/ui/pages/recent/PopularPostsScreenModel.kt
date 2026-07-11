@@ -2,17 +2,19 @@ package ddd.kc.ui.pages.recent
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.PageInfo
+import ddd.kc.data.model.PopularInfo
+import ddd.kc.data.model.PopularPage
+import ddd.kc.data.model.PopularProps
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.QueryError
 import ddd.kc.data.model.QueryState
-import ddd.kc.data.network.PageInfo
-import ddd.kc.data.network.PopularInfo
-import ddd.kc.data.network.PopularPage
-import ddd.kc.data.network.PopularProps
+import ddd.kc.data.model.key
 import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.data.repository.awaitData
 import ddd.kc.ui.state.pageInfoForOffset
+import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlin.time.Clock
 import kotlinx.coroutines.launch
@@ -29,10 +31,10 @@ private const val PAGE_SIZE = 50
 private const val SERVER_WEEK_START_ISO_DAY_NUMBER = 2
 private val popularLog = KcLog.withTag("PopularPostsScreenModel")
 
-enum class PopularPeriod(val apiValue: String, val label: String) {
-  DAY("day", "Day"),
-  WEEK("week", "Week"),
-  MONTH("month", "Month"),
+enum class PopularPeriod(val apiValue: String) {
+  DAY("day"),
+  WEEK("week"),
+  MONTH("month"),
 }
 
 data class PopularPostsState(
@@ -50,14 +52,14 @@ data class PopularPostsState(
     val hasMore: Boolean = true,
     val isLoadingPrevious: Boolean = false,
     val isLoadingMore: Boolean = false,
-    val prependErrorMessage: String? = null,
-    val appendErrorMessage: String? = null,
+    val prependError: QueryError? = null,
+    val appendError: QueryError? = null,
 ) {
   val isLoading: Boolean
     get() = result.isLoading
 
-  val errorMessage: String?
-    get() = result.error?.message
+  val error: ddd.kc.data.model.QueryError?
+    get() = result.error
 
   val visiblePageInfo: PageInfo?
     get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
@@ -75,14 +77,12 @@ data class PopularPostsState(
 class PopularPostsScreenModel(
     private val postRepo: PostRepository,
 ) : StateScreenModel<PopularPostsState>(PopularPostsState()) {
+  private var generation: Long = 0
 
-  private var platform = Platform.PAWCHIVE
-
-  fun load(platform: Platform, forceRefresh: Boolean = false) {
-    val platformChanged = this.platform != platform
-    this.platform = platform
+  fun load(forceRefresh: Boolean = false) {
     val state = mutableState.value
-    if (!forceRefresh && !platformChanged && state.posts.isNotEmpty()) return
+    if (!forceRefresh && state.posts.isNotEmpty()) return
+    generation++
     mutableState.value =
         state.copy(
             result =
@@ -91,8 +91,8 @@ class PopularPostsScreenModel(
                     isRefreshing = state.posts.isNotEmpty(),
                     error = null,
                 ),
-            appendErrorMessage = null,
-            prependErrorMessage = null,
+            appendError = null,
+            prependError = null,
         )
     screenModelScope.launch { loadPage(offset = 0, forceRefresh = forceRefresh, replace = true) }
   }
@@ -100,7 +100,7 @@ class PopularPostsScreenModel(
   fun loadMore() {
     val state = mutableState.value
     if (state.isLoading || state.isLoadingMore || !state.hasMore) return
-    mutableState.value = state.copy(isLoadingMore = true, appendErrorMessage = null)
+    mutableState.value = state.copy(isLoadingMore = true, appendError = null)
     screenModelScope.launch {
       loadPage(offset = state.offset, forceRefresh = false, replace = false)
     }
@@ -116,7 +116,7 @@ class PopularPostsScreenModel(
             state.isLoadingMore
     )
         return
-    mutableState.value = state.copy(isLoadingPrevious = true, prependErrorMessage = null)
+    mutableState.value = state.copy(isLoadingPrevious = true, prependError = null)
     val offset = (state.startOffset - PAGE_SIZE).coerceAtLeast(0)
     screenModelScope.launch {
       loadPage(offset = offset, forceRefresh = false, replace = false, prepend = true)
@@ -127,6 +127,7 @@ class PopularPostsScreenModel(
     val state = mutableState.value
     val targetPage = page.coerceIn(1, state.pageInfo?.lastPage ?: page.coerceAtLeast(1))
     val offset = (targetPage - 1) * PAGE_SIZE
+    generation++
     mutableState.value =
         state.copy(
             result =
@@ -140,8 +141,8 @@ class PopularPostsScreenModel(
             autoPrependArmed = offset <= 0,
             isLoadingMore = false,
             isLoadingPrevious = false,
-            appendErrorMessage = null,
-            prependErrorMessage = null,
+            appendError = null,
+            prependError = null,
         )
     screenModelScope.launch {
       loadPage(offset = offset, forceRefresh = false, replace = true, rollbackState = state)
@@ -191,6 +192,7 @@ class PopularPostsScreenModel(
 
   private fun submit(date: String?, period: PopularPeriod) {
     val normalizedDate = normalizePopularBaseDate(date, period)
+    generation++
     mutableState.value =
         mutableState.value.copy(
             date = normalizedDate,
@@ -205,8 +207,8 @@ class PopularPostsScreenModel(
             result = QueryState(isLoading = true),
             isLoadingPrevious = false,
             isLoadingMore = false,
-            prependErrorMessage = null,
-            appendErrorMessage = null,
+            prependError = null,
+            appendError = null,
         )
     screenModelScope.launch { loadPage(offset = 0, forceRefresh = false, replace = true) }
   }
@@ -217,25 +219,35 @@ class PopularPostsScreenModel(
       replace: Boolean,
       prepend: Boolean = false,
       rollbackState: PopularPostsState? = null,
+      requestGeneration: Long = generation,
   ) {
     val state = mutableState.value
-    runCatching {
+    val requestDate = normalizePopularBaseDate(state.date, state.period)
+    val requestPeriod = state.period
+    resultOfSuspend {
           postRepo
               .observePopularPostsPage(
-                  date = normalizePopularBaseDate(state.date, state.period),
-                  period = state.period.apiValue,
+                  date = requestDate,
+                  period = requestPeriod.apiValue,
                   offset = offset,
                   forceRefresh = forceRefresh,
               )
               .awaitData()
         }
         .onSuccess { page ->
+          if (
+              requestGeneration != generation ||
+                  mutableState.value.period != requestPeriod ||
+                  normalizePopularBaseDate(mutableState.value.date, requestPeriod) != requestDate
+          ) {
+            return@onSuccess
+          }
           val firstPage = replace || (offset == 0 && !prepend)
           val merged =
               when {
                 firstPage -> page.posts
-                prepend -> (page.posts + mutableState.value.posts).distinctBy { it.id }
-                else -> (mutableState.value.posts + page.posts).distinctBy { it.id }
+                prepend -> (page.posts + mutableState.value.posts).distinctBy { it.key }
+                else -> (mutableState.value.posts + page.posts).distinctBy { it.key }
               }
           val nextStartOffset =
               when {
@@ -274,14 +286,21 @@ class PopularPostsScreenModel(
                   hasMore = page.pageInfo?.hasNext ?: (page.posts.size >= PAGE_SIZE),
                   isLoadingPrevious = false,
                   isLoadingMore = false,
-                  prependErrorMessage = null,
-                  appendErrorMessage = null,
+                  prependError = null,
+                  appendError = null,
               )
           popularLog.i {
             "热门Posts -> 加载成功(period=${state.period.apiValue},date=${state.date},offset=$offset,count=${page.posts.size})"
           }
         }
         .onFailure {
+          if (
+              requestGeneration != generation ||
+                  mutableState.value.period != requestPeriod ||
+                  normalizePopularBaseDate(mutableState.value.date, requestPeriod) != requestDate
+          ) {
+            return@onFailure
+          }
           popularLog.e(it) {
             "热门Posts -> 加载失败(period=${state.period.apiValue},date=${state.date},offset=$offset)"
           }
@@ -296,8 +315,8 @@ class PopularPostsScreenModel(
                         ),
                     isLoadingPrevious = false,
                     isLoadingMore = false,
-                    prependErrorMessage = null,
-                    appendErrorMessage = null,
+                    prependError = null,
+                    appendError = null,
                 )
               } else {
                 mutableState.value.copy(
@@ -309,8 +328,8 @@ class PopularPostsScreenModel(
                         ),
                     isLoadingPrevious = false,
                     isLoadingMore = false,
-                    prependErrorMessage = if (prepend) it.message else null,
-                    appendErrorMessage = if (!prepend && offset != 0) it.message else null,
+                    prependError = if (prepend) it.toQueryError() else null,
+                    appendError = if (!prepend && offset != 0) it.toQueryError() else null,
                 )
               }
         }

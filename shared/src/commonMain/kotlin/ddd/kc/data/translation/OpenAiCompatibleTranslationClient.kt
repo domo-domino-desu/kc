@@ -51,7 +51,7 @@ internal class OpenAiCompatibleTranslationClient(
                             .toString(),
                 ),
         )
-    ensureTranslationSuccess(response.statusCode, response.body, provider = "OpenAI compatible")
+    ensureTranslationSuccess(response.statusCode, provider = "OpenAI compatible")
 
     val contentElement =
         json

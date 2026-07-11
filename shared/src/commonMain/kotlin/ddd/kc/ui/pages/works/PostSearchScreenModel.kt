@@ -2,16 +2,18 @@ package ddd.kc.ui.pages.works
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.PageInfo
+import ddd.kc.data.model.PagedResult
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.QueryError
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.model.key
 import ddd.kc.data.model.preserveRefreshUi
-import ddd.kc.data.network.PageInfo
-import ddd.kc.data.network.PagedResult
 import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.data.repository.awaitData
 import ddd.kc.ui.state.pageInfoForOffset
+import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -34,14 +36,14 @@ data class PostSearchState(
     val autoPrependArmed: Boolean = startOffset <= 0,
     val isLoadingPrevious: Boolean = false,
     val isLoadingMore: Boolean = false,
-    val prependErrorMessage: String? = null,
-    val appendErrorMessage: String? = null,
+    val prependError: QueryError? = null,
+    val appendError: QueryError? = null,
 ) {
   val isLoading: Boolean
     get() = result.isLoading
 
-  val errorMessage: String?
-    get() = result.error?.message
+  val error: ddd.kc.data.model.QueryError?
+    get() = result.error
 
   val visiblePageInfo: PageInfo?
     get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
@@ -54,26 +56,21 @@ class PostSearchScreenModel(
     private val postRepo: PostRepository,
 ) : StateScreenModel<PostSearchState>(PostSearchState()) {
   private var searchJob: Job? = null
-  private var platform = Platform.PAWCHIVE
+  private var generation: Long = 0
 
-  fun init(platform: Platform) {
-    val platformChanged = this.platform != platform
-    this.platform = platform
-    if (platformChanged) {
-      mutableState.value = PostSearchState(query = mutableState.value.query)
-      loadDefault()
-    } else if (mutableState.value.posts.isEmpty()) {
-      loadDefault()
-    }
+  fun init() {
+    if (mutableState.value.posts.isEmpty()) loadDefault()
   }
 
   fun refresh(forceRefreshDefault: Boolean = true) {
     searchJob?.cancel()
+    generation++
     val query = mutableState.value.query
     if (query.isBlank()) {
       loadDefault(forceRefresh = forceRefreshDefault)
     } else {
-      search(query)
+      val requestGeneration = generation
+      searchJob = screenModelScope.launch { search(query, requestGeneration) }
     }
   }
 
@@ -91,19 +88,21 @@ class PostSearchScreenModel(
             autoPrependArmed = true,
             isLoadingPrevious = false,
             isLoadingMore = false,
-            prependErrorMessage = null,
-            appendErrorMessage = null,
+            prependError = null,
+            appendError = null,
         )
     searchJob?.cancel()
+    generation++
     if (query.isBlank()) {
       loadDefault()
       return
     }
+    val requestGeneration = generation
     searchJob =
         screenModelScope.launch {
           try {
             delay(300)
-            search(query)
+            search(query, requestGeneration)
           } catch (_: CancellationException) {
             return@launch
           }
@@ -111,6 +110,7 @@ class PostSearchScreenModel(
   }
 
   private fun loadDefault(forceRefresh: Boolean = false) {
+    val requestGeneration = generation
     mutableState.value =
         mutableState.value.copy(
             result =
@@ -120,50 +120,53 @@ class PostSearchScreenModel(
                     error = null,
                 )
         )
-    screenModelScope.launch {
-      postRepo
-          .observePopularPostsPage(
-              date = null,
-              period = "day",
-              offset = 0,
-              forceRefresh = forceRefresh,
-          )
-          .collect { next ->
-            val posts = next.data?.posts ?: mutableState.value.posts
-            val result =
-                QueryState(
-                        data = next.data?.let { PagedResult(it.posts, it.pageInfo) },
-                        isLoading = next.isLoading,
-                        isRefreshing = next.isRefreshing,
-                        isFromCache = next.isFromCache,
-                        isStale = next.isStale,
-                        error = next.error,
-                        lastUpdatedAtMillis = next.lastUpdatedAtMillis,
+    searchJob =
+        screenModelScope.launch {
+          postRepo
+              .observePopularPostsPage(
+                  date = null,
+                  period = "day",
+                  offset = 0,
+                  forceRefresh = forceRefresh,
+              )
+              .collect { next ->
+                if (requestGeneration != generation || mutableState.value.query.isNotBlank())
+                    return@collect
+                val posts = next.data?.posts ?: mutableState.value.posts
+                val result =
+                    QueryState(
+                            data = next.data?.let { PagedResult(it.posts, it.pageInfo) },
+                            isLoading = next.isLoading,
+                            isRefreshing = next.isRefreshing,
+                            isFromCache = next.isFromCache,
+                            isStale = next.isStale,
+                            error = next.error,
+                            lastUpdatedAtMillis = next.lastUpdatedAtMillis,
+                        )
+                        .preserveRefreshUi(posts.isNotEmpty())
+                log.i { "作品搜索默认Popular -> 状态(count=${posts.size})" }
+                mutableState.value =
+                    mutableState.value.copy(
+                        result = result,
+                        posts = posts,
+                        defaultPopularDate =
+                            next.data?.info?.minDate
+                                ?: next.data?.info?.date
+                                ?: mutableState.value.defaultPopularDate,
+                        startOffset = 0,
+                        offset = posts.size,
+                        hasMore = next.data?.pageInfo?.hasNext ?: (posts.size >= PAGE_SIZE),
+                        pageInfo = next.data?.pageInfo,
+                        visibleOffset = 0,
+                        autoPrependArmed = true,
+                        isLoadingPrevious = false,
+                        prependError = null,
                     )
-                    .preserveRefreshUi(posts.isNotEmpty())
-            log.i { "作品搜索默认Popular -> 状态(count=${posts.size})" }
-            mutableState.value =
-                mutableState.value.copy(
-                    result = result,
-                    posts = posts,
-                    defaultPopularDate =
-                        next.data?.info?.minDate
-                            ?: next.data?.info?.date
-                            ?: mutableState.value.defaultPopularDate,
-                    startOffset = 0,
-                    offset = posts.size,
-                    hasMore = next.data?.pageInfo?.hasNext ?: (posts.size >= PAGE_SIZE),
-                    pageInfo = next.data?.pageInfo,
-                    visibleOffset = 0,
-                    autoPrependArmed = true,
-                    isLoadingPrevious = false,
-                    prependErrorMessage = null,
-                )
-          }
-    }
+              }
+        }
   }
 
-  private fun search(query: String) {
+  private suspend fun search(query: String, requestGeneration: Long) {
     mutableState.value =
         mutableState.value.copy(
             result =
@@ -173,35 +176,34 @@ class PostSearchScreenModel(
                     error = null,
                 )
         )
-    screenModelScope.launch {
-      postRepo
-          .observePostSearchPage(query, offset = 0, tag = null, service = null, forceRefresh = true)
-          .collect { next ->
-            val posts = next.data?.items ?: mutableState.value.posts
-            val result = next.preserveRefreshUi(posts.isNotEmpty())
-            log.i { "作品搜索 -> 状态(queryLength=${query.length},count=${posts.size})" }
-            mutableState.value =
-                mutableState.value.copy(
-                    result = result,
-                    posts = posts,
-                    startOffset = 0,
-                    offset = posts.size,
-                    hasMore = next.data?.pageInfo?.hasNext ?: (posts.size >= PAGE_SIZE),
-                    pageInfo = next.data?.pageInfo,
-                    visibleOffset = 0,
-                    autoPrependArmed = true,
-                    isLoadingPrevious = false,
-                    prependErrorMessage = null,
-                    appendErrorMessage = null,
-                )
-          }
-    }
+    postRepo
+        .observePostSearchPage(query, offset = 0, tag = null, service = null, forceRefresh = true)
+        .collect { next ->
+          if (requestGeneration != generation || mutableState.value.query != query) return@collect
+          val posts = next.data?.items ?: mutableState.value.posts
+          val result = next.preserveRefreshUi(posts.isNotEmpty())
+          log.i { "作品搜索 -> 状态(queryLength=${query.length},count=${posts.size})" }
+          mutableState.value =
+              mutableState.value.copy(
+                  result = result,
+                  posts = posts,
+                  startOffset = 0,
+                  offset = posts.size,
+                  hasMore = next.data?.pageInfo?.hasNext ?: (posts.size >= PAGE_SIZE),
+                  pageInfo = next.data?.pageInfo,
+                  visibleOffset = 0,
+                  autoPrependArmed = true,
+                  isLoadingPrevious = false,
+                  prependError = null,
+                  appendError = null,
+              )
+        }
   }
 
   fun loadMore() {
     val state = mutableState.value
     if (state.isLoading || state.isLoadingMore || !state.hasMore) return
-    mutableState.value = state.copy(isLoadingMore = true, appendErrorMessage = null)
+    mutableState.value = state.copy(isLoadingMore = true, appendError = null)
     screenModelScope.launch { fetchPage(offset = state.offset, replace = false) }
   }
 
@@ -215,7 +217,7 @@ class PostSearchScreenModel(
             state.isLoadingMore
     )
         return
-    mutableState.value = state.copy(isLoadingPrevious = true, prependErrorMessage = null)
+    mutableState.value = state.copy(isLoadingPrevious = true, prependError = null)
     screenModelScope.launch {
       fetchPage(
           offset = (state.startOffset - PAGE_SIZE).coerceAtLeast(0),
@@ -229,6 +231,8 @@ class PostSearchScreenModel(
     val state = mutableState.value
     val targetPage = page.coerceIn(1, state.pageInfo?.lastPage ?: page.coerceAtLeast(1))
     val offset = (targetPage - 1) * PAGE_SIZE
+    searchJob?.cancel()
+    generation++
     mutableState.value =
         state.copy(
             result =
@@ -242,10 +246,18 @@ class PostSearchScreenModel(
             autoPrependArmed = offset <= 0,
             isLoadingMore = false,
             isLoadingPrevious = false,
-            appendErrorMessage = null,
-            prependErrorMessage = null,
+            appendError = null,
+            prependError = null,
         )
-    screenModelScope.launch { fetchPage(offset = offset, replace = true, rollbackState = state) }
+    val requestGeneration = generation
+    screenModelScope.launch {
+      fetchPage(
+          offset = offset,
+          replace = true,
+          rollbackState = state,
+          requestGeneration = requestGeneration,
+      )
+    }
   }
 
   fun onVisiblePostIndex(firstVisiblePostIndex: Int) {
@@ -262,9 +274,11 @@ class PostSearchScreenModel(
       replace: Boolean,
       prepend: Boolean = false,
       rollbackState: PostSearchState? = null,
+      requestGeneration: Long = generation,
   ) {
-    runCatching {
-          if (mutableState.value.query.isBlank()) {
+    val requestQuery = mutableState.value.query
+    resultOfSuspend {
+          if (requestQuery.isBlank()) {
             val page =
                 postRepo
                     .observePopularPostsPage(
@@ -276,8 +290,7 @@ class PostSearchScreenModel(
             PagedResult(page.posts, page.pageInfo)
           } else {
             postRepo.searchPostsPage(
-                platform = platform,
-                query = mutableState.value.query,
+                query = requestQuery,
                 offset = offset,
                 tag = null,
                 service = null,
@@ -286,11 +299,14 @@ class PostSearchScreenModel(
           }
         }
         .onSuccess { page ->
+          if (requestGeneration != generation || mutableState.value.query != requestQuery) {
+            return@onSuccess
+          }
           val posts =
               when {
                 replace -> page.items
-                prepend -> (page.items + mutableState.value.posts).distinctBy { it.id }
-                else -> (mutableState.value.posts + page.items).distinctBy { it.id }
+                prepend -> (page.items + mutableState.value.posts).distinctBy { it.key }
+                else -> (mutableState.value.posts + page.items).distinctBy { it.key }
               }
           mutableState.value =
               mutableState.value.copy(
@@ -314,11 +330,14 @@ class PostSearchScreenModel(
                       },
                   isLoadingPrevious = false,
                   isLoadingMore = false,
-                  prependErrorMessage = null,
-                  appendErrorMessage = null,
+                  prependError = null,
+                  appendError = null,
               )
         }
         .onFailure { error ->
+          if (requestGeneration != generation || mutableState.value.query != requestQuery) {
+            return@onFailure
+          }
           mutableState.value =
               if (replace && rollbackState != null) {
                 rollbackState.copy(
@@ -330,8 +349,8 @@ class PostSearchScreenModel(
                         ),
                     isLoadingPrevious = false,
                     isLoadingMore = false,
-                    prependErrorMessage = null,
-                    appendErrorMessage = null,
+                    prependError = null,
+                    appendError = null,
                 )
               } else {
                 mutableState.value.copy(
@@ -343,8 +362,8 @@ class PostSearchScreenModel(
                         ),
                     isLoadingPrevious = false,
                     isLoadingMore = false,
-                    prependErrorMessage = if (prepend) error.message else null,
-                    appendErrorMessage = if (!prepend && offset != 0) error.message else null,
+                    prependError = if (prepend) error.toQueryError() else null,
+                    appendError = if (!prepend && offset != 0) error.toQueryError() else null,
                 )
               }
         }

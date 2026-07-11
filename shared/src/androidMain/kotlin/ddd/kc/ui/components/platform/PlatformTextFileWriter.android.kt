@@ -43,6 +43,9 @@ private fun writeTextFileIntoDirectory(
   if (rootDirectory == null || !rootDirectory.isDirectory) {
     return PlatformTextFileWriteResult.Failure("Cannot access directory")
   }
+  if (!hasSafeRelativePath(destination.relativeDirectories, request.fileName)) {
+    return PlatformTextFileWriteResult.Failure("Unsafe relative path")
+  }
   val targetDirectory =
       destination.relativeDirectories.fold(rootDirectory) { current, segment ->
         current.findFile(segment)?.takeIf { file -> file.isDirectory }
@@ -50,8 +53,9 @@ private fun writeTextFileIntoDirectory(
             ?: return PlatformTextFileWriteResult.Failure("Cannot create parent directory")
       }
 
-  targetDirectory.findFile(request.fileName)?.delete()
-  val document = targetDirectory.createFile("text/plain", request.fileName)
+  val document =
+      targetDirectory.findFile(request.fileName)
+          ?: targetDirectory.createFile("text/plain", request.fileName)
   if (document == null) {
     return PlatformTextFileWriteResult.Failure("Cannot create target file")
   }

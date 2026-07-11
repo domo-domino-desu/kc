@@ -1,7 +1,8 @@
 package ddd.kc.ui.pages.post
 
+import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.Post
-import ddd.kc.data.network.PageInfo
+import ddd.kc.data.model.key
 
 internal data class DetailAppendResult(
     val posts: List<Post>,
@@ -23,7 +24,7 @@ internal fun appendDetailPosts(
     pageSize: Int,
 ): DetailAppendResult =
     DetailAppendResult(
-        posts = (currentPosts + pagePosts).distinctBy { it.id },
+        posts = (currentPosts + pagePosts).distinctBy { it.key },
         offset = nextOffset + pagePosts.size,
         hasMore = pageInfo?.hasNext ?: (pagePosts.size >= pageSize),
     )
@@ -34,8 +35,8 @@ internal fun prependDetailPosts(
     previousOffset: Int,
     pagePosts: List<Post>,
 ): DetailPrependResult {
-  val existingIds = currentPosts.map { it.id }.toSet()
-  val incoming = pagePosts.filterNot { it.id in existingIds }
+  val existingKeys = currentPosts.map { it.key }.toSet()
+  val incoming = pagePosts.filterNot { it.key in existingKeys }
   return DetailPrependResult(
       posts = incoming + currentPosts,
       currentIndex = currentIndex + incoming.size,

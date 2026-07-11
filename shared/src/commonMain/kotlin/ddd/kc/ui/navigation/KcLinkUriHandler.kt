@@ -4,17 +4,18 @@ import androidx.compose.ui.platform.UriHandler
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import ddd.kc.data.model.Creator
-import ddd.kc.data.model.Platform
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.key
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.post.PostRouteScreen
 
 class KcLinkUriHandler(
     private val navigator: Navigator,
     private val fallback: UriHandler,
+    private val navigationWindows: NavigationWindowStore,
 ) : UriHandler {
   override fun openUri(uri: String) {
-    val target = parseKcRouteTarget(uri)
+    val target = parseKcRouteTarget(uri, navigationWindows)
     if (target == null) {
       fallback.openUri(uri)
       return
@@ -23,7 +24,7 @@ class KcLinkUriHandler(
   }
 }
 
-internal fun parseKcRouteTarget(url: String): Screen? {
+internal fun parseKcRouteTarget(url: String, navigationWindows: NavigationWindowStore): Screen? {
   val route = parseKcRoute(url) ?: return null
   return when (route) {
     is KcRoute.PostRoute -> {
@@ -35,8 +36,8 @@ internal fun parseKcRouteTarget(url: String): Screen? {
               service = route.service,
           )
       PostRouteScreen(
-          platform = route.platform,
-          posts = listOf(post),
+          windowId = navigationWindows.putPosts(listOf(post)),
+          resourceKey = post.key,
           startIndex = 0,
           source = "link",
       )
@@ -50,24 +51,25 @@ internal fun parseKcRouteTarget(url: String): Screen? {
               service = route.service,
               publicId = route.creatorId,
           )
-      CreatorRouteScreen(platform = route.platform, creators = listOf(creator), startIndex = 0)
+      CreatorRouteScreen(
+          windowId = navigationWindows.putCreators(listOf(creator)),
+          resourceKey = creator.key,
+          startIndex = 0,
+      )
     }
   }
 }
 
 private sealed interface KcRoute {
-  val platform: Platform
   val service: String
   val creatorId: String
 
   data class CreatorRoute(
-      override val platform: Platform,
       override val service: String,
       override val creatorId: String,
   ) : KcRoute
 
   data class PostRoute(
-      override val platform: Platform,
       override val service: String,
       override val creatorId: String,
       val postId: String,
@@ -82,25 +84,21 @@ private fun parseKcRoute(url: String): KcRoute? {
   val host = afterScheme.substringBefore('/').substringBefore('?').substringBefore('#').lowercase()
   val rawPath = "/" + afterScheme.substringAfter('/', missingDelimiterValue = "")
   val path = rawPath.substringBefore('?').substringBefore('#')
-  val platform =
-      when {
-        scheme == "kc" && host == "pawchive" -> Platform.PAWCHIVE
-        scheme in setOf("http", "https") &&
-            host in setOf("pawchive.st", "www.pawchive.st", "pawchive.pw", "www.pawchive.pw") ->
-            Platform.PAWCHIVE
-        else -> return null
-      }
+  val isPawchive =
+      (scheme == "kc" && host == "pawchive") ||
+          (scheme in setOf("http", "https") &&
+              host in setOf("pawchive.st", "www.pawchive.st", "pawchive.pw", "www.pawchive.pw"))
+  if (!isPawchive) return null
   val segments = path.split('/').filter { it.isNotBlank() }
   if (segments.size < 3 || segments[1] != "user") return null
   val service = segments[0].takeIf { it.isNotBlank() } ?: return null
   val creatorId = segments[2].takeIf { it.isNotBlank() } ?: return null
   if (segments.size >= 5 && segments[3] == "post") {
     return KcRoute.PostRoute(
-        platform = platform,
         service = service,
         creatorId = creatorId,
         postId = segments[4],
     )
   }
-  return KcRoute.CreatorRoute(platform = platform, service = service, creatorId = creatorId)
+  return KcRoute.CreatorRoute(service = service, creatorId = creatorId)
 }

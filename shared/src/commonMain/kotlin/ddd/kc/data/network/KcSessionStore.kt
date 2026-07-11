@@ -1,42 +1,37 @@
 package ddd.kc.data.network
 
-import ddd.kc.data.model.Platform
-import eu.anifantakis.lib.ksafe.KSafe
+import ddd.kc.data.security.SecretStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 private const val PAWCHIVE_SESSION_KEY = "pawchive_session"
 
-class KcSessionStore(private val vault: KSafe) {
-  private val _loggedInPlatforms =
-      MutableStateFlow(
-          if (vault.getDirect(PAWCHIVE_SESSION_KEY, "").isNotBlank()) setOf(Platform.PAWCHIVE)
-          else emptySet()
-      )
-  val loggedInPlatforms: StateFlow<Set<Platform>> = _loggedInPlatforms
+class KcSessionStore(private val secretStore: SecretStore) {
+  private val _loggedIn =
+      MutableStateFlow(secretStore.get(PAWCHIVE_SESSION_KEY).orEmpty().isNotBlank())
+  val loggedIn: StateFlow<Boolean> = _loggedIn
 
-  fun getSession(platform: Platform): String? =
-      vault.getDirect(PAWCHIVE_SESSION_KEY, "").takeIf { it.isNotBlank() }
+  fun getSession(): String? = secretStore.get(PAWCHIVE_SESSION_KEY)
 
-  fun hasSession(platform: Platform): Boolean = getSession(platform) != null
+  fun hasSession(): Boolean = getSession() != null
 
-  fun saveSession(platform: Platform, session: String) {
+  fun saveSession(session: String) {
     val normalized = normalizeSession(session)
     if (normalized.isBlank()) {
-      clearSession(platform)
+      clearSession()
       return
     }
-    vault.putDirect(PAWCHIVE_SESSION_KEY, normalized)
-    _loggedInPlatforms.value = setOf(Platform.PAWCHIVE)
+    secretStore.put(PAWCHIVE_SESSION_KEY, normalized)
+    _loggedIn.value = true
   }
 
-  fun clearSession(platform: Platform) {
-    vault.deleteDirect(PAWCHIVE_SESSION_KEY)
-    _loggedInPlatforms.value = emptySet()
+  fun clearSession() {
+    secretStore.delete(PAWCHIVE_SESSION_KEY)
+    _loggedIn.value = false
   }
 
-  fun cookieHeader(platform: Platform = Platform.PAWCHIVE): String {
-    val session = getSession(platform) ?: throw AuthRequiredException()
+  fun cookieHeader(): String {
+    val session = getSession() ?: throw AuthRequiredException()
     return "session=$session"
   }
 

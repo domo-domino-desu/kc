@@ -7,7 +7,7 @@ data class PostFile(
     val name: String? = null,
     val path: String? = null,
     val deferred: Boolean = false,
-) : PlatformSerializable
+)
 
 private val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "webp", "avif", "jxl", "bmp")
 private val videoExtensions =

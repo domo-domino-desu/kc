@@ -1,16 +1,15 @@
 package ddd.kc.di
 
-import ddd.kc.data.model.DiscordChannel
 import ddd.kc.ui.pages.creator.CreatorScreenModel
 import ddd.kc.ui.pages.creators.CreatorSearchScreenModel
-import ddd.kc.ui.pages.discord.DiscordChannelScreenModel
 import ddd.kc.ui.pages.dm.DmSearchScreenModel
+import ddd.kc.ui.pages.history.HistoryScreenModel
 import ddd.kc.ui.pages.more.FavoritesScreenModel
-import ddd.kc.ui.pages.more.LoginScreenModel
 import ddd.kc.ui.pages.more.MoreScreenModel
 import ddd.kc.ui.pages.post.PostScreenModel
 import ddd.kc.ui.pages.recent.PopularPostsScreenModel
 import ddd.kc.ui.pages.recent.RecentDMsScreenModel
+import ddd.kc.ui.pages.settings.SettingsScreenModel
 import ddd.kc.ui.pages.tagposts.TagPostsScreenModel
 import ddd.kc.ui.pages.tags.TagsScreenModel
 import ddd.kc.ui.pages.works.PostSearchScreenModel
@@ -26,7 +25,7 @@ fun screenModelModule() = module {
   single { DmSearchScreenModel(get()) }
   single { TagsScreenModel(get()) }
   single { WorksScreenModel() }
-  single { MoreScreenModel(get(), get(), get()) }
+  single { MoreScreenModel(get(), get(), get(), get()) }
 
   // Detail models: factory (parameterised per navigation target)
   factory { (tag: String) -> TagPostsScreenModel(get(), tag) }
@@ -40,20 +39,12 @@ fun screenModelModule() = module {
         params[2],
         params[3],
         params[4],
-        params[5],
     )
   }
-  factory {
-      (
-          platform: ddd.kc.data.model.Platform,
-          creators: List<ddd.kc.data.model.Creator>,
-          startIndex: Int) ->
-    CreatorScreenModel(get(), get(), get(), get(), platform, creators, startIndex)
+  factory { (creators: List<ddd.kc.data.model.Creator>, startIndex: Int) ->
+    CreatorScreenModel(get(), get(), get(), creators, startIndex)
   }
-  factory { (platform: ddd.kc.data.model.Platform, channels: List<DiscordChannel>, startIndex: Int)
-    ->
-    DiscordChannelScreenModel(get(), platform, channels, startIndex)
-  }
-  factory { LoginScreenModel(get()) }
   factory { FavoritesScreenModel(get(), get()) }
+  factory { HistoryScreenModel(get()) }
+  factory { SettingsScreenModel(get()) }
 }

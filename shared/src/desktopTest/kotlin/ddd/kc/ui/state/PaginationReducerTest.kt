@@ -1,6 +1,7 @@
 package ddd.kc.ui.state
 
-import ddd.kc.data.network.PageInfo
+import ddd.kc.data.model.PageInfo
+import ddd.kc.data.model.QueryError
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -112,7 +113,7 @@ class PaginationReducerTest {
     assertEquals(150, restored.startOffset)
     assertEquals(150, restored.visibleOffset)
     assertEquals(4, restored.visiblePageInfo?.currentPage)
-    assertEquals("failed", restored.errorMessage)
+    assertTrue(restored.error is QueryError.Unknown)
     assertFalse(restored.loading)
     assertFalse(restored.refreshing)
     assertEquals(300, jumping.startOffset)

@@ -49,15 +49,16 @@ import cafe.adriel.voyager.navigator.tab.TabOptions
 import ddd.kc.data.model.Tag
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
-import ddd.kc.ui.app.LocalActivePlatform
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.SkeletonBlock
 import ddd.kc.ui.components.isAtTop
+import ddd.kc.ui.i18n.localizedMessage
 import ddd.kc.ui.pages.tagposts.TagPostsScreen
 import ddd.kc.ui.state.ScrollPosition
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.filter_tags_hint
+import kc.shared.generated.resources.tags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -73,6 +74,15 @@ private const val TAG_SKELETON_ROW_COUNT = 24
 private const val TAG_SKELETON_MIN_WIDTH_DP = 64
 private const val TAG_SKELETON_MAX_WIDTH_DP = 188
 
+private data class TagsLayoutCacheKey(
+    val tagsSize: Int,
+    val tagsSignature: Long,
+    val rowWidthPx: Int,
+    val horizontalSpacingPx: Int,
+    val chipHorizontalPaddingPx: Int,
+    val textStyleHash: Int,
+)
+
 object TagsTab : Tab {
   private fun readResolve(): Any = TagsTab
 
@@ -81,7 +91,7 @@ object TagsTab : Tab {
     get() =
         TabOptions(
             index = 2u,
-            title = "标签",
+            title = stringResource(Res.string.tags),
             icon = rememberVectorPainter(Icons.TagW400Outlined),
         )
 
@@ -109,14 +119,13 @@ fun TagsContent(
   val navigator = LocalNavigator.currentOrThrow
   val screenModel = koinInject<TagsScreenModel>()
   val state by screenModel.state.collectAsState()
-  val platform = LocalActivePlatform.current
   val listState =
       rememberLazyListState(
           initialFirstVisibleItemIndex = initialScrollPosition.index,
           initialFirstVisibleItemScrollOffset = initialScrollPosition.offset,
       )
   val scope = rememberCoroutineScope()
-  val refresh = { screenModel.load(platform, forceRefresh = true) }
+  val refresh = { screenModel.load(forceRefresh = true) }
   val latestOnReselect by
       rememberUpdatedState<() -> Unit> {
         if (listState.isAtTop) {
@@ -126,7 +135,7 @@ fun TagsContent(
         }
       }
 
-  LaunchedEffect(platform) { screenModel.load(platform) }
+  LaunchedEffect(Unit) { screenModel.load() }
   LaunchedEffect(listState) {
     snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
         .distinctUntilChanged()
@@ -137,7 +146,7 @@ fun TagsContent(
     onReselectHandlerChanged(handler)
     onDispose { onReselectHandlerChanged(null) }
   }
-  ErrorToastEffect(state.errorMessage)
+  ErrorToastEffect(state.error?.localizedMessage())
 
   Scaffold(contentWindowInsets = WindowInsets(0.dp)) { paddingValues ->
     KcPullRefreshBox(
@@ -161,6 +170,7 @@ fun TagsContent(
             with(density) { AssistChipEstimatedHorizontalPadding.roundToPx() }
         val chipWidthCache =
             remember(chipTextStyle, chipHorizontalPaddingPx) { mutableMapOf<String, Int>() }
+        val tagRowsCache = remember { mutableMapOf<TagsLayoutCacheKey, List<List<Tag>>>() }
         val layoutCacheKey =
             remember(
                 filteredTags,
@@ -188,14 +198,12 @@ fun TagsContent(
               )
             }
         var tagRows by
-            remember(layoutCacheKey) {
-              mutableStateOf(screenModel.cachedTagRows(layoutCacheKey) ?: emptyList())
-            }
+            remember(layoutCacheKey) { mutableStateOf(tagRowsCache[layoutCacheKey] ?: emptyList()) }
 
         LaunchedEffect(
             layoutCacheKey,
         ) {
-          screenModel.cachedTagRows(layoutCacheKey)?.let {
+          tagRowsCache[layoutCacheKey]?.let {
             tagRows = it
             return@LaunchedEffect
           }
@@ -216,7 +224,7 @@ fun TagsContent(
                     horizontalSpacingPx = horizontalSpacingPx,
                 )
               }
-          screenModel.cacheTagRows(layoutCacheKey, tagRows)
+          tagRowsCache[layoutCacheKey] = tagRows
         }
 
         LazyColumn(
@@ -247,7 +255,7 @@ fun TagsContent(
             itemsIndexed(tagRows, key = { index, _ -> "tag-row-$index" }) { _, row ->
               TagRow(
                   tags = row,
-                  onTagClick = { tag -> navigator.push(TagPostsScreen(platform, tag.tag)) },
+                  onTagClick = { tag -> navigator.push(TagPostsScreen(tag.tag)) },
               )
             }
           }

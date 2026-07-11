@@ -17,13 +17,15 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.key
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
 import ddd.kc.ui.components.PostGridPagingActions
 import ddd.kc.ui.components.PostGridPagingState
+import ddd.kc.ui.i18n.localizedMessage
+import ddd.kc.ui.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
@@ -34,7 +36,6 @@ import org.koin.core.parameter.parametersOf
 private val log = KcLog.withTag("TagPostsScreen")
 
 class TagPostsScreen(
-    private val platform: Platform,
     private val tag: String,
     private val routeKey: String = nextRouteInstanceKey("tag-posts"),
 ) : Screen {
@@ -44,21 +45,21 @@ class TagPostsScreen(
   @Composable
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
+    val navigationWindows = LocalNavigationWindowStore.current
     val screenModel = koinScreenModel<TagPostsScreenModel> { parametersOf(tag) }
     val state by screenModel.state.collectAsState()
     val gridState = rememberLazyGridState()
     val cellWidth = LocalAppSettings.current.cellMinWidthDp()
-    val refresh = { screenModel.load(platform, forceRefresh = true) }
+    val refresh = { screenModel.load(forceRefresh = true) }
 
-    LaunchedEffect(Unit) { screenModel.load(platform) }
-    ErrorToastEffect(state.errorMessage)
-    ErrorToastEffect(state.appendErrorMessage)
-    ErrorToastEffect(state.prependErrorMessage)
+    LaunchedEffect(Unit) { screenModel.load() }
+    ErrorToastEffect(state.error?.localizedMessage())
+    ErrorToastEffect(state.appendError?.localizedMessage())
+    ErrorToastEffect(state.prependError?.localizedMessage())
 
     Scaffold(topBar = { DetailAppBar("#$tag") }) { paddingValues ->
       Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         PagedPostGrid(
-            platform = platform,
             state =
                 PostGridPagingState(
                     posts = state.items,
@@ -69,23 +70,21 @@ class TagPostsScreen(
                     isLoadingPrevious = state.isLoadingPrevious,
                     hasMore = state.hasMore,
                     canLoadPrevious = state.canAutoLoadPrevious,
-                    appendErrorMessage = state.appendErrorMessage,
+                    appendErrorMessage = state.appendError?.localizedMessage(),
                 ),
             actions =
                 PostGridPagingActions(
                     onRefresh = refresh,
-                    onLoadMore = { screenModel.loadMore(platform) },
-                    onLoadPrevious = { screenModel.loadPrevious(platform) },
-                    onJumpToPage = { page -> screenModel.jumpToPage(platform, page) },
+                    onLoadMore = { screenModel.loadMore() },
+                    onLoadPrevious = { screenModel.loadPrevious() },
+                    onJumpToPage = { page -> screenModel.jumpToPage(page) },
                     onVisiblePostIndex = screenModel::onVisiblePostIndex,
                     onPostClick = { post ->
-                      log.i {
-                        "打开Post -> 点击来源(source=tag,platform=${platform.name},${summarizePost(post)})"
-                      }
+                      log.i { "打开Post -> 点击来源(source=tag,${summarizePost(post)})" }
                       navigator.push(
                           PostRouteScreen(
-                              platform = platform,
-                              posts = state.items,
+                              windowId = navigationWindows.putPosts(state.items),
+                              resourceKey = post.key,
                               startIndex = state.items.indexOf(post),
                               source = "tag",
                               initialOffset = state.startOffset,

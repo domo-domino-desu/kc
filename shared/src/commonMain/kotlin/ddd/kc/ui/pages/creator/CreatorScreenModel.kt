@@ -4,13 +4,13 @@ import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Announcement
 import ddd.kc.data.model.Creator
-import ddd.kc.data.model.DiscordChannel
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.Tag
-import ddd.kc.data.network.AuthRequiredException
+import ddd.kc.data.model.key
+import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.CreatorRepository
-import ddd.kc.data.repository.DiscordRepository
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.data.translation.TranslationBlockResult
 import ddd.kc.data.translation.TranslationEngine
@@ -20,6 +20,7 @@ import ddd.kc.ui.state.PaginationReducer
 import ddd.kc.ui.state.PaginationSnapshot
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
 
@@ -29,9 +30,7 @@ private val log = KcLog.withTag("CreatorScreenModel")
 class CreatorScreenModel(
     private val postRepo: PostRepository,
     private val creatorRepo: CreatorRepository,
-    private val discordRepo: DiscordRepository,
     private val translationService: TranslationEngine,
-    private val platform: Platform,
     initialCreators: List<Creator>,
     startIndex: Int,
 ) :
@@ -42,9 +41,36 @@ class CreatorScreenModel(
             hasMore = initialCreators.size >= PAGE_SIZE,
         )
     ) {
+  private enum class RequestKind {
+    ANNOUNCEMENTS,
+    POSTS,
+    TAGS,
+    LINKS,
+  }
 
-  private var favoriteStatusDisabled = false
-  private val postReducer = PaginationReducer<Post, String> { it.id }
+  private val requestTokens = mutableMapOf<Pair<RequestKind, CreatorKey>, Long>()
+
+  private fun beginRequest(kind: RequestKind, key: CreatorKey): Long {
+    val next = (requestTokens[kind to key] ?: 0L) + 1L
+    requestTokens[kind to key] = next
+    return next
+  }
+
+  private fun isCurrentRequest(kind: RequestKind, key: CreatorKey, token: Long): Boolean =
+      requestTokens[kind to key] == token
+
+  private val updatingFavoriteCreators = mutableSetOf<CreatorKey>()
+  private val favoriteRequestTokens = mutableMapOf<CreatorKey, Long>()
+  private val postReducer = PaginationReducer<Post, PostKey> { it.key }
+
+  private fun beginFavoriteRequest(key: CreatorKey): Long {
+    val next = (favoriteRequestTokens[key] ?: 0L) + 1L
+    favoriteRequestTokens[key] = next
+    return next
+  }
+
+  private fun isCurrentFavoriteRequest(key: CreatorKey, token: Long): Boolean =
+      favoriteRequestTokens[key] == token
 
   fun onPageChanged(index: Int) {
     log.d { "打开Creator -> 切换(index=$index)" }
@@ -72,42 +98,53 @@ class CreatorScreenModel(
   fun getCreatorPosts(creator: Creator): List<Post> = getCreatorPostSnapshot(creator).items
 
   fun getCreatorPostSnapshot(creator: Creator): PaginationSnapshot<Post> =
-      mutableState.value.creatorPostSnapshots[creator.id] ?: PaginationSnapshot()
+      mutableState.value.creatorPostSnapshots[creator.key] ?: PaginationSnapshot()
 
   fun loadCreatorAnnouncements(creator: Creator, forceRefresh: Boolean = false) {
-    if (!forceRefresh && mutableState.value.creatorAnnouncements.containsKey(creator.id)) return
+    if (!forceRefresh && mutableState.value.creatorAnnouncements.containsKey(creator.key)) return
+    val requestToken = beginRequest(RequestKind.ANNOUNCEMENTS, creator.key)
     mutableState.value =
         mutableState.value.copy(
             loadingCreatorAnnouncementIds =
-                mutableState.value.loadingCreatorAnnouncementIds + creator.id
+                mutableState.value.loadingCreatorAnnouncementIds + creator.key,
+            announcementErrors = mutableState.value.announcementErrors - creator.key,
         )
     screenModelScope.launch {
-      runCatching {
+      resultOfSuspend {
             creatorRepo.getCreatorAnnouncements(
-                platform,
                 creator.service,
                 creator.id,
                 forceRefresh,
             )
           }
           .onSuccess { announcements ->
+            if (!isCurrentRequest(RequestKind.ANNOUNCEMENTS, creator.key, requestToken)) {
+              return@onSuccess
+            }
             mutableState.value =
                 mutableState.value.copy(
                     loadingCreatorAnnouncementIds =
-                        mutableState.value.loadingCreatorAnnouncementIds - creator.id,
+                        mutableState.value.loadingCreatorAnnouncementIds - creator.key,
                     creatorAnnouncements =
                         mutableState.value.creatorAnnouncements +
-                            (creator.id to announcements.sortedByDescending { it.added.orEmpty() }),
+                            (creator.key to
+                                announcements.sortedByDescending { it.added.orEmpty() }),
+                    announcementErrors = mutableState.value.announcementErrors - creator.key,
                 )
             log.i {
               "加载Creator Announcements -> 成功(service=${creator.service},creator=${creator.id},count=${announcements.size})"
             }
           }
           .onFailure {
+            if (!isCurrentRequest(RequestKind.ANNOUNCEMENTS, creator.key, requestToken)) {
+              return@onFailure
+            }
             mutableState.value =
                 mutableState.value.copy(
                     loadingCreatorAnnouncementIds =
-                        mutableState.value.loadingCreatorAnnouncementIds - creator.id
+                        mutableState.value.loadingCreatorAnnouncementIds - creator.key,
+                    announcementErrors =
+                        mutableState.value.announcementErrors + (creator.key to it.toQueryError()),
                 )
             log.e(it) {
               "加载Creator Announcements -> 失败(service=${creator.service},creator=${creator.id})"
@@ -117,19 +154,19 @@ class CreatorScreenModel(
   }
 
   fun getCreatorAnnouncements(creator: Creator): List<Announcement> =
-      mutableState.value.creatorAnnouncements[creator.id] ?: emptyList()
+      mutableState.value.creatorAnnouncements[creator.key] ?: emptyList()
 
   fun translateAnnouncement(creator: Creator, announcement: Announcement) {
     if (!translationService.isEnabled()) return
     if (announcement.content.isBlank()) return
     val key = announcement.translationKey()
-    val existing = mutableState.value.announcementTranslations[creator.id]?.get(key)
+    val existing = mutableState.value.announcementTranslations[creator.key]?.get(key)
     if (existing?.showTranslation == true) {
-      updateAnnouncementTranslation(creator.id, key, existing.copy(showTranslation = false))
+      updateAnnouncementTranslation(creator.key, key, existing.copy(showTranslation = false))
       return
     }
     if (existing != null && existing.blocks.isNotEmpty() && !existing.isTranslating) {
-      updateAnnouncementTranslation(creator.id, key, existing.copy(showTranslation = true))
+      updateAnnouncementTranslation(creator.key, key, existing.copy(showTranslation = true))
       return
     }
 
@@ -137,7 +174,7 @@ class CreatorScreenModel(
       val blocks = translationService.extractBlocks(announcement.content)
       if (blocks.isEmpty()) return@launch
       updateAnnouncementTranslation(
-          creator.id,
+          creator.key,
           key,
           ContentTranslationState(
               blocks =
@@ -151,18 +188,18 @@ class CreatorScreenModel(
               showTranslation = true,
           ),
       )
-      runCatching {
+      resultOfSuspend {
             translationService.translateBlocks(blocks) { index, result ->
-              updateAnnouncementTranslationBlock(creator.id, key, index, result)
+              updateAnnouncementTranslationBlock(creator.key, key, index, result)
             }
           }
           .onFailure { error ->
             log.e(error) { "翻译Announcement -> 失败(creator=${creator.id},key=$key)" }
             val failed =
-                mutableState.value.announcementTranslations[creator.id]?.get(key)
+                mutableState.value.announcementTranslations[creator.key]?.get(key)
                     ?: ContentTranslationState()
             updateAnnouncementTranslation(
-                creator.id,
+                creator.key,
                 key,
                 failed.copy(
                     blocks =
@@ -177,10 +214,10 @@ class CreatorScreenModel(
             )
           }
       val done =
-          mutableState.value.announcementTranslations[creator.id]?.get(key)
+          mutableState.value.announcementTranslations[creator.key]?.get(key)
               ?: ContentTranslationState()
       updateAnnouncementTranslation(
-          creator.id,
+          creator.key,
           key,
           done.copy(isTranslating = false, showTranslation = true),
       )
@@ -192,14 +229,14 @@ class CreatorScreenModel(
     val announcements = getCreatorAnnouncements(creator).filter { it.content.isNotBlank() }
     if (announcements.isEmpty()) return
     val keys = announcements.map { it.translationKey() }
-    val currentTranslations = mutableState.value.announcementTranslations[creator.id] ?: emptyMap()
+    val currentTranslations = mutableState.value.announcementTranslations[creator.key] ?: emptyMap()
     val allVisible = keys.all { currentTranslations[it]?.showTranslation == true }
     if (allVisible) {
       mutableState.value =
           mutableState.value.copy(
               announcementTranslations =
                   mutableState.value.announcementTranslations +
-                      (creator.id to
+                      (creator.key to
                           currentTranslations.mapValues { (_, state) ->
                             state.copy(showTranslation = false)
                           })
@@ -217,7 +254,7 @@ class CreatorScreenModel(
           mutableState.value.copy(
               announcementTranslations =
                   mutableState.value.announcementTranslations +
-                      (creator.id to
+                      (creator.key to
                           currentTranslations.mapValues { (_, state) ->
                             state.copy(showTranslation = true)
                           })
@@ -228,17 +265,17 @@ class CreatorScreenModel(
     screenModelScope.launch {
       announcements.forEach { announcement ->
         val key = announcement.translationKey()
-        val latest = mutableState.value.announcementTranslations[creator.id] ?: emptyMap()
+        val latest = mutableState.value.announcementTranslations[creator.key] ?: emptyMap()
         val existing = latest[key]
         if (existing != null && existing.blocks.isNotEmpty() && !existing.isTranslating) {
-          updateAnnouncementTranslation(creator.id, key, existing.copy(showTranslation = true))
+          updateAnnouncementTranslation(creator.key, key, existing.copy(showTranslation = true))
           return@forEach
         }
 
         val blocks = translationService.extractBlocks(announcement.content)
         if (blocks.isEmpty()) return@forEach
         updateAnnouncementTranslation(
-            creator.id,
+            creator.key,
             key,
             ContentTranslationState(
                 blocks =
@@ -252,18 +289,18 @@ class CreatorScreenModel(
                 showTranslation = true,
             ),
         )
-        runCatching {
+        resultOfSuspend {
               translationService.translateBlocks(blocks) { index, result ->
-                updateAnnouncementTranslationBlock(creator.id, key, index, result)
+                updateAnnouncementTranslationBlock(creator.key, key, index, result)
               }
             }
             .onFailure { error ->
               log.e(error) { "翻译Announcement -> 失败(creator=${creator.id},key=$key)" }
               val failed =
-                  (mutableState.value.announcementTranslations[creator.id]?.get(key)
+                  (mutableState.value.announcementTranslations[creator.key]?.get(key)
                       ?: ContentTranslationState())
               updateAnnouncementTranslation(
-                  creator.id,
+                  creator.key,
                   key,
                   failed.copy(
                       blocks =
@@ -278,10 +315,10 @@ class CreatorScreenModel(
               )
             }
         val done =
-            mutableState.value.announcementTranslations[creator.id]?.get(key)
+            mutableState.value.announcementTranslations[creator.key]?.get(key)
                 ?: ContentTranslationState()
         updateAnnouncementTranslation(
-            creator.id,
+            creator.key,
             key,
             done.copy(isTranslating = false, showTranslation = true),
         )
@@ -292,20 +329,20 @@ class CreatorScreenModel(
   fun loadCreatorPosts(creator: Creator, offset: Int = 0, forceRefresh: Boolean = false) {
     val existing = getCreatorPostSnapshot(creator)
     if (offset == 0 && !forceRefresh && (existing.items.isNotEmpty() || existing.loading)) return
+    val requestToken = beginRequest(RequestKind.POSTS, creator.key)
     val loading = postReducer.beginLoad(existing, forceRefresh)
     mutableState.value =
         mutableState.value.copy(
-            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id,
+            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.key,
             creatorPostSnapshots =
-                mutableState.value.creatorPostSnapshots + (creator.id to loading),
+                mutableState.value.creatorPostSnapshots + (creator.key to loading),
         )
     screenModelScope.launch {
       log.i {
         "加载Creator Posts -> 开始(service=${creator.service},creator=${creator.id},offset=$offset)"
       }
-      runCatching {
+      resultOfSuspend {
             postRepo.getCreatorPostsPage(
-                platform,
                 creator.service,
                 creator.id,
                 offset,
@@ -313,6 +350,7 @@ class CreatorScreenModel(
             )
           }
           .onSuccess { page ->
+            if (!isCurrentRequest(RequestKind.POSTS, creator.key, requestToken)) return@onSuccess
             val posts = page.items
             val snapshot =
                 postReducer.reduceFirstPage(
@@ -324,21 +362,22 @@ class CreatorScreenModel(
                 )
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
-                        mutableState.value.creatorPostSnapshots + (creator.id to snapshot),
+                        mutableState.value.creatorPostSnapshots + (creator.key to snapshot),
                 )
             log.i {
               "加载Creator Posts -> 成功(service=${creator.service},creator=${creator.id},offset=$offset,count=${posts.size})"
             }
           }
           .onFailure {
+            if (!isCurrentRequest(RequestKind.POSTS, creator.key, requestToken)) return@onFailure
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
                         mutableState.value.creatorPostSnapshots +
-                            (creator.id to
+                            (creator.key to
                                 postReducer.reduceFirstPageError(
                                     getCreatorPostSnapshot(creator),
                                     it,
@@ -354,19 +393,19 @@ class CreatorScreenModel(
   fun loadMoreCreatorPosts(creator: Creator) {
     val current = getCreatorPostSnapshot(creator)
     if (!postReducer.canLoadMore(current)) return
+    val requestToken = beginRequest(RequestKind.POSTS, creator.key)
     val appending = postReducer.beginAppend(current)
     mutableState.value =
         mutableState.value.copy(
-            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id,
+            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.key,
             creatorPostSnapshots =
-                mutableState.value.creatorPostSnapshots + (creator.id to appending),
+                mutableState.value.creatorPostSnapshots + (creator.key to appending),
         )
     screenModelScope.launch {
       val offset = current.offset
-      runCatching {
-            postRepo.getCreatorPostsPage(platform, creator.service, creator.id, offset, false)
-          }
+      resultOfSuspend { postRepo.getCreatorPostsPage(creator.service, creator.id, offset, false) }
           .onSuccess { page ->
+            if (!isCurrentRequest(RequestKind.POSTS, creator.key, requestToken)) return@onSuccess
             val posts = page.items
             val snapshot =
                 postReducer.reduceAppend(
@@ -378,18 +417,19 @@ class CreatorScreenModel(
                 )
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
-                        mutableState.value.creatorPostSnapshots + (creator.id to snapshot),
+                        mutableState.value.creatorPostSnapshots + (creator.key to snapshot),
                 )
           }
           .onFailure {
+            if (!isCurrentRequest(RequestKind.POSTS, creator.key, requestToken)) return@onFailure
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
                         mutableState.value.creatorPostSnapshots +
-                            (creator.id to postReducer.reduceAppendError(appending, it)),
+                            (creator.key to postReducer.reduceAppendError(appending, it)),
                 )
           }
     }
@@ -398,19 +438,19 @@ class CreatorScreenModel(
   fun loadPreviousCreatorPosts(creator: Creator) {
     val current = getCreatorPostSnapshot(creator)
     if (!postReducer.canLoadPrevious(current)) return
+    val requestToken = beginRequest(RequestKind.POSTS, creator.key)
     val offset = (current.startOffset - PAGE_SIZE).coerceAtLeast(0)
     val prepending = postReducer.beginPrepend(current)
     mutableState.value =
         mutableState.value.copy(
-            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id,
+            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.key,
             creatorPostSnapshots =
-                mutableState.value.creatorPostSnapshots + (creator.id to prepending),
+                mutableState.value.creatorPostSnapshots + (creator.key to prepending),
         )
     screenModelScope.launch {
-      runCatching {
-            postRepo.getCreatorPostsPage(platform, creator.service, creator.id, offset, false)
-          }
+      resultOfSuspend { postRepo.getCreatorPostsPage(creator.service, creator.id, offset, false) }
           .onSuccess { page ->
+            if (!isCurrentRequest(RequestKind.POSTS, creator.key, requestToken)) return@onSuccess
             val snapshot =
                 postReducer.reducePrepend(
                     prepending,
@@ -421,18 +461,19 @@ class CreatorScreenModel(
                 )
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
-                        mutableState.value.creatorPostSnapshots + (creator.id to snapshot),
+                        mutableState.value.creatorPostSnapshots + (creator.key to snapshot),
                 )
           }
           .onFailure {
+            if (!isCurrentRequest(RequestKind.POSTS, creator.key, requestToken)) return@onFailure
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
                         mutableState.value.creatorPostSnapshots +
-                            (creator.id to postReducer.reducePrependError(prepending, it)),
+                            (creator.key to postReducer.reducePrependError(prepending, it)),
                 )
           }
     }
@@ -442,18 +483,18 @@ class CreatorScreenModel(
     val current = getCreatorPostSnapshot(creator)
     val targetPage = page.coerceIn(1, current.pageInfo?.lastPage ?: page.coerceAtLeast(1))
     val offset = (targetPage - 1) * PAGE_SIZE
+    val requestToken = beginRequest(RequestKind.POSTS, creator.key)
     val loading = postReducer.beginJump(current, offset)
     mutableState.value =
         mutableState.value.copy(
-            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.id,
+            loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds + creator.key,
             creatorPostSnapshots =
-                mutableState.value.creatorPostSnapshots + (creator.id to loading),
+                mutableState.value.creatorPostSnapshots + (creator.key to loading),
         )
     screenModelScope.launch {
-      runCatching {
-            postRepo.getCreatorPostsPage(platform, creator.service, creator.id, offset, false)
-          }
+      resultOfSuspend { postRepo.getCreatorPostsPage(creator.service, creator.id, offset, false) }
           .onSuccess { pageResult ->
+            if (!isCurrentRequest(RequestKind.POSTS, creator.key, requestToken)) return@onSuccess
             val posts = pageResult.items
             val snapshot =
                 postReducer.reduceFirstPage(
@@ -465,18 +506,19 @@ class CreatorScreenModel(
                 )
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
-                        mutableState.value.creatorPostSnapshots + (creator.id to snapshot),
+                        mutableState.value.creatorPostSnapshots + (creator.key to snapshot),
                 )
           }
           .onFailure {
+            if (!isCurrentRequest(RequestKind.POSTS, creator.key, requestToken)) return@onFailure
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.id,
+                    loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
                         mutableState.value.creatorPostSnapshots +
-                            (creator.id to postReducer.reduceJumpError(current, it)),
+                            (creator.key to postReducer.reduceJumpError(current, it)),
                 )
           }
     }
@@ -493,34 +535,38 @@ class CreatorScreenModel(
     if (next === current || next == current) return
     mutableState.value =
         mutableState.value.copy(
-            creatorPostSnapshots = mutableState.value.creatorPostSnapshots + (creator.id to next),
+            creatorPostSnapshots = mutableState.value.creatorPostSnapshots + (creator.key to next),
         )
   }
 
   fun loadCreatorTags(creator: Creator, forceRefresh: Boolean = false) {
-    if (!forceRefresh && mutableState.value.creatorTags.containsKey(creator.id)) return
+    if (!forceRefresh && mutableState.value.creatorTags.containsKey(creator.key)) return
+    val requestToken = beginRequest(RequestKind.TAGS, creator.key)
     mutableState.value =
         mutableState.value.copy(
-            loadingCreatorTagIds = mutableState.value.loadingCreatorTagIds + creator.id
+            loadingCreatorTagIds = mutableState.value.loadingCreatorTagIds + creator.key,
+            tagErrors = mutableState.value.tagErrors - creator.key,
         )
     screenModelScope.launch {
-      runCatching {
-            creatorRepo.getCreatorTags(platform, creator.service, creator.id, forceRefresh)
-          }
+      resultOfSuspend { creatorRepo.getCreatorTags(creator.service, creator.id, forceRefresh) }
           .onSuccess { tags ->
+            if (!isCurrentRequest(RequestKind.TAGS, creator.key, requestToken)) return@onSuccess
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorTagIds = mutableState.value.loadingCreatorTagIds - creator.id,
-                    creatorTags = mutableState.value.creatorTags + (creator.id to tags),
+                    loadingCreatorTagIds = mutableState.value.loadingCreatorTagIds - creator.key,
+                    creatorTags = mutableState.value.creatorTags + (creator.key to tags),
+                    tagErrors = mutableState.value.tagErrors - creator.key,
                 )
             log.i {
               "加载Creator Tags -> 成功(service=${creator.service},creator=${creator.id},count=${tags.size})"
             }
           }
           .onFailure {
+            if (!isCurrentRequest(RequestKind.TAGS, creator.key, requestToken)) return@onFailure
             mutableState.value =
                 mutableState.value.copy(
-                    loadingCreatorTagIds = mutableState.value.loadingCreatorTagIds - creator.id
+                    loadingCreatorTagIds = mutableState.value.loadingCreatorTagIds - creator.key,
+                    tagErrors = mutableState.value.tagErrors + (creator.key to it.toQueryError()),
                 )
             log.e(it) { "加载Creator Tags -> 失败(service=${creator.service},creator=${creator.id})" }
           }
@@ -528,160 +574,110 @@ class CreatorScreenModel(
   }
 
   fun getCreatorTags(creator: Creator): List<Tag> =
-      mutableState.value.creatorTags[creator.id] ?: emptyList()
+      mutableState.value.creatorTags[creator.key] ?: emptyList()
 
   fun loadCreatorLinks(creator: Creator, forceRefresh: Boolean = false) {
-    if (!forceRefresh && mutableState.value.creatorLinks.containsKey(creator.id)) return
+    if (!forceRefresh && mutableState.value.creatorLinks.containsKey(creator.key)) return
+    val requestToken = beginRequest(RequestKind.LINKS, creator.key)
+    mutableState.value =
+        mutableState.value.copy(linkErrors = mutableState.value.linkErrors - creator.key)
     screenModelScope.launch {
-      runCatching {
-            creatorRepo.getCreatorLinks(platform, creator.service, creator.id, forceRefresh)
-          }
+      resultOfSuspend { creatorRepo.getCreatorLinks(creator.service, creator.id, forceRefresh) }
           .onSuccess { links ->
+            if (!isCurrentRequest(RequestKind.LINKS, creator.key, requestToken)) return@onSuccess
             mutableState.value =
                 mutableState.value.copy(
-                    creatorLinks = mutableState.value.creatorLinks + (creator.id to links)
+                    creatorLinks = mutableState.value.creatorLinks + (creator.key to links),
+                    linkErrors = mutableState.value.linkErrors - creator.key,
                 )
           }
           .onFailure {
+            if (!isCurrentRequest(RequestKind.LINKS, creator.key, requestToken)) return@onFailure
+            mutableState.value =
+                mutableState.value.copy(
+                    linkErrors = mutableState.value.linkErrors + (creator.key to it.toQueryError())
+                )
             log.w(it) { "加载Creator Links -> 失败(service=${creator.service},creator=${creator.id})" }
           }
     }
   }
 
   fun getCreatorLinks(creator: Creator): List<Creator> =
-      mutableState.value.creatorLinks[creator.id] ?: emptyList()
-
-  fun loadRecommendedCreators(creator: Creator) {
-    if (mutableState.value.recommendedCreators.containsKey(creator.id)) return
-    mutableState.value =
-        mutableState.value.copy(
-            loadingRecommendedCreatorIds =
-                mutableState.value.loadingRecommendedCreatorIds + creator.id
-        )
-    screenModelScope.launch {
-      runCatching { creatorRepo.getRecommendedCreators(platform, creator.service, creator.id) }
-          .onSuccess { recommended ->
-            mutableState.value =
-                mutableState.value.copy(
-                    loadingRecommendedCreatorIds =
-                        mutableState.value.loadingRecommendedCreatorIds - creator.id,
-                    recommendedCreators =
-                        mutableState.value.recommendedCreators + (creator.id to recommended),
-                )
-          }
-          .onFailure {
-            mutableState.value =
-                mutableState.value.copy(
-                    loadingRecommendedCreatorIds =
-                        mutableState.value.loadingRecommendedCreatorIds - creator.id
-                )
-            log.w(it) {
-              "加载Recommended Creators -> 失败(service=${creator.service},creator=${creator.id})"
-            }
-          }
-    }
-  }
-
-  fun getRecommendedCreators(creator: Creator): List<Creator> =
-      mutableState.value.recommendedCreators[creator.id] ?: emptyList()
+      mutableState.value.creatorLinks[creator.key] ?: emptyList()
 
   fun loadFavoriteStatus(creator: Creator) {
-    if (favoriteStatusDisabled) return
-    if (!creatorRepo.hasSession(platform)) {
+    if (!creatorRepo.hasSession()) {
       log.d { "Creator收藏状态 -> 跳过(未登录,service=${creator.service},creator=${creator.id})" }
       return
     }
+    val requestToken = beginFavoriteRequest(creator.key)
     screenModelScope.launch {
-      runCatching { creatorRepo.isFavoriteCreator(platform, creator.service, creator.id) }
+      resultOfSuspend { creatorRepo.isFavoriteCreator(creator.service, creator.id) }
           .onSuccess { isFavorite ->
+            if (!isCurrentFavoriteRequest(creator.key, requestToken)) return@onSuccess
             val current = mutableState.value.favoriteCreatorIds
             mutableState.value =
                 mutableState.value.copy(
                     favoriteCreatorIds =
-                        if (isFavorite) current + creator.id else current - creator.id,
-                    favoriteErrorMessage = null,
+                        if (isFavorite) current + creator.key else current - creator.key,
+                    favoriteError = null,
                 )
             log.i {
               "Creator收藏状态 -> 成功(service=${creator.service},creator=${creator.id},favorite=$isFavorite)"
             }
           }
           .onFailure {
+            if (!isCurrentFavoriteRequest(creator.key, requestToken)) return@onFailure
             log.w(it) { "Creator收藏状态 -> 失败(service=${creator.service},creator=${creator.id})" }
-            if (it is AuthRequiredException) favoriteStatusDisabled = true
-            mutableState.value = mutableState.value.copy(favoriteErrorMessage = it.message)
+            mutableState.value = mutableState.value.copy(favoriteError = it.toQueryError())
           }
     }
   }
 
   fun toggleFavoriteCreator(creator: Creator) {
+    if (!updatingFavoriteCreators.add(creator.key)) return
+    val requestToken = beginFavoriteRequest(creator.key)
     val current = mutableState.value
-    val wasFavorite = creator.id in current.favoriteCreatorIds
+    val wasFavorite = creator.key in current.favoriteCreatorIds
     mutableState.value =
         current.copy(
             favoriteCreatorIds =
-                if (wasFavorite) current.favoriteCreatorIds - creator.id
-                else current.favoriteCreatorIds + creator.id,
-            favoriteErrorMessage = null,
+                if (wasFavorite) current.favoriteCreatorIds - creator.key
+                else current.favoriteCreatorIds + creator.key,
+            favoriteError = null,
         )
     screenModelScope.launch {
-      runCatching {
-            if (wasFavorite) {
-              creatorRepo.removeFavoriteCreator(platform, creator.service, creator.id)
-            } else {
-              creatorRepo.addFavoriteCreator(platform, creator.service, creator.id)
+      try {
+        resultOfSuspend {
+              if (wasFavorite) {
+                creatorRepo.removeFavoriteCreator(creator.service, creator.id)
+              } else {
+                creatorRepo.addFavoriteCreator(creator.service, creator.id)
+              }
             }
-          }
-          .onSuccess {
-            log.i {
-              "收藏Creator -> 成功(service=${creator.service},creator=${creator.id},favorite=${!wasFavorite})"
+            .onSuccess {
+              if (!isCurrentFavoriteRequest(creator.key, requestToken)) return@onSuccess
+              log.i {
+                "收藏Creator -> 成功(service=${creator.service},creator=${creator.id},favorite=${!wasFavorite})"
+              }
             }
-          }
-          .onFailure {
-            log.e(it) { "收藏Creator -> 失败(service=${creator.service},creator=${creator.id})" }
-            val latest = mutableState.value
-            mutableState.value =
-                latest.copy(
-                    favoriteCreatorIds =
-                        if (wasFavorite) latest.favoriteCreatorIds + creator.id
-                        else latest.favoriteCreatorIds - creator.id,
-                    favoriteErrorMessage = it.message,
-                )
-          }
+            .onFailure {
+              if (!isCurrentFavoriteRequest(creator.key, requestToken)) return@onFailure
+              log.e(it) { "收藏Creator -> 失败(service=${creator.service},creator=${creator.id})" }
+              val latest = mutableState.value
+              mutableState.value =
+                  latest.copy(
+                      favoriteCreatorIds =
+                          if (wasFavorite) latest.favoriteCreatorIds + creator.key
+                          else latest.favoriteCreatorIds - creator.key,
+                      favoriteError = it.toQueryError(),
+                  )
+            }
+      } finally {
+        updatingFavoriteCreators -= creator.key
+      }
     }
   }
-
-  fun loadDiscordChannels(creator: Creator, forceRefresh: Boolean = false) {
-    if (!forceRefresh && mutableState.value.creatorDiscordChannels.containsKey(creator.id)) return
-    mutableState.value =
-        mutableState.value.copy(
-            loadingCreatorDiscordChannelIds =
-                mutableState.value.loadingCreatorDiscordChannelIds + creator.id
-        )
-    screenModelScope.launch {
-      runCatching { discordRepo.getChannels(platform, creator.id) }
-          .onSuccess { channels ->
-            mutableState.value =
-                mutableState.value.copy(
-                    loadingCreatorDiscordChannelIds =
-                        mutableState.value.loadingCreatorDiscordChannelIds - creator.id,
-                    creatorDiscordChannels =
-                        mutableState.value.creatorDiscordChannels + (creator.id to channels),
-                )
-            log.i { "加载Discord频道列表 -> 成功(creator=${creator.id},count=${channels.size})" }
-          }
-          .onFailure {
-            mutableState.value =
-                mutableState.value.copy(
-                    loadingCreatorDiscordChannelIds =
-                        mutableState.value.loadingCreatorDiscordChannelIds - creator.id
-                )
-            log.e(it) { "加载Discord频道列表 -> 失败(creator=${creator.id})" }
-          }
-    }
-  }
-
-  fun getDiscordChannels(creator: Creator): List<DiscordChannel> =
-      mutableState.value.creatorDiscordChannels[creator.id] ?: emptyList()
 
   private fun loadMoreCreators() {
     val state = mutableState.value
@@ -689,7 +685,7 @@ class CreatorScreenModel(
     log.i { "加载更多Creators -> 开始(current=${state.creators.size})" }
     mutableState.value = state.copy(isLoadingMore = true)
     screenModelScope.launch {
-      runCatching { creatorRepo.getAllCreators(platform, false) }
+      resultOfSuspend { creatorRepo.getAllCreators(false) }
           .onSuccess { all ->
             val current = mutableState.value
             val existing = current.creators
@@ -707,28 +703,28 @@ class CreatorScreenModel(
   }
 
   private fun updateAnnouncementTranslation(
-      creatorId: String,
+      creatorKey: CreatorKey,
       announcementKey: String,
       translationState: ContentTranslationState,
   ) {
     val current = mutableState.value
-    val creatorTranslations = current.announcementTranslations[creatorId] ?: emptyMap()
+    val creatorTranslations = current.announcementTranslations[creatorKey] ?: emptyMap()
     mutableState.value =
         current.copy(
             announcementTranslations =
                 current.announcementTranslations +
-                    (creatorId to (creatorTranslations + (announcementKey to translationState)))
+                    (creatorKey to (creatorTranslations + (announcementKey to translationState)))
         )
   }
 
   private fun updateAnnouncementTranslationBlock(
-      creatorId: String,
+      creatorKey: CreatorKey,
       announcementKey: String,
       index: Int,
       result: TranslationBlockResult,
   ) {
     val translation =
-        mutableState.value.announcementTranslations[creatorId]?.get(announcementKey) ?: return
+        mutableState.value.announcementTranslations[creatorKey]?.get(announcementKey) ?: return
     if (index !in translation.blocks.indices) return
     val updatedBlocks = translation.blocks.toMutableList()
     updatedBlocks[index] =
@@ -742,13 +738,13 @@ class CreatorScreenModel(
               updatedBlocks[index].copy(status = TranslationStatus.EMPTY)
           is TranslationBlockResult.Failure -> {
             log.w(result.cause) {
-              "翻译Announcement block -> 失败(creator=$creatorId,key=$announcementKey,index=$index)"
+              "翻译Announcement block -> 失败(creator=$creatorKey,key=$announcementKey,index=$index)"
             }
             updatedBlocks[index].copy(status = TranslationStatus.FAILURE)
           }
         }
     updateAnnouncementTranslation(
-        creatorId,
+        creatorKey,
         announcementKey,
         translation.copy(blocks = updatedBlocks, showTranslation = true),
     )

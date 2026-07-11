@@ -22,7 +22,6 @@ datastore = "1.2.1"
 room = "2.7.1"
 slf4j = "2.0.17"
 sqlite = "2.5.0"
-store = "5.1.0-alpha08"
 voyager = "1.1.0-beta03"
 zoomimage = "1.4.0"
 symbolcraft = "0.3.4"
@@ -60,14 +59,12 @@ ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "kto
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 ktor-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
-ktor-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 datastore-preferences-core = { module = "androidx.datastore:datastore-preferences-core", version.ref = "datastore" }
 documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
-store5 = { module = "org.mobilenativefoundation.store:store5", version.ref = "store" }
 voyager-core = { module = "cafe.adriel.voyager:voyager-core", version.ref = "voyager" }
 voyager-koin = { module = "cafe.adriel.voyager:voyager-koin", version.ref = "voyager" }
 voyager-navigator = { module = "cafe.adriel.voyager:voyager-navigator", version.ref = "voyager" }

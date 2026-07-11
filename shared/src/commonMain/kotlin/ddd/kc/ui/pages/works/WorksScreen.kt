@@ -43,12 +43,11 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.key
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.DateRangeW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowLeftW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW400Outlined
-import ddd.kc.ui.app.LocalActivePlatform
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
@@ -57,6 +56,8 @@ import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.components.fullWidthItem
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
+import ddd.kc.ui.i18n.localizedMessage
+import ddd.kc.ui.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.ui.pages.recent.PopularDateBoundary
@@ -103,7 +104,6 @@ class WorksScreen(
   @OptIn(ExperimentalMaterial3ExpressiveApi::class)
   @Composable
   override fun Content() {
-    val platform = LocalActivePlatform.current
     val worksModel = koinInject<WorksScreenModel>()
     val worksState by worksModel.state.collectAsState()
 
@@ -134,14 +134,12 @@ class WorksScreen(
           when (worksState.selectedIndex) {
             0 ->
                 PopularWorksContent(
-                    platform = platform,
                     onReselectHandlerChanged = onReselectHandlerChanged,
                     initialScrollPosition = worksModel.popularScroll,
                     onScrollPositionChanged = worksModel::onPopularScrollChanged,
                 )
             1 ->
                 PostSearchContent(
-                    platform = platform,
                     onReselectHandlerChanged = onReselectHandlerChanged,
                     initialScrollPosition = worksModel.searchScroll,
                     onScrollPositionChanged = worksModel::onSearchScrollChanged,
@@ -161,19 +159,19 @@ class WorksScreen(
 
 @Composable
 private fun PopularWorksContent(
-    platform: Platform,
     onReselectHandlerChanged: (((() -> Unit)?) -> Unit),
     initialScrollPosition: ScrollPosition,
     onScrollPositionChanged: (Int, Int) -> Unit,
 ) {
   val navigator = LocalNavigator.currentOrThrow
+  val navigationWindows = LocalNavigationWindowStore.current
   val popularModel = koinInject<PopularPostsScreenModel>()
   val state by popularModel.state.collectAsState()
-  val refresh = { popularModel.load(platform, forceRefresh = true) }
+  val refresh = { popularModel.load(forceRefresh = true) }
 
-  LaunchedEffect(platform) { popularModel.load(platform) }
-  ErrorToastEffect(state.errorMessage)
-  ErrorToastEffect(state.appendErrorMessage)
+  LaunchedEffect(Unit) { popularModel.load() }
+  ErrorToastEffect(state.error?.localizedMessage())
+  ErrorToastEffect(state.appendError?.localizedMessage())
 
   val cellWidth = LocalAppSettings.current.cellMinWidthDp()
   val gridState =
@@ -201,7 +199,6 @@ private fun PopularWorksContent(
     onDispose { onReselectHandlerChanged(null) }
   }
   PagedPostGrid(
-      platform = platform,
       state =
           PostGridPagingState(
               posts = state.posts,
@@ -212,7 +209,7 @@ private fun PopularWorksContent(
               isLoadingPrevious = state.isLoadingPrevious,
               hasMore = state.hasMore,
               canLoadPrevious = state.canAutoLoadPrevious,
-              appendErrorMessage = state.appendErrorMessage,
+              appendErrorMessage = state.appendError?.localizedMessage(),
           ),
       actions =
           PostGridPagingActions(
@@ -222,13 +219,11 @@ private fun PopularWorksContent(
               onJumpToPage = popularModel::jumpToPage,
               onVisiblePostIndex = popularModel::onVisiblePostIndex,
               onPostClick = { post ->
-                log.i {
-                  "打开Post -> 点击来源(source=popular,platform=${platform.name},${summarizePost(post)})"
-                }
+                log.i { "打开Post -> 点击来源(source=popular,${summarizePost(post)})" }
                 navigator.push(
                     PostRouteScreen(
-                        platform = platform,
-                        posts = state.posts,
+                        windowId = navigationWindows.putPosts(state.posts),
+                        resourceKey = post.key,
                         startIndex = state.posts.indexOf(post),
                         source = "popular",
                         initialOffset = state.startOffset,
@@ -262,12 +257,12 @@ private fun PopularWorksContent(
 
 @Composable
 private fun PostSearchContent(
-    platform: Platform,
     onReselectHandlerChanged: (((() -> Unit)?) -> Unit),
     initialScrollPosition: ScrollPosition,
     onScrollPositionChanged: (Int, Int) -> Unit,
 ) {
   val navigator = LocalNavigator.currentOrThrow
+  val navigationWindows = LocalNavigationWindowStore.current
   val screenModel = koinInject<PostSearchScreenModel>()
   val state by screenModel.state.collectAsState()
   val cellWidth = LocalAppSettings.current.cellMinWidthDp()
@@ -287,7 +282,7 @@ private fun PostSearchContent(
         }
       }
 
-  LaunchedEffect(platform) { screenModel.init(platform) }
+  LaunchedEffect(Unit) { screenModel.init() }
   LaunchedEffect(gridState) {
     snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
         .distinctUntilChanged()
@@ -298,11 +293,10 @@ private fun PostSearchContent(
     onReselectHandlerChanged(handler)
     onDispose { onReselectHandlerChanged(null) }
   }
-  ErrorToastEffect(state.errorMessage)
-  ErrorToastEffect(state.appendErrorMessage)
-  ErrorToastEffect(state.prependErrorMessage)
+  ErrorToastEffect(state.error?.localizedMessage())
+  ErrorToastEffect(state.appendError?.localizedMessage())
+  ErrorToastEffect(state.prependError?.localizedMessage())
   PagedPostGrid(
-      platform = platform,
       state =
           PostGridPagingState(
               posts = state.posts,
@@ -313,7 +307,7 @@ private fun PostSearchContent(
               isLoadingPrevious = state.isLoadingPrevious,
               hasMore = state.hasMore,
               canLoadPrevious = state.canAutoLoadPrevious,
-              appendErrorMessage = state.appendErrorMessage,
+              appendErrorMessage = state.appendError?.localizedMessage(),
           ),
       actions =
           PostGridPagingActions(
@@ -323,13 +317,11 @@ private fun PostSearchContent(
               onJumpToPage = screenModel::jumpToPage,
               onVisiblePostIndex = screenModel::onVisiblePostIndex,
               onPostClick = { post ->
-                log.i {
-                  "打开Post -> 点击来源(source=post-search,platform=${platform.name},${summarizePost(post)})"
-                }
+                log.i { "打开Post -> 点击来源(source=post-search,${summarizePost(post)})" }
                 navigator.push(
                     PostRouteScreen(
-                        platform = platform,
-                        posts = state.posts,
+                        windowId = navigationWindows.putPosts(state.posts),
+                        resourceKey = post.key,
                         startIndex = state.posts.indexOf(post),
                         source = "post-search",
                         initialOffset = state.startOffset,

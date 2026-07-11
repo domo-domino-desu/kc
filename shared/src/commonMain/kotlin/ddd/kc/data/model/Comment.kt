@@ -11,4 +11,4 @@ data class Comment(
     @SerialName("commenter") val commenter: String? = null,
     @SerialName("commenter_name") val commenterName: String? = null,
     @SerialName("parent_id") val parentId: String? = null,
-) : PlatformSerializable
+)

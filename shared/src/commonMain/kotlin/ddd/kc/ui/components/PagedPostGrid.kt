@@ -20,9 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.Post
-import ddd.kc.data.network.PageInfo
+import ddd.kc.data.model.key
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -49,7 +49,6 @@ data class PostGridPagingActions(
 
 @Composable
 fun PagedPostGrid(
-    platform: Platform,
     state: PostGridPagingState,
     actions: PostGridPagingActions,
     gridState: LazyGridState,
@@ -78,10 +77,9 @@ fun PagedPostGrid(
         if (state.loading && state.posts.isEmpty()) {
           gridSkeletonItems()
         } else {
-          items(state.posts, key = { it.id }) { post ->
+          items(state.posts, key = { it.key }) { post ->
             PostCard(
                 post = post,
-                platform = platform,
                 onClick = { actions.onPostClick(post) },
             )
           }

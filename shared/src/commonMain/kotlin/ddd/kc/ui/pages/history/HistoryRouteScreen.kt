@@ -17,25 +17,27 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.data.model.Creator
-import ddd.kc.data.model.Platform
-import ddd.kc.data.model.Post
 import ddd.kc.data.model.creatorId
-import ddd.kc.data.repository.ActivityHistoryRepository
+import ddd.kc.data.model.key
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.BackAppBar
 import ddd.kc.ui.components.CreatorSearchCard
+import ddd.kc.ui.components.ErrorToastEffect
+import ddd.kc.ui.components.GridLoadingSkeleton
 import ddd.kc.ui.components.PostCard
+import ddd.kc.ui.i18n.localizedMessage
+import ddd.kc.ui.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.post.PostRouteScreen
@@ -45,10 +47,8 @@ import kc.shared.generated.resources.history
 import kc.shared.generated.resources.history_tab_posts
 import kc.shared.generated.resources.history_tab_users
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
 
 class HistoryRouteScreen(
-    private val platform: Platform = Platform.PAWCHIVE,
     private val routeKey: String = nextRouteInstanceKey("history"),
 ) : Screen {
   override val key: String = routeKey
@@ -57,24 +57,28 @@ class HistoryRouteScreen(
   @Composable
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
-    val historyRepository = koinInject<ActivityHistoryRepository>()
+    val navigationWindows = LocalNavigationWindowStore.current
+    val screenModel = koinScreenModel<HistoryScreenModel>()
+    val state by screenModel.state.collectAsState()
     val cellWidth = LocalAppSettings.current.cellMinWidthDp()
     var selectedTab by remember { mutableIntStateOf(0) }
-    var creators by remember { mutableStateOf<List<Creator>>(emptyList()) }
-    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
+    val creators = state.creators
+    val posts = state.posts
     val tabLabels =
         listOf(
             stringResource(Res.string.history_tab_users),
             stringResource(Res.string.history_tab_posts),
         )
 
-    LaunchedEffect(Unit) {
-      creators = historyRepository.loadCreatorHistory()
-      posts = historyRepository.loadPostHistory()
-    }
+    LaunchedEffect(Unit) { screenModel.load() }
+    ErrorToastEffect(state.error?.localizedMessage())
 
     Scaffold(topBar = { BackAppBar(stringResource(Res.string.history)) }) { paddingValues ->
       Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        if (state.loading && creators.isEmpty() && posts.isEmpty()) {
+          GridLoadingSkeleton(minCardWidthDp = cellWidth)
+          return@Column
+        }
         ButtonGroup(
             overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
             horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
@@ -104,12 +108,11 @@ class HistoryRouteScreen(
                   items(creators, key = { "${it.service}:${it.id}" }) { creator ->
                     CreatorSearchCard(
                         creator = creator,
-                        platform = platform,
                         onClick = {
                           navigator.push(
                               CreatorRouteScreen(
-                                  platform = platform,
-                                  creators = creators,
+                                  windowId = navigationWindows.putCreators(creators),
+                                  resourceKey = creator.key,
                                   startIndex = creators.indexOf(creator),
                               )
                           )
@@ -132,12 +135,11 @@ class HistoryRouteScreen(
                   items(posts, key = { "${it.service}:${it.creatorId}:${it.id}" }) { post ->
                     PostCard(
                         post = post,
-                        platform = platform,
                         onClick = {
                           navigator.push(
                               PostRouteScreen(
-                                  platform = platform,
-                                  posts = posts,
+                                  windowId = navigationWindows.putPosts(posts),
+                                  resourceKey = post.key,
                                   startIndex = posts.indexOf(post),
                                   source = "history",
                               )

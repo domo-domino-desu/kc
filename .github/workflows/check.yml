@@ -1,0 +1,32 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+    tags-ignore:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Android build environment
+        uses: ./.github/actions/setup-android-build
+
+      - name: Run tests and static checks
+        run: ./gradlew --stacktrace :shared:desktopTest :shared:verifyAboutLibrariesMetadata :androidApp:lintDebug
+
+      - name: Verify generated license metadata is committed
+        run: git diff --exit-code -- shared/src/commonMain/composeResources/files/aboutlibraries.json

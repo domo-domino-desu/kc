@@ -11,14 +11,10 @@ import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
 import coil3.gif.GifDecoder
 import ddd.kc.data.media.installKcCoilImageProgressSupport
-import ddd.kc.data.model.Platform
-import ddd.kc.data.settings.AppSettings
 import ddd.kc.ui.app.KcApp
-import ddd.kc.ui.platform.EXTRA_PLATFORM
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import okio.Path.Companion.toPath
-import org.koin.android.ext.android.inject
 
 private const val coilDiskCacheMaxBytes = 1024L * 1024L * 1024L
 private val supportedKcHosts =
@@ -26,12 +22,10 @@ private val supportedKcHosts =
 
 class MainActivity : ComponentActivity() {
   private val externalKcLinkEvents = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 1)
-  private val appSettings: AppSettings by inject()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     if (savedInstanceState == null) {
-      applyPlatformFromIntent(intent)
       emitExternalKcLink(intent)
     }
     enableEdgeToEdge()
@@ -55,14 +49,7 @@ class MainActivity : ComponentActivity() {
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
-    applyPlatformFromIntent(intent)
     emitExternalKcLink(intent)
-  }
-
-  private fun applyPlatformFromIntent(intent: Intent?) {
-    val platformName = intent?.getStringExtra(EXTRA_PLATFORM) ?: return
-    val platform = Platform.entries.firstOrNull { it.name == platformName } ?: return
-    appSettings.setActivePlatform(platform)
   }
 
   private fun emitExternalKcLink(intent: Intent?) {

@@ -47,10 +47,10 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import ddd.kc.data.model.key
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ExpandMoreW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.SortW400Outlined
-import ddd.kc.ui.app.LocalActivePlatform
 import ddd.kc.ui.components.AutoLoadEffect
 import ddd.kc.ui.components.AutoLoadPreviousEffect
 import ddd.kc.ui.components.CreatorSearchCard
@@ -61,7 +61,9 @@ import ddd.kc.ui.components.SkeletonBlock
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.loadingFooter
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
-import ddd.kc.ui.icons.services
+import ddd.kc.ui.i18n.localizedMessage
+import ddd.kc.ui.icons.pawchiveServices
+import ddd.kc.ui.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.filter_all
@@ -79,9 +81,10 @@ class CreatorsScreen(
   @Composable
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
+    val navigationWindows = LocalNavigationWindowStore.current
     val screenModel = koinInject<CreatorSearchScreenModel>()
     val state by screenModel.state.collectAsState()
-    val platform = LocalActivePlatform.current
+    val appendErrorMessage = state.error?.localizedMessage()
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val refresh = { screenModel.refresh() }
@@ -94,7 +97,7 @@ class CreatorsScreen(
           }
         }
 
-    LaunchedEffect(platform) { screenModel.init(platform) }
+    LaunchedEffect(Unit) { screenModel.init() }
     LaunchedEffect(gridState) {
       snapshotFlow { gridState.firstVisibleItemIndex }
           .distinctUntilChanged()
@@ -105,7 +108,7 @@ class CreatorsScreen(
       onReselectHandlerChanged(handler)
       onDispose { onReselectHandlerChanged(null) }
     }
-    ErrorToastEffect(state.errorMessage)
+    ErrorToastEffect(state.error?.localizedMessage())
 
     var serviceDropdownExpanded by remember { mutableStateOf(false) }
     var sortDropdownExpanded by remember { mutableStateOf(false) }
@@ -171,7 +174,7 @@ class CreatorsScreen(
                         serviceDropdownExpanded = false
                       },
                   )
-                  platform.services().forEach { service ->
+                  pawchiveServices().forEach { service ->
                     DropdownMenuItem(
                         text = { Text(service.replaceFirstChar { it.uppercase() }) },
                         onClick = {
@@ -236,19 +239,18 @@ class CreatorsScreen(
               items(state.creators, key = { "${it.service}:${it.id}" }) { creator ->
                 CreatorSearchCard(
                     creator = creator,
-                    platform = platform,
                     onClick = {
                       navigator.push(
                           CreatorRouteScreen(
-                              platform,
-                              state.creators,
+                              navigationWindows.putCreators(state.creators),
+                              creator.key,
                               state.creators.indexOf(creator),
                           )
                       )
                     },
                 )
               }
-              loadingFooter(state.isLoadingMore, state.appendErrorMessage)
+              loadingFooter(state.isLoadingMore, appendErrorMessage)
             }
           }
         }

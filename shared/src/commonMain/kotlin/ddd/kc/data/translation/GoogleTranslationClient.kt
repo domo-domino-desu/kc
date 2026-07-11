@@ -30,7 +30,7 @@ internal class GoogleTranslationClient(
                     accept = ContentType.Application.Json,
                 ),
         )
-    ensureTranslationSuccess(response.statusCode, response.body, provider = "Google")
+    ensureTranslationSuccess(response.statusCode, provider = "Google")
 
     val root = json.parseToJsonElement(response.body).jsonArray
     val chunks = root.getOrNull(0)?.jsonArray.orEmpty()

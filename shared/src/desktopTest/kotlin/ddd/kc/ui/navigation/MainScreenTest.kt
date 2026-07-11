@@ -9,7 +9,7 @@ class MainScreenTest {
   fun selectingDifferentTabSelectsTab() {
     assertEquals(
         MainTabSelectionAction.SelectTab,
-        resolveMainTabSelectionAction(targetTab = 1, selectedTab = 0),
+        resolveMainTabSelectionAction(targetTab = MainTab.Works, selectedTab = MainTab.Creators),
     )
   }
 
@@ -17,12 +17,17 @@ class MainScreenTest {
   fun selectingCurrentTabRepeatsCurrentTab() {
     assertEquals(
         MainTabSelectionAction.RepeatCurrentTab,
-        resolveMainTabSelectionAction(targetTab = 2, selectedTab = 2),
+        resolveMainTabSelectionAction(targetTab = MainTab.Dm, selectedTab = MainTab.Dm),
     )
   }
 
   @Test
   fun pawchivePwLinksResolveToInternalRoutes() {
-    assertNotNull(parseKcRouteTarget("https://pawchive.pw/patreon/user/artist/post/post1"))
+    assertNotNull(
+        parseKcRouteTarget(
+            "https://pawchive.pw/patreon/user/artist/post/post1",
+            NavigationWindowStore(),
+        )
+    )
   }
 }

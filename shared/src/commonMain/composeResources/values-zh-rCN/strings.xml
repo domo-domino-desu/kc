@@ -99,6 +99,13 @@
   <string name="login_username">用户名</string>
   <string name="login_password">密码</string>
   <string name="back">返回</string>
+  <string name="home">主页</string>
+  <string name="translate_action">翻译</string>
+  <string name="load_full_size_images">加载大图</string>
+  <string name="more">更多</string>
+  <string name="tags">标签</string>
+  <string name="pawchive_session_cookie">Pawchive Session Cookie</string>
+  <string name="session_cookie_hint">session=…</string>
   <!-- Favorites screen -->
   <string name="favorites_tab_creators">用户</string>
   <string name="favorites_tab_posts">帖子</string>
@@ -128,6 +135,7 @@
   <string name="link_copied">链接已复制</string>
   <!-- About screen -->
   <string name="about_libraries_metadata_source">许可证与依赖元数据来源：AboutLibraries</string>
+  <string name="about_libraries_load_failed">许可证元数据加载失败。</string>
   <string name="about_description">Pawchive 第三方客户端</string>
   <string name="about_project_address">GitHub</string>
   <string name="about_project_address_url">https://github.com/domo-domino-desu/kc</string>
@@ -156,6 +164,7 @@
   <string name="history_tab_users">用户</string>
   <string name="history_tab_posts">帖子</string>
   <string name="empty_history">暂无浏览记录。</string>
+  <string name="navigation_content_expired">临时列表已失效，请返回后重新打开。</string>
   <string name="appearance">外观设置</string>
   <string name="translation">翻译设置</string>
   <string name="download_settings">下载设置</string>
@@ -183,6 +192,8 @@
   <string name="base_url">Base URL</string>
   <string name="openai_base_url_desc">OpenAI 兼容翻译 API 的地址</string>
   <string name="api_key">API Key</string>
+  <string name="show_api_key">显示 API Key</string>
+  <string name="hide_api_key">隐藏 API Key</string>
   <string name="openai_api_key_desc">发送给兼容 API 服务商的凭据</string>
   <string name="model">Model</string>
   <string name="openai_model_desc">兼容 API 服务商使用的模型名称</string>
@@ -203,10 +214,32 @@
   <string name="download_file_name_template">文件名模板</string>
   <string name="download_file_name_template_desc">支持 {username} {title} {submission_id} {post_id} {service}</string>
   <string name="settings_saved">设置已保存</string>
+  <string name="settings_save_failed">设置保存失败。</string>
   <string name="settings_unsaved_changes_title">有未保存改动</string>
   <string name="settings_unsaved_changes_body">离开前保存设置？</string>
   <string name="settings_save_and_exit">保存并退出</string>
   <string name="settings_discard_changes">放弃更改</string>
   <string name="reset">重置</string>
   <string name="close_without_saving">不保存并关闭</string>
+  <string name="error_network">网络连接失败，请稍后重试。</string>
+  <string name="error_unauthorized">请先配置 Pawchive session cookie。</string>
+  <string name="error_rate_limited">请求过于频繁，请稍后再试。</string>
+  <string name="error_forbidden">当前 session 无权访问该资源。</string>
+  <string name="error_http">请求失败：HTTP %1$d</string>
+  <string name="error_parse">数据解析失败。</string>
+  <string name="error_unknown">加载失败。</string>
+  <string name="settings_error_card_width_number">卡片宽度必须是数字。</string>
+  <string name="settings_error_chunk_limit_number">分块字数上限必须是数字。</string>
+  <string name="settings_error_concurrency_number">最大并发数必须是数字。</string>
+  <string name="settings_error_card_width_range">卡片宽度必须在 %1$d–%2$d dp 之间。</string>
+  <string name="settings_error_pawchive_url_empty">Pawchive Base URL 不能为空。</string>
+  <string name="settings_error_pawchive_url_invalid">Pawchive Base URL 只能包含 HTTPS 源站，不能带路径、查询参数或片段。</string>
+  <string name="settings_error_pawchive_url_https">Pawchive Base URL 必须使用 HTTPS。</string>
+  <string name="settings_error_chunk_limit_range">分块字数上限必须在 %1$d–%2$d 之间。</string>
+  <string name="settings_error_concurrency_range">最大并发数必须在 %1$d–%2$d 之间。</string>
+  <string name="settings_error_openai_url_empty">翻译 Base URL 不能为空。</string>
+  <string name="settings_error_openai_url_https">翻译 Base URL 必须使用 HTTPS。</string>
+  <string name="settings_error_api_key_empty">API Key 不能为空。</string>
+  <string name="settings_error_model_empty">模型名称不能为空。</string>
+  <string name="settings_error_prompt_empty">提示词模板不能为空。</string>
 </resources>

@@ -16,7 +16,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
@@ -27,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.Navigator
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CommentW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CommentW400Outlinedfill1
@@ -50,6 +50,7 @@ import org.jetbrains.compose.resources.stringResource
 private val navRailMinWidth = 960.dp
 
 private data class TabDef(
+    val key: MainTab,
     val label: String,
     val icon: ImageVector,
     val selectedIcon: ImageVector,
@@ -60,9 +61,16 @@ internal enum class MainTabSelectionAction {
   RepeatCurrentTab,
 }
 
+internal enum class MainTab {
+  Creators,
+  Works,
+  Dm,
+  More,
+}
+
 internal fun resolveMainTabSelectionAction(
-    targetTab: Int,
-    selectedTab: Int,
+    targetTab: MainTab,
+    selectedTab: MainTab,
 ): MainTabSelectionAction =
     if (targetTab == selectedTab) MainTabSelectionAction.RepeatCurrentTab
     else MainTabSelectionAction.SelectTab
@@ -71,21 +79,25 @@ internal fun resolveMainTabSelectionAction(
 private fun tabs() =
     listOf(
         TabDef(
+            MainTab.Creators,
             stringResource(Res.string.tab_creators),
             Icons.PersonW400Outlined,
             Icons.PersonW400Outlinedfill1,
         ),
         TabDef(
+            MainTab.Works,
             stringResource(Res.string.tab_works),
             Icons.ImageW400Outlined,
             Icons.ImageW400Outlinedfill1,
         ),
         TabDef(
+            MainTab.Dm,
             stringResource(Res.string.tab_dm),
             Icons.CommentW400Outlined,
             Icons.CommentW400Outlinedfill1,
         ),
         TabDef(
+            MainTab.More,
             stringResource(Res.string.tab_more),
             Icons.MenuW400Outlined,
             Icons.MenuW400Outlinedfill1,
@@ -98,17 +110,18 @@ private fun tabs() =
 class MainScreen : Screen {
   @Composable
   override fun Content() {
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedTabName by rememberSaveable { mutableStateOf(MainTab.Creators.name) }
+    val selectedTab = MainTab.valueOf(selectedTabName)
     var currentTabReselectHandler by remember { mutableStateOf<(() -> Unit)?>(null) }
     val onReselectHandlerChanged = remember {
       { handler: (() -> Unit)? -> currentTabReselectHandler = handler }
     }
     val stateHolder = rememberSaveableStateHolder()
-    val onTabSelected: (Int) -> Unit = { targetTab ->
+    val onTabSelected: (MainTab) -> Unit = { targetTab ->
       when (resolveMainTabSelectionAction(targetTab, selectedTab)) {
         MainTabSelectionAction.SelectTab -> {
           currentTabReselectHandler = null
-          selectedTab = targetTab
+          selectedTabName = targetTab.name
         }
         MainTabSelectionAction.RepeatCurrentTab -> currentTabReselectHandler?.invoke()
       }
@@ -136,9 +149,9 @@ class MainScreen : Screen {
 
 @Composable
 private fun BottomBarLayout(
-    selectedTab: Int,
+    selectedTab: MainTab,
     onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
-    onTabSelected: (Int) -> Unit,
+    onTabSelected: (MainTab) -> Unit,
     stateHolder: SaveableStateHolder,
 ) {
   val tabList = tabs()
@@ -146,13 +159,13 @@ private fun BottomBarLayout(
       containerColor = MaterialTheme.colorScheme.surface,
       bottomBar = {
         NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-          tabList.forEachIndexed { index, tab ->
+          tabList.forEach { tab ->
             NavigationBarItem(
-                selected = selectedTab == index,
-                onClick = { onTabSelected(index) },
+                selected = selectedTab == tab.key,
+                onClick = { onTabSelected(tab.key) },
                 icon = {
                   Icon(
-                      imageVector = if (selectedTab == index) tab.selectedIcon else tab.icon,
+                      imageVector = if (selectedTab == tab.key) tab.selectedIcon else tab.icon,
                       contentDescription = tab.label,
                   )
                 },
@@ -170,21 +183,21 @@ private fun BottomBarLayout(
 
 @Composable
 private fun RailLayout(
-    selectedTab: Int,
+    selectedTab: MainTab,
     onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
-    onTabSelected: (Int) -> Unit,
+    onTabSelected: (MainTab) -> Unit,
     stateHolder: SaveableStateHolder,
 ) {
   val tabList = tabs()
   Row(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
     NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
-      tabList.forEachIndexed { index, tab ->
+      tabList.forEach { tab ->
         NavigationRailItem(
-            selected = selectedTab == index,
-            onClick = { onTabSelected(index) },
+            selected = selectedTab == tab.key,
+            onClick = { onTabSelected(tab.key) },
             icon = {
               Icon(
-                  imageVector = if (selectedTab == index) tab.selectedIcon else tab.icon,
+                  imageVector = if (selectedTab == tab.key) tab.selectedIcon else tab.icon,
                   contentDescription = tab.label,
               )
             },
@@ -200,7 +213,7 @@ private fun RailLayout(
 
 @Composable
 private fun TabContent(
-    selectedTab: Int,
+    selectedTab: MainTab,
     onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
     stateHolder: SaveableStateHolder,
 ) {
@@ -208,10 +221,10 @@ private fun TabContent(
   // across tab switches and root navigator pushes.
   stateHolder.SaveableStateProvider(key = selectedTab) {
     when (selectedTab) {
-      0 -> CreatorsScreen(onReselectHandlerChanged).Content()
-      1 -> WorksScreen(onReselectHandlerChanged).Content()
-      2 -> DmScreen(onReselectHandlerChanged).Content()
-      3 -> MoreScreen(onReselectHandlerChanged).Content()
+      MainTab.Creators -> Navigator(CreatorsScreen(onReselectHandlerChanged))
+      MainTab.Works -> Navigator(WorksScreen(onReselectHandlerChanged))
+      MainTab.Dm -> Navigator(DmScreen(onReselectHandlerChanged))
+      MainTab.More -> Navigator(MoreScreen(onReselectHandlerChanged))
     }
   }
 }

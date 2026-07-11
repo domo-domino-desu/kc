@@ -55,14 +55,15 @@ private fun HttpClient.installCachedImageInterceptors(
       try {
         execute(request).save().also { call ->
           log.d {
-            "图片缓存请求结束(status=${call.response.status.value},contentLength=${call.response.headers[HttpHeaders.ContentLength].orEmpty().ifBlank { "-" }},url=$progressKey)"
+            "图片缓存请求结束(status=${call.response.status.value},contentLength=${call.response.headers[HttpHeaders.ContentLength].orEmpty().ifBlank { "-" }},urlLength=${progressKey.length})"
           }
         }
       } catch (error: Throwable) {
         when {
-          error is CancellationException -> log.d { "图片缓存请求取消(url=$progressKey)" }
-          progressKey.isExpectedMissingMediaUrl() -> log.d(error) { "图片缓存请求失败(url=$progressKey)" }
-          else -> log.w(error) { "图片缓存请求失败(url=$progressKey)" }
+          error is CancellationException -> log.d { "图片缓存请求取消(urlLength=${progressKey.length})" }
+          progressKey.isExpectedMissingMediaUrl() ->
+              log.d(error) { "图片缓存请求失败(urlLength=${progressKey.length})" }
+          else -> log.w(error) { "图片缓存请求失败(urlLength=${progressKey.length})" }
         }
         throw error
       }

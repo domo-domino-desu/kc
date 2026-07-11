@@ -27,10 +27,12 @@ data class AppFeedbackRequest(
 
 val LocalShowFeedback: ProvidableCompositionLocal<(AppFeedbackRequest) -> Unit> =
     staticCompositionLocalOf {
-      {}
+      error("AppFeedbackHost not provided")
     }
 
-val LocalShowToast: ProvidableCompositionLocal<(String) -> Unit> = staticCompositionLocalOf { {} }
+val LocalShowToast: ProvidableCompositionLocal<(String) -> Unit> = staticCompositionLocalOf {
+  error("AppFeedbackHost not provided")
+}
 
 @Composable
 fun AppFeedbackHost(content: @Composable () -> Unit) {
@@ -42,7 +44,6 @@ fun AppFeedbackHost(content: @Composable () -> Unit) {
           val normalized = request.message.trim()
           if (normalized.isNotBlank()) {
             coroutineScope.launch {
-              snackbarHostState.currentSnackbarData?.dismiss()
               val actionLabel = request.actionLabel?.trim()?.ifBlank { null }
               val result =
                   snackbarHostState.showSnackbar(

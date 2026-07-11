@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "09afa7a17976d12efd6d82a56fcd07d3",
+    "identityHash": "3237277800155f346741d9a3a9f36cea",
     "entities": [
       {
         "tableName": "kc_cache",
@@ -34,17 +34,11 @@
       },
       {
         "tableName": "kc_creator_history",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`historyKey` TEXT NOT NULL, `platform` TEXT NOT NULL, `service` TEXT NOT NULL, `creatorId` TEXT NOT NULL, `creatorJson` TEXT NOT NULL, `visitedAtMs` INTEGER NOT NULL, PRIMARY KEY(`historyKey`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`historyKey` TEXT NOT NULL, `service` TEXT NOT NULL, `creatorId` TEXT NOT NULL, `creatorJson` TEXT NOT NULL, `visitedAtMs` INTEGER NOT NULL, PRIMARY KEY(`historyKey`))",
         "fields": [
           {
             "fieldPath": "historyKey",
             "columnName": "historyKey",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "platform",
-            "columnName": "platform",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -80,17 +74,11 @@
       },
       {
         "tableName": "kc_post_history",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`historyKey` TEXT NOT NULL, `platform` TEXT NOT NULL, `service` TEXT NOT NULL, `creatorId` TEXT NOT NULL, `postId` TEXT NOT NULL, `postJson` TEXT NOT NULL, `visitedAtMs` INTEGER NOT NULL, PRIMARY KEY(`historyKey`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`historyKey` TEXT NOT NULL, `service` TEXT NOT NULL, `creatorId` TEXT NOT NULL, `postId` TEXT NOT NULL, `postJson` TEXT NOT NULL, `visitedAtMs` INTEGER NOT NULL, PRIMARY KEY(`historyKey`))",
         "fields": [
           {
             "fieldPath": "historyKey",
             "columnName": "historyKey",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "platform",
-            "columnName": "platform",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -133,7 +121,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '09afa7a17976d12efd6d82a56fcd07d3')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3237277800155f346741d9a3a9f36cea')"
     ]
   }
 }

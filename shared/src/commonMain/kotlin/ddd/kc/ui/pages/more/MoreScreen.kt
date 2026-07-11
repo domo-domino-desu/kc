@@ -29,8 +29,6 @@ import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabOptions
-import ddd.kc.data.model.Platform
-import ddd.kc.data.network.KcSessionStore
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.AttributionW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
@@ -39,9 +37,10 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.MenuW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.PersonW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ReceiptLongW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.SettingsW400Outlined
-import ddd.kc.ui.app.LocalActivePlatform
+import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.isAtTop
+import ddd.kc.ui.i18n.localizedMessage
 import ddd.kc.ui.pages.about.AboutRouteScreen
 import ddd.kc.ui.pages.history.HistoryRouteScreen
 import ddd.kc.ui.pages.settings.SettingsRouteScreen
@@ -59,10 +58,13 @@ import kc.shared.generated.resources.history_summary
 import kc.shared.generated.resources.logout
 import kc.shared.generated.resources.logout_confirm_body
 import kc.shared.generated.resources.logout_confirm_title
+import kc.shared.generated.resources.more
+import kc.shared.generated.resources.pawchive_session_cookie
 import kc.shared.generated.resources.platform_logged_in
 import kc.shared.generated.resources.platform_login
 import kc.shared.generated.resources.save
 import kc.shared.generated.resources.session_cookie_configured
+import kc.shared.generated.resources.session_cookie_hint
 import kc.shared.generated.resources.session_cookie_not_configured
 import kc.shared.generated.resources.settings
 import kc.shared.generated.resources.settings_summary
@@ -78,7 +80,7 @@ object MoreTab : Tab {
     get() =
         TabOptions(
             index = 3u,
-            title = "更多",
+            title = stringResource(Res.string.more),
             icon = rememberVectorPainter(Icons.MenuW400Outlined),
         )
 
@@ -95,25 +97,21 @@ class MoreScreen(
   @Composable
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
-    val activePlatform = LocalActivePlatform.current
-    val sessionStore = koinInject<KcSessionStore>()
     val screenModel = koinInject<MoreScreenModel>()
     val showToast = LocalShowToast.current
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
-    val loggedInPlatforms by sessionStore.loggedInPlatforms.collectAsState()
-    val isLoggedIn = activePlatform in loggedInPlatforms
-    val favoritesLoginToast =
-        stringResource(Res.string.favorites_requires_login, activePlatform.displayName)
+    val sessionState by screenModel.state.collectAsState()
+    val isLoggedIn = sessionState.loggedIn
+    val favoritesLoginToast = stringResource(Res.string.favorites_requires_login, "Pawchive")
 
     var showSessionEditor by remember { mutableStateOf(false) }
-    var sessionInput by remember {
-      mutableStateOf(sessionStore.getSession(Platform.PAWCHIVE).orEmpty())
-    }
+    var sessionInput by remember { mutableStateOf(sessionState.session) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     val latestOnReselect by rememberUpdatedState {
       if (!listState.isAtTop) scope.launch { listState.animateScrollToItem(0) }
     }
+    ErrorToastEffect(sessionState.error?.localizedMessage())
 
     DisposableEffect(onReselectHandlerChanged) {
       val handler = { latestOnReselect() }
@@ -124,21 +122,21 @@ class MoreScreen(
     if (showSessionEditor) {
       AlertDialog(
           onDismissRequest = { showSessionEditor = false },
-          title = { Text("Pawchive Session Cookie") },
+          title = { Text(stringResource(Res.string.pawchive_session_cookie)) },
           text = {
             OutlinedTextField(
                 value = sessionInput,
                 onValueChange = { sessionInput = it },
                 singleLine = false,
                 minLines = 3,
-                label = { Text("session=...") },
+                label = { Text(stringResource(Res.string.session_cookie_hint)) },
                 modifier = Modifier.fillMaxWidth(),
             )
           },
           confirmButton = {
             TextButton(
                 onClick = {
-                  sessionStore.saveSession(Platform.PAWCHIVE, sessionInput)
+                  screenModel.saveSession(sessionInput)
                   showSessionEditor = false
                 }
             ) {
@@ -162,7 +160,7 @@ class MoreScreen(
             TextButton(
                 onClick = {
                   showLogoutDialog = false
-                  screenModel.logout(activePlatform) { error -> showToast(error) }
+                  screenModel.logout()
                 }
             ) {
               Text(stringResource(Res.string.logout))
@@ -189,16 +187,16 @@ class MoreScreen(
               title = stringResource(Res.string.current_account),
               subtitle =
                   if (isLoggedIn) {
-                    stringResource(Res.string.platform_logged_in, activePlatform.displayName) +
+                    stringResource(Res.string.platform_logged_in, "Pawchive") +
                         " · " +
                         stringResource(Res.string.session_cookie_configured)
                   } else {
-                    stringResource(Res.string.platform_login, activePlatform.displayName) +
+                    stringResource(Res.string.platform_login, "Pawchive") +
                         " · " +
                         stringResource(Res.string.session_cookie_not_configured)
                   },
               onClick = {
-                sessionInput = sessionStore.getSession(Platform.PAWCHIVE).orEmpty()
+                sessionInput = sessionState.session
                 showSessionEditor = true
               },
           )
@@ -218,14 +216,14 @@ class MoreScreen(
               icon = Icons.ReceiptLongW400Outlined,
               title = stringResource(Res.string.history),
               subtitle = stringResource(Res.string.history_summary),
-              onClick = { navigator.push(HistoryRouteScreen(activePlatform)) },
+              onClick = { navigator.push(HistoryRouteScreen()) },
           )
           SettingsListItem(
               icon = Icons.FavoriteW400Outlined,
               title = stringResource(Res.string.favorites),
               subtitle = stringResource(Res.string.favorites),
               onClick = {
-                if (isLoggedIn) navigator.push(FavoritesScreen(activePlatform))
+                if (isLoggedIn) navigator.push(FavoritesScreen())
                 else showToast(favoritesLoginToast)
               },
           )

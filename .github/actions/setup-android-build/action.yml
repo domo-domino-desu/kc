@@ -28,10 +28,14 @@ runs:
           exit "${license_status}"
         fi
 
+        compile_sdk="$(awk -F= '/^ANDROID_COMPILE_SDK=/{print $2; exit}' gradle.properties)"
+        build_tools="$(awk -F= '/^ANDROID_BUILD_TOOLS=/{print $2; exit}' gradle.properties)"
+        test -n "${compile_sdk}" && test -n "${build_tools}"
+
         sdkmanager \
           "platform-tools" \
-          "platforms;android-36" \
-          "build-tools;36.0.0"
+          "platforms;android-${compile_sdk}" \
+          "build-tools;${build_tools}"
 
     - name: Make Gradle wrapper executable
       shell: bash

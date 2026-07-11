@@ -3,14 +3,15 @@ package ddd.kc.ui.pages.dm
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.DM
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.PageInfo
+import ddd.kc.data.model.PagedResult
+import ddd.kc.data.model.QueryError
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.preserveRefreshUi
-import ddd.kc.data.network.PageInfo
-import ddd.kc.data.network.PagedResult
 import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.ui.state.pageInfoForOffset
+import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -32,14 +33,14 @@ data class DmSearchState(
     val autoPrependArmed: Boolean = startOffset <= 0,
     val isLoadingPrevious: Boolean = false,
     val isLoadingMore: Boolean = false,
-    val prependErrorMessage: String? = null,
-    val appendErrorMessage: String? = null,
+    val prependError: QueryError? = null,
+    val appendError: QueryError? = null,
 ) {
   val isLoading: Boolean
     get() = result.isLoading
 
-  val errorMessage: String?
-    get() = result.error?.message
+  val error: ddd.kc.data.model.QueryError?
+    get() = result.error
 
   val visiblePageInfo: PageInfo?
     get() = pageInfoForOffset(pageInfo, visibleOffset, PAGE_SIZE)
@@ -52,15 +53,9 @@ class DmSearchScreenModel(
     private val creatorRepo: CreatorRepository,
 ) : StateScreenModel<DmSearchState>(DmSearchState()) {
   private var searchJob: Job? = null
-  private var platform = Platform.PAWCHIVE
+  private var generation: Long = 0
 
-  fun init(platform: Platform) {
-    val platformChanged = this.platform != platform
-    this.platform = platform
-    if (platformChanged) {
-      mutableState.value = DmSearchState()
-    }
-  }
+  fun init() = Unit
 
   fun onQueryChanged(query: String) {
     mutableState.value =
@@ -75,19 +70,21 @@ class DmSearchScreenModel(
             autoPrependArmed = true,
             isLoadingPrevious = false,
             isLoadingMore = false,
-            prependErrorMessage = null,
-            appendErrorMessage = null,
+            prependError = null,
+            appendError = null,
         )
     searchJob?.cancel()
+    generation++
     if (query.isBlank()) {
       mutableState.value = mutableState.value.copy(dms = emptyList(), result = QueryState())
       return
     }
+    val requestGeneration = generation
     searchJob =
         screenModelScope.launch {
           try {
             delay(300)
-            search(query)
+            search(query, requestGeneration)
           } catch (_: CancellationException) {
             return@launch
           }
@@ -96,12 +93,14 @@ class DmSearchScreenModel(
 
   fun refresh() {
     searchJob?.cancel()
+    generation++
     val query = mutableState.value.query
     if (query.isBlank()) return
-    searchJob = screenModelScope.launch { search(query) }
+    val requestGeneration = generation
+    searchJob = screenModelScope.launch { search(query, requestGeneration) }
   }
 
-  private suspend fun search(query: String) {
+  private suspend fun search(query: String, requestGeneration: Long) {
     mutableState.value =
         mutableState.value.copy(
             result =
@@ -112,6 +111,7 @@ class DmSearchScreenModel(
                 )
         )
     creatorRepo.observeDmsPage(query = query, offset = 0, forceRefresh = true).collect { next ->
+      if (requestGeneration != generation || mutableState.value.query != query) return@collect
       val dms = next.data?.items ?: mutableState.value.dms
       val result = next.preserveRefreshUi(dms.isNotEmpty())
       log.i { "DM搜索 -> 状态(queryLength=${query.length},count=${dms.size})" }
@@ -126,8 +126,8 @@ class DmSearchScreenModel(
               visibleOffset = 0,
               autoPrependArmed = true,
               isLoadingPrevious = false,
-              prependErrorMessage = null,
-              appendErrorMessage = null,
+              prependError = null,
+              appendError = null,
           )
     }
   }
@@ -135,7 +135,7 @@ class DmSearchScreenModel(
   fun loadMore() {
     val state = mutableState.value
     if (state.query.isBlank() || state.isLoading || state.isLoadingMore || !state.hasMore) return
-    mutableState.value = state.copy(isLoadingMore = true, appendErrorMessage = null)
+    mutableState.value = state.copy(isLoadingMore = true, appendError = null)
     screenModelScope.launch { fetchPage(state.offset, replace = false) }
   }
 
@@ -150,7 +150,7 @@ class DmSearchScreenModel(
             state.isLoadingMore
     )
         return
-    mutableState.value = state.copy(isLoadingPrevious = true, prependErrorMessage = null)
+    mutableState.value = state.copy(isLoadingPrevious = true, prependError = null)
     screenModelScope.launch {
       fetchPage((state.startOffset - PAGE_SIZE).coerceAtLeast(0), replace = false, prepend = true)
     }
@@ -161,6 +161,8 @@ class DmSearchScreenModel(
     if (state.query.isBlank()) return
     val targetPage = page.coerceIn(1, state.pageInfo?.lastPage ?: page.coerceAtLeast(1))
     val offset = (targetPage - 1) * PAGE_SIZE
+    searchJob?.cancel()
+    generation++
     mutableState.value =
         state.copy(
             result =
@@ -174,10 +176,18 @@ class DmSearchScreenModel(
             autoPrependArmed = offset <= 0,
             isLoadingMore = false,
             isLoadingPrevious = false,
-            appendErrorMessage = null,
-            prependErrorMessage = null,
+            appendError = null,
+            prependError = null,
         )
-    screenModelScope.launch { fetchPage(offset, replace = true, rollbackState = state) }
+    val requestGeneration = generation
+    screenModelScope.launch {
+      fetchPage(
+          offset,
+          replace = true,
+          rollbackState = state,
+          requestGeneration = requestGeneration,
+      )
+    }
   }
 
   fun onVisibleItemIndex(firstVisibleItemIndex: Int) {
@@ -194,10 +204,12 @@ class DmSearchScreenModel(
       replace: Boolean,
       prepend: Boolean = false,
       rollbackState: DmSearchState? = null,
+      requestGeneration: Long = generation,
   ) {
     val query = mutableState.value.query
-    runCatching { creatorRepo.searchDMsPage(platform, query, offset, forceRefresh = true) }
+    resultOfSuspend { creatorRepo.searchDMsPage(query, offset, forceRefresh = true) }
         .onSuccess { page ->
+          if (requestGeneration != generation || mutableState.value.query != query) return@onSuccess
           val dms =
               when {
                 replace -> page.items
@@ -232,11 +244,12 @@ class DmSearchScreenModel(
                       },
                   isLoadingPrevious = false,
                   isLoadingMore = false,
-                  prependErrorMessage = null,
-                  appendErrorMessage = null,
+                  prependError = null,
+                  appendError = null,
               )
         }
         .onFailure { error ->
+          if (requestGeneration != generation || mutableState.value.query != query) return@onFailure
           mutableState.value =
               if (replace && rollbackState != null) {
                 rollbackState.copy(
@@ -248,8 +261,8 @@ class DmSearchScreenModel(
                         ),
                     isLoadingPrevious = false,
                     isLoadingMore = false,
-                    prependErrorMessage = null,
-                    appendErrorMessage = null,
+                    prependError = null,
+                    appendError = null,
                 )
               } else {
                 mutableState.value.copy(
@@ -261,8 +274,8 @@ class DmSearchScreenModel(
                         ),
                     isLoadingPrevious = false,
                     isLoadingMore = false,
-                    prependErrorMessage = if (prepend) error.message else null,
-                    appendErrorMessage = if (!prepend && offset != 0) error.message else null,
+                    prependError = if (prepend) error.toQueryError() else null,
+                    appendError = if (!prepend && offset != 0) error.toQueryError() else null,
                 )
               }
         }

@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 plugins {
   alias(libs.plugins.kotlinMultiplatform)
   alias(libs.plugins.androidKotlinMultiplatformLibrary)
@@ -13,6 +15,7 @@ plugins {
 val appVersionName = providers.gradleProperty("APP_VERSION_NAME").get()
 val generatedAboutMetadataDir =
     layout.buildDirectory.dir("generated/aboutMetadata/commonMain/kotlin")
+val generatedSymbolCraftDir = layout.buildDirectory.dir("generated/symbolcraft/commonMain/kotlin")
 val generateAboutMetadata =
     tasks.register("generateAboutMetadata") {
       val licenseFile = rootProject.file("LICENSE")
@@ -45,10 +48,12 @@ val generateAboutMetadata =
     }
 
 kotlin {
+  val androidCompileSdk = providers.gradleProperty("ANDROID_COMPILE_SDK").map(String::toInt).get()
+  val androidMinSdk = providers.gradleProperty("ANDROID_MIN_SDK").map(String::toInt).get()
   android {
     namespace = "ddd.kc.shared"
-    compileSdk = 36
-    minSdk = 29
+    compileSdk = androidCompileSdk
+    minSdk = androidMinSdk
     androidResources { enable = true }
   }
 
@@ -57,6 +62,7 @@ kotlin {
   sourceSets {
     val commonMain by getting {
       kotlin.srcDir(generatedAboutMetadataDir)
+      kotlin.srcDir(generatedSymbolCraftDir)
       dependencies {
         implementation(libs.aboutlibraries.compose.m3)
         implementation(libs.aboutlibraries.core)
@@ -82,10 +88,8 @@ kotlin {
         implementation(libs.ktor.client.core)
         implementation(libs.ktor.content.negotiation)
         implementation(libs.ktor.serialization.json)
-        implementation(libs.ktor.logging)
         implementation(libs.materialyou)
         implementation(libs.room.runtime)
-        implementation(libs.store5)
         implementation(libs.voyager.core)
         implementation(libs.voyager.koin)
         implementation(libs.voyager.navigator)
@@ -136,9 +140,29 @@ aboutLibraries {
   export { outputFile = file("src/commonMain/composeResources/files/aboutlibraries.json") }
 }
 
+val verifyAboutLibrariesMetadata =
+    tasks.register("verifyAboutLibrariesMetadata") {
+      val metadata = file("src/commonMain/composeResources/files/aboutlibraries.json")
+      dependsOn("exportLibraryDefinitions")
+      inputs.file(metadata)
+      doLast {
+        val root =
+            JsonSlurper().parse(metadata) as? Map<*, *>
+                ?: error("aboutlibraries.json must contain a JSON object")
+        val libraries = root["libraries"] as? Collection<*>
+        check(!libraries.isNullOrEmpty()) { "aboutlibraries.json must contain libraries" }
+      }
+    }
+
+tasks
+    .matching { it.name == "copyNonXmlValueResourcesForCommonMain" }
+    .configureEach { mustRunAfter("exportLibraryDefinitions") }
+
+tasks.matching { it.name == "check" }.configureEach { dependsOn(verifyAboutLibrariesMetadata) }
+
 symbolCraft {
   packageName.set("ddd.kc.generated.symbols")
-  outputDirectory.set("src/commonMain/kotlin")
+  outputDirectory.set(generatedSymbolCraftDir.get().asFile.absolutePath)
   generatePreview.set(false)
   cacheEnabled.set(true)
 

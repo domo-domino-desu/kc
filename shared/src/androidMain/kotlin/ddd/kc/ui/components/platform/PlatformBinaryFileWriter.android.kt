@@ -43,6 +43,9 @@ private fun writeBinaryFileIntoDirectory(
   if (rootDirectory == null || !rootDirectory.isDirectory) {
     return PlatformBinaryFileWriteResult.Failure("Cannot access directory")
   }
+  if (!hasSafeRelativePath(destination.relativeDirectories, request.fileName)) {
+    return PlatformBinaryFileWriteResult.Failure("Unsafe relative path")
+  }
   runCatching { syncNoMediaFlag(rootDirectory, destination.allowMediaIndexing) }
       .onFailure {
         return PlatformBinaryFileWriteResult.Failure(it.message ?: "Cannot sync .nomedia")
@@ -54,8 +57,9 @@ private fun writeBinaryFileIntoDirectory(
             ?: return PlatformBinaryFileWriteResult.Failure("Cannot create parent directory")
       }
 
-  targetDirectory.findFile(request.fileName)?.delete()
-  val document = targetDirectory.createFile(request.mimeType, request.fileName)
+  val document =
+      targetDirectory.findFile(request.fileName)
+          ?: targetDirectory.createFile(request.mimeType, request.fileName)
   if (document == null) {
     return PlatformBinaryFileWriteResult.Failure("Cannot create target file")
   }

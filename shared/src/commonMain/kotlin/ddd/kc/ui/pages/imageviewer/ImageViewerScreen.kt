@@ -44,32 +44,40 @@ import ddd.kc.ui.components.CenterCircularWavyImageLoadingProgress
 import ddd.kc.ui.components.ImageLoadLifecycleState
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.rememberImageLoadProgressState
+import ddd.kc.ui.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.close
+import kc.shared.generated.resources.navigation_content_expired
 import org.jetbrains.compose.resources.stringResource
 
 private val log = KcLog.withTag("ImageViewerScreen")
-private val imageViewedCallbacks = mutableMapOf<String, (String) -> Unit>()
 
 class ImageViewerScreen(
-    private val imageUrls: List<String>,
-    private val thumbnailUrls: List<String> = emptyList(),
+    private val windowId: String,
     private val startIndex: Int = 0,
     private val routeKey: String = nextRouteInstanceKey("image-viewer"),
-    onImageViewed: ((String) -> Unit)? = null,
 ) : Screen {
   override val key: String = routeKey
-
-  init {
-    if (onImageViewed != null) imageViewedCallbacks[routeKey] = onImageViewed
-  }
 
   @OptIn(ExperimentalFoundationApi::class)
   @Composable
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
+    val imageWindow = LocalNavigationWindowStore.current.images(windowId)
+    if (imageWindow == null) {
+      Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            text = stringResource(Res.string.navigation_content_expired),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.clickable { navigator.pop() },
+        )
+      }
+      return
+    }
+    val imageUrls = imageWindow.imageUrls
+    val thumbnailUrls = imageWindow.thumbnailUrls
     val pagerState = rememberPagerState(initialPage = startIndex, pageCount = { imageUrls.size })
     val focusRequester = remember { FocusRequester() }
 
@@ -78,9 +86,7 @@ class ImageViewerScreen(
       focusRequester.requestFocus()
     }
     LaunchedEffect(pagerState.currentPage) {
-      imageUrls.getOrNull(pagerState.currentPage)?.let {
-        imageViewedCallbacks[routeKey]?.invoke(it)
-      }
+      imageUrls.getOrNull(pagerState.currentPage)?.let { imageWindow.onImageViewed?.invoke(it) }
     }
 
     Box(
@@ -211,7 +217,7 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -
           loadFailed = true
           loadLifecycleState = ImageLoadLifecycleState.Error
           log.w(error.result.throwable) {
-            "图片查看器 -> 大图加载失败(url=${fullUrl.orEmpty()},thumbnailUrl=${thumbnailUrl.orEmpty()})"
+            "图片查看器 -> 大图加载失败(fullUrlLength=${fullUrl.orEmpty().length},thumbnailUrlLength=${thumbnailUrl.orEmpty().length})"
           }
         },
         zoomState = zoomState,

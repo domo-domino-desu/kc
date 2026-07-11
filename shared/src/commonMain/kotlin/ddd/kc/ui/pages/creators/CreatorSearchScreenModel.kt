@@ -4,10 +4,11 @@ import androidx.compose.runtime.Composable
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Creator
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.CreatorKey
+import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.model.key
 import ddd.kc.data.model.preserveRefreshUi
-import ddd.kc.data.network.PageInfo
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.ui.state.pageInfoForOffset
 import ddd.kc.utils.logging.KcLog
@@ -74,14 +75,12 @@ data class CreatorSearchState(
     val autoPrependArmed: Boolean = startOffset <= 0,
     val isLoadingPrevious: Boolean = false,
     val isLoadingMore: Boolean = false,
-    val prependErrorMessage: String? = null,
-    val appendErrorMessage: String? = null,
 ) {
   val isLoading: Boolean
     get() = result.isLoading
 
-  val errorMessage: String?
-    get() = result.error?.message
+  val error: ddd.kc.data.model.QueryError?
+    get() = result.error
 
   val hasMore: Boolean
     get() = offset < filteredCount
@@ -97,15 +96,9 @@ class CreatorSearchScreenModel(
     private val creatorRepo: CreatorRepository,
 ) : StateScreenModel<CreatorSearchState>(CreatorSearchState()) {
   private var searchJob: Job? = null
-  private var platform = Platform.PAWCHIVE
 
-  fun init(platform: Platform) {
-    val platformChanged = this.platform != platform
-    this.platform = platform
-    if (platformChanged) {
-      mutableState.value = CreatorSearchState(query = mutableState.value.query)
-    }
-    if (platformChanged || mutableState.value.creators.isEmpty()) reload(delayMs = 0)
+  fun init() {
+    if (mutableState.value.creators.isEmpty()) reload(delayMs = 0)
   }
 
   fun onQueryChanged(query: String) {
@@ -142,7 +135,6 @@ class CreatorSearchScreenModel(
             creators = mergeCreators(state.creators, nextItems),
             offset = state.offset + nextItems.size,
             isLoadingMore = false,
-            appendErrorMessage = null,
         )
   }
 
@@ -164,7 +156,6 @@ class CreatorSearchScreenModel(
             startOffset = previousOffset,
             autoPrependArmed = true,
             isLoadingPrevious = false,
-            prependErrorMessage = null,
         )
   }
 
@@ -260,17 +251,15 @@ class CreatorSearchScreenModel(
         autoPrependArmed = safeOffset <= 0,
         isLoadingPrevious = false,
         isLoadingMore = false,
-        prependErrorMessage = null,
-        appendErrorMessage = null,
     )
   }
 }
 
 private fun mergeCreators(existing: List<Creator>, incoming: List<Creator>): List<Creator> {
   if (incoming.isEmpty()) return existing
-  val map = LinkedHashMap<String, Creator>(existing.size + incoming.size)
-  existing.forEach { map["${it.service}:${it.id}"] = it }
-  incoming.forEach { map["${it.service}:${it.id}"] = it }
+  val map = LinkedHashMap<CreatorKey, Creator>(existing.size + incoming.size)
+  existing.forEach { map[it.key] = it }
+  incoming.forEach { map[it.key] = it }
   return map.values.toList()
 }
 

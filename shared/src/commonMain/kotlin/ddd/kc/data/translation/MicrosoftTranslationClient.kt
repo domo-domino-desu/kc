@@ -19,7 +19,6 @@ internal class MicrosoftTranslationClient(
     val tokenResponse = transport.get(tokenEndpoint)
     ensureTranslationSuccess(
         tokenResponse.statusCode,
-        tokenResponse.body,
         provider = "Microsoft token",
     )
     val token = tokenResponse.body.trim()
@@ -54,7 +53,7 @@ internal class MicrosoftTranslationClient(
                             .toString(),
                 ),
         )
-    ensureTranslationSuccess(response.statusCode, response.body, provider = "Microsoft")
+    ensureTranslationSuccess(response.statusCode, provider = "Microsoft")
 
     val translated =
         json

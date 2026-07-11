@@ -27,7 +27,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.key
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.components.BackAppBar
 import ddd.kc.ui.components.CreatorSearchCard
@@ -36,6 +36,8 @@ import ddd.kc.ui.components.GridLoadingSkeleton
 import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.ListLoadingSkeleton
 import ddd.kc.ui.components.PostCard
+import ddd.kc.ui.i18n.localizedMessage
+import ddd.kc.ui.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.post.PostRouteScreen
@@ -46,7 +48,6 @@ import kc.shared.generated.resources.favorites_tab_posts
 import org.jetbrains.compose.resources.stringResource
 
 class FavoritesScreen(
-    private val platform: Platform = Platform.PAWCHIVE,
     private val routeKey: String = nextRouteInstanceKey("favorites"),
 ) : Screen {
   override val key: String = routeKey
@@ -55,19 +56,20 @@ class FavoritesScreen(
   @Composable
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
+    val navigationWindows = LocalNavigationWindowStore.current
     val screenModel = koinScreenModel<FavoritesScreenModel>()
     val state by screenModel.state.collectAsState()
     val cellWidth = LocalAppSettings.current.cellMinWidthDp()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val refresh = { screenModel.load(platform, forceRefresh = true) }
+    val refresh = { screenModel.load(forceRefresh = true) }
     val tabLabels =
         listOf(
             stringResource(Res.string.favorites_tab_creators),
             stringResource(Res.string.favorites_tab_posts),
         )
 
-    LaunchedEffect(platform) { screenModel.load(platform) }
-    ErrorToastEffect(state.errorMessage)
+    LaunchedEffect(Unit) { screenModel.load() }
+    ErrorToastEffect(state.error?.localizedMessage())
 
     Scaffold(topBar = { BackAppBar(stringResource(Res.string.favorites)) }) { paddingValues ->
       KcPullRefreshBox(
@@ -105,15 +107,14 @@ class FavoritesScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                      items(state.creators, key = { it.id }) { creator ->
+                      items(state.creators, key = { it.key }) { creator ->
                         CreatorSearchCard(
                             creator = creator,
-                            platform = platform,
                             onClick = {
                               navigator.push(
                                   CreatorRouteScreen(
-                                      platform,
-                                      state.creators,
+                                      navigationWindows.putCreators(state.creators),
+                                      creator.key,
                                       state.creators.indexOf(creator),
                                   )
                               )
@@ -132,15 +133,14 @@ class FavoritesScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                      items(state.posts, key = { it.id }) { post ->
+                      items(state.posts, key = { it.key }) { post ->
                         PostCard(
                             post = post,
-                            platform = platform,
                             onClick = {
                               navigator.push(
                                   PostRouteScreen(
-                                      platform,
-                                      state.posts,
+                                      navigationWindows.putPosts(state.posts),
+                                      post.key,
                                       state.posts.indexOf(post),
                                       source = "favorites",
                                   )

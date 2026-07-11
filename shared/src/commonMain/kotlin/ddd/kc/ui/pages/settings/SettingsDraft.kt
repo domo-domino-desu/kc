@@ -1,6 +1,7 @@
 package ddd.kc.ui.pages.settings
 
 import ddd.kc.data.i18n.AppLanguage
+import ddd.kc.data.settings.AppPreferences
 import ddd.kc.data.settings.AppSettings
 import ddd.kc.data.settings.DownloadFileNameMode
 import ddd.kc.data.settings.DownloadSubfolderMode
@@ -9,6 +10,8 @@ import ddd.kc.data.translation.OpenAiTranslationConfig
 import ddd.kc.data.translation.TranslationProvider
 import ddd.kc.data.translation.TranslationSettings
 import ddd.kc.data.translation.TranslationTargetLanguage
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
 
 internal data class SettingsDraft(
     val themeMode: ThemeMode,
@@ -30,44 +33,56 @@ internal data class SettingsDraft(
     val downloadFileNameMode: DownloadFileNameMode,
     val downloadCustomFileNameTemplate: String,
 ) {
-  fun validationMessage(): String? {
-    val cardWidth = cardWidthInput.toIntOrNull() ?: return "Card width must be a number"
+  fun validationError(): SettingsValidationError? {
+    val cardWidth =
+        cardWidthInput.toIntOrNull() ?: return SettingsValidationError.CARD_WIDTH_NOT_NUMBER
     val chunkWordLimit =
-        chunkWordLimitInput.toIntOrNull() ?: return "Chunk word limit must be a number"
+        chunkWordLimitInput.toIntOrNull() ?: return SettingsValidationError.CHUNK_LIMIT_NOT_NUMBER
     val maxConcurrency =
-        maxConcurrencyInput.toIntOrNull() ?: return "Max concurrency must be a number"
+        maxConcurrencyInput.toIntOrNull() ?: return SettingsValidationError.CONCURRENCY_NOT_NUMBER
     if (cardWidth !in AppSettings.CELL_MIN_WIDTH_MIN..AppSettings.CELL_MIN_WIDTH_MAX) {
-      return "Card width must be ${AppSettings.CELL_MIN_WIDTH_MIN}-${AppSettings.CELL_MIN_WIDTH_MAX} dp"
+      return SettingsValidationError.CARD_WIDTH_OUT_OF_RANGE
     }
     val normalizedPawchiveBaseUrl = pawchiveBaseUrl.trim()
-    if (normalizedPawchiveBaseUrl.isBlank()) return "Pawchive Base URL cannot be empty"
+    if (normalizedPawchiveBaseUrl.isBlank()) return SettingsValidationError.PAWCHIVE_URL_EMPTY
+    val parsedPawchiveUrl =
+        try {
+          Url(normalizedPawchiveBaseUrl)
+        } catch (_: IllegalArgumentException) {
+          return SettingsValidationError.PAWCHIVE_URL_INVALID
+        }
+    if (parsedPawchiveUrl.protocol != URLProtocol.HTTPS) {
+      return SettingsValidationError.PAWCHIVE_URL_NOT_HTTPS
+    }
     if (
-        !normalizedPawchiveBaseUrl.startsWith("http://") &&
-            !normalizedPawchiveBaseUrl.startsWith("https://")
+        parsedPawchiveUrl.host.isBlank() ||
+            (parsedPawchiveUrl.encodedPath.isNotBlank() && parsedPawchiveUrl.encodedPath != "/") ||
+            parsedPawchiveUrl.parameters.entries().isNotEmpty() ||
+            parsedPawchiveUrl.fragment.isNotEmpty()
     ) {
-      return "Pawchive Base URL must start with http:// or https://"
+      return SettingsValidationError.PAWCHIVE_URL_INVALID
     }
     if (
         chunkWordLimit !in
             AppSettings.TRANSLATION_CHUNK_WORD_LIMIT_MIN..AppSettings
                     .TRANSLATION_CHUNK_WORD_LIMIT_MAX
     ) {
-      return "Chunk word limit must be ${AppSettings.TRANSLATION_CHUNK_WORD_LIMIT_MIN}-${AppSettings.TRANSLATION_CHUNK_WORD_LIMIT_MAX}"
+      return SettingsValidationError.CHUNK_LIMIT_OUT_OF_RANGE
     }
     if (
         maxConcurrency !in
             AppSettings.TRANSLATION_MAX_CONCURRENCY_MIN..AppSettings.TRANSLATION_MAX_CONCURRENCY_MAX
     ) {
-      return "Max concurrency must be ${AppSettings.TRANSLATION_MAX_CONCURRENCY_MIN}-${AppSettings.TRANSLATION_MAX_CONCURRENCY_MAX}"
+      return SettingsValidationError.CONCURRENCY_OUT_OF_RANGE
     }
     if (translationEnabled && translationProvider == TranslationProvider.OPENAI_COMPATIBLE) {
-      if (openAiBaseUrl.isBlank()) return "Base URL cannot be empty"
-      if (!openAiBaseUrl.startsWith("http://") && !openAiBaseUrl.startsWith("https://")) {
-        return "Base URL must start with http:// or https://"
+      if (openAiBaseUrl.isBlank()) return SettingsValidationError.OPENAI_URL_EMPTY
+      if (!openAiBaseUrl.startsWith("https://")) {
+        return SettingsValidationError.OPENAI_URL_NOT_HTTPS
       }
-      if (openAiApiKey.isBlank()) return "API Key cannot be empty"
-      if (openAiModel.isBlank()) return "Model cannot be empty"
-      if (openAiPromptTemplate.isBlank()) return "Prompt Template cannot be empty"
+      if (openAiApiKey.isBlank()) return SettingsValidationError.OPENAI_API_KEY_EMPTY
+      if (openAiModel.isBlank()) return SettingsValidationError.OPENAI_MODEL_EMPTY
+      if (openAiPromptTemplate.isBlank()) return SettingsValidationError.OPENAI_PROMPT_EMPTY
     }
     return null
   }
@@ -86,6 +101,20 @@ internal data class SettingsDraft(
                   model = openAiModel,
                   promptTemplate = openAiPromptTemplate,
               ),
+      )
+
+  fun toAppPreferences(): AppPreferences =
+      AppPreferences(
+          cellMinWidthDp = cardWidthInput.toInt(),
+          downloadSavePath = downloadSavePath,
+          downloadAllowMediaIndexing = downloadAllowMediaIndexing,
+          downloadSubfolderMode = downloadSubfolderMode,
+          downloadFileNameMode = downloadFileNameMode,
+          downloadCustomFileNameTemplate = downloadCustomFileNameTemplate,
+          pawchiveBaseUrl = pawchiveBaseUrl,
+          themeMode = themeMode,
+          language = language,
+          translationSettings = toTranslationSettings(),
       )
 
   companion object {
@@ -117,4 +146,21 @@ internal data class SettingsDraft(
             downloadCustomFileNameTemplate = settings.downloadCustomFileNameTemplate(),
         )
   }
+}
+
+internal enum class SettingsValidationError {
+  CARD_WIDTH_NOT_NUMBER,
+  CHUNK_LIMIT_NOT_NUMBER,
+  CONCURRENCY_NOT_NUMBER,
+  CARD_WIDTH_OUT_OF_RANGE,
+  PAWCHIVE_URL_EMPTY,
+  PAWCHIVE_URL_NOT_HTTPS,
+  PAWCHIVE_URL_INVALID,
+  CHUNK_LIMIT_OUT_OF_RANGE,
+  CONCURRENCY_OUT_OF_RANGE,
+  OPENAI_URL_EMPTY,
+  OPENAI_URL_NOT_HTTPS,
+  OPENAI_API_KEY_EMPTY,
+  OPENAI_MODEL_EMPTY,
+  OPENAI_PROMPT_EMPTY,
 }

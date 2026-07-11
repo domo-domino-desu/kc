@@ -1,17 +1,19 @@
 package ddd.kc.data.repository
 
+import ddd.kc.data.cache.CacheNamespace
+import ddd.kc.data.cache.rawBodyQueryStore
 import ddd.kc.data.local.AppDatabase
+import ddd.kc.data.media.MediaDownloader
 import ddd.kc.data.model.Comment
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.CreatorKey
+import ddd.kc.data.model.PagedResult
+import ddd.kc.data.model.PopularPage
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.creatorId
-import ddd.kc.data.network.KcApiClient
-import ddd.kc.data.network.PagedResult
-import ddd.kc.data.network.PopularPage
+import ddd.kc.data.network.PawchiveApi
 import ddd.kc.data.network.asException
-import ddd.kc.data.store.CacheNamespace
-import ddd.kc.data.store.rawBodyQueryStore
 import ddd.kc.utils.logging.KcLog
 import ddd.kc.utils.logging.summarizePost
 import kotlin.coroutines.CoroutineContext
@@ -37,14 +39,13 @@ private data class SearchKey(
     val service: String?,
 )
 
-private data class CreatorPostsKey(val service: String, val creatorId: String, val offset: Int)
-
-private data class PostKey(val service: String, val creatorId: String, val postId: String)
+private data class CreatorPostsKey(val creator: CreatorKey, val offset: Int)
 
 class PostRepository(
-    private val api: KcApiClient,
+    private val api: PawchiveApi,
     private val db: AppDatabase,
     private val json: Json,
+    private val mediaDownloader: MediaDownloader,
     private val ioContext: CoroutineContext,
 ) {
   private val dao
@@ -97,19 +98,21 @@ class PostRepository(
   }
 
   private val creatorPostsStore by lazy {
-    rawBodyQueryStore<CreatorPostsKey, List<Post>>(
+    rawBodyQueryStore<CreatorPostsKey, PagedResult<Post>>(
         cacheDao = dao,
         namespace = CacheNamespace.PostList,
         fetcherName = "pawchive-creator-posts",
-        cacheKey = { key -> "pawchive:${key.service}:${key.creatorId}:posts:${key.offset}" },
+        cacheKey = { key ->
+          "pawchive:${key.creator.service}:${key.creator.id}:posts:${key.offset}"
+        },
         fetch = { key ->
-          api.fetchCreatorPostsBody(
-              service = key.service,
-              creatorId = key.creatorId,
+          api.fetchCreatorPostsPageBody(
+              service = key.creator.service,
+              creatorId = key.creator.id,
               offset = key.offset,
           )
         },
-        parse = { _, body -> api.parsePosts(body) },
+        parse = { key, body -> api.parsePostCardsPage(body, key.offset) },
     )
   }
 
@@ -118,9 +121,9 @@ class PostRepository(
         cacheDao = dao,
         namespace = CacheNamespace.Detail,
         fetcherName = "pawchive-post-detail",
-        cacheKey = { key -> "pawchive:${key.service}:${key.creatorId}:post:${key.postId}" },
+        cacheKey = { key -> "pawchive:${key.service}:${key.creatorId}:post:${key.id}" },
         fetch = { key ->
-          api.fetchPostBody(service = key.service, creatorId = key.creatorId, postId = key.postId)
+          api.fetchPostBody(service = key.service, creatorId = key.creatorId, postId = key.id)
         },
         parse = { _, body -> api.parsePost(body) },
     )
@@ -148,10 +151,10 @@ class PostRepository(
         emitAll(recentStore.query(OffsetKey(offset)))
       }
 
-  suspend fun getRecentPosts(platform: Platform, offset: Int, forceRefresh: Boolean): List<Post> =
+  suspend fun getRecentPosts(offset: Int, forceRefresh: Boolean): List<Post> =
       observeRecentPosts(offset, forceRefresh).awaitData()
 
-  suspend fun getPopularPosts(platform: Platform, forceRefresh: Boolean): List<Post> =
+  suspend fun getPopularPosts(forceRefresh: Boolean): List<Post> =
       observePopularPostsPage(date = null, period = "day", offset = 0, forceRefresh = forceRefresh)
           .awaitData()
           .posts
@@ -169,7 +172,6 @@ class PostRepository(
   }
 
   suspend fun getPopularPostsPage(
-      platform: Platform,
       date: String?,
       period: String,
       offset: Int,
@@ -207,7 +209,6 @@ class PostRepository(
   }
 
   suspend fun searchPosts(
-      platform: Platform,
       query: String,
       offset: Int,
       tag: String?,
@@ -215,7 +216,6 @@ class PostRepository(
   ): List<Post> = observePostSearch(query, offset, tag, service, forceRefresh = true).awaitData()
 
   suspend fun searchPostsPage(
-      platform: Platform,
       query: String,
       offset: Int,
       tag: String?,
@@ -225,7 +225,6 @@ class PostRepository(
       observePostSearchPage(query, offset, tag, service, forceRefresh = forceRefresh).awaitData()
 
   suspend fun getPostsByTag(
-      platform: Platform,
       tag: String,
       offset: Int,
       forceRefresh: Boolean = false,
@@ -240,7 +239,6 @@ class PostRepository(
           .awaitData()
 
   suspend fun getPostsByTagPage(
-      platform: Platform,
       tag: String,
       offset: Int,
       forceRefresh: Boolean = false,
@@ -254,35 +252,16 @@ class PostRepository(
           )
           .awaitData()
 
-  fun observeCreatorPosts(
-      service: String,
-      creatorId: String,
-      offset: Int,
-      forceRefresh: Boolean = false,
-  ): Flow<QueryState<List<Post>>> = flow {
-    if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:posts:")
-    emitAll(creatorPostsStore.query(CreatorPostsKey(service, creatorId, offset)))
-  }
-
-  suspend fun getCreatorPosts(
-      platform: Platform,
-      service: String,
-      creatorId: String,
-      offset: Int,
-      forceRefresh: Boolean,
-  ): List<Post> = observeCreatorPosts(service, creatorId, offset, forceRefresh).awaitData()
-
   suspend fun getCreatorPostsPage(
-      platform: Platform,
       service: String,
       creatorId: String,
       offset: Int,
       forceRefresh: Boolean,
   ): PagedResult<Post> {
-    val posts = getCreatorPosts(platform, service, creatorId, offset, forceRefresh)
-    val pageInfo =
-        withContext(ioContext) { api.getCreatorPostsPageInfo(platform, service, creatorId, offset) }
-    return PagedResult(items = posts, pageInfo = pageInfo)
+    if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:posts:")
+    return creatorPostsStore
+        .query(CreatorPostsKey(CreatorKey(service, creatorId), offset))
+        .awaitData()
   }
 
   fun observePost(
@@ -296,7 +275,6 @@ class PostRepository(
   }
 
   suspend fun getPost(
-      platform: Platform,
       service: String,
       creatorId: String,
       postId: String,
@@ -310,58 +288,53 @@ class PostRepository(
     emitAll(favoritePostsStore.query(Unit))
   }
 
-  suspend fun getFavoritePosts(platform: Platform, forceRefresh: Boolean = false): List<Post> =
+  suspend fun getFavoritePosts(forceRefresh: Boolean = false): List<Post> =
       observeFavoritePosts(forceRefresh).awaitData()
 
-  fun hasSession(platform: Platform): Boolean = api.hasSession(platform)
+  fun hasSession(): Boolean = api.hasSession()
 
-  suspend fun clearFavoritesCache(platform: Platform) =
+  suspend fun clearFavoritesCache() =
       withContext(ioContext) { dao.delete("pawchive:favorites:posts") }
 
   suspend fun isFavoritePost(
-      platform: Platform,
       service: String,
       creatorId: String,
       postId: String,
   ): Boolean =
       withContext(ioContext) {
-        getFavoritePosts(platform).any {
+        getFavoritePosts().any {
           it.service == service && it.id == postId && it.creatorId == creatorId
         }
       }
 
   suspend fun addFavoritePost(
-      platform: Platform,
       service: String,
       creatorId: String,
       postId: String,
   ) =
       withContext(ioContext) {
-        api.addFavoritePost(platform, service, creatorId, postId)
+        api.addFavoritePost(service, creatorId, postId)
         dao.delete("pawchive:favorites:posts")
       }
 
   suspend fun removeFavoritePost(
-      platform: Platform,
       service: String,
       creatorId: String,
       postId: String,
   ) =
       withContext(ioContext) {
-        api.removeFavoritePost(platform, service, creatorId, postId)
+        api.removeFavoritePost(service, creatorId, postId)
         dao.delete("pawchive:favorites:posts")
       }
 
   suspend fun getPostComments(
-      platform: Platform,
       service: String,
       creatorId: String,
       postId: String,
-  ): List<Comment> =
-      withContext(ioContext) { api.getPostComments(platform, service, creatorId, postId) }
+  ): List<Comment> = withContext(ioContext) { api.getPostComments(service, creatorId, postId) }
 
   suspend fun downloadFile(url: String): ByteArray =
-      withContext(ioContext) { api.downloadFileBytes(url) }
+      withContext(ioContext) { mediaDownloader.download(url) }
 
   private suspend fun deleteCacheGroup(prefix: String) {
     withContext(ioContext) { dao.deleteKeyAndPrefixed(prefix, "$prefix%") }

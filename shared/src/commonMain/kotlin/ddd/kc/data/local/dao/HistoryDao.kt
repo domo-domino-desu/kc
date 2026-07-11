@@ -19,6 +19,9 @@ interface HistoryDao {
   )
   suspend fun trimCreators(limit: Int)
 
+  @Query("DELETE FROM kc_creator_history WHERE historyKey = :key")
+  suspend fun deleteCreator(key: String)
+
   @Upsert suspend fun upsertPost(entity: PostHistoryEntity)
 
   @Query("SELECT * FROM kc_post_history ORDER BY visitedAtMs DESC LIMIT :limit")
@@ -29,4 +32,6 @@ interface HistoryDao {
           "(SELECT historyKey FROM kc_post_history ORDER BY visitedAtMs DESC LIMIT :limit)"
   )
   suspend fun trimPosts(limit: Int)
+
+  @Query("DELETE FROM kc_post_history WHERE historyKey = :key") suspend fun deletePost(key: String)
 }

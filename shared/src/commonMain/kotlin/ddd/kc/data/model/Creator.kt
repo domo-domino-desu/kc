@@ -5,14 +5,14 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Creator(
-    val id: String = "",
+    val id: String,
     val name: String = "",
-    val service: String = "",
+    val service: String,
     @Serializable(with = FlexibleLongSerializer::class) val indexed: Long = 0L,
     @Serializable(with = FlexibleLongSerializer::class) val updated: Long = 0L,
     val favorited: Int = 0,
     @SerialName("public_id") val publicId: String? = null,
-) : PlatformSerializable
+)
 
 fun Creator.thumbnailUrl(baseUrl: String): String = "$baseUrl/icons/${service}/${id}"
 

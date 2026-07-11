@@ -20,7 +20,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import ddd.kc.data.network.PageInfo
+import ddd.kc.data.model.PageInfo
+import ddd.kc.ui.i18n.localizedMessage
 import ddd.kc.ui.state.PaginationSnapshot
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -44,8 +45,8 @@ fun <T> PageStateContent(
 ) {
   when {
     snapshot.loading -> loadingContent()
-    !snapshot.errorMessage.isNullOrBlank() -> {
-      ErrorToastEffect(snapshot.errorMessage)
+    snapshot.error != null -> {
+      ErrorToastEffect(snapshot.error.localizedMessage())
       Box(modifier = modifier.fillMaxSize())
     }
     else -> content()

@@ -6,6 +6,7 @@ import ddd.kc.data.model.PostFile
 import ddd.kc.data.settings.AppSettings
 import ddd.kc.data.settings.DownloadFileNameMode
 import ddd.kc.data.settings.DownloadSubfolderMode
+import ddd.kc.fake.TestSecretStore
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,9 +17,15 @@ class DownloadNamingTest {
   @Test
   fun buildsConfiguredSubfolderAndFileName() = runBlocking {
     val settings = tempSettings()
-    settings.setDownloadSubfolderMode(DownloadSubfolderMode.BY_USERNAME)
-    settings.setDownloadFileNameMode(DownloadFileNameMode.CUSTOM)
-    settings.setDownloadCustomFileNameTemplate("{username}-{post_id}-{title}-{service}")
+    settings.save(
+        settings
+            .snapshot()
+            .copy(
+                downloadSubfolderMode = DownloadSubfolderMode.BY_USERNAME,
+                downloadFileNameMode = DownloadFileNameMode.CUSTOM,
+                downloadCustomFileNameTemplate = "{username}-{post_id}-{title}-{service}",
+            )
+    )
 
     val target =
         buildPostDownloadTarget(
@@ -41,7 +48,8 @@ class DownloadNamingTest {
     val file = File.createTempFile("kc-download-test", ".preferences_pb")
     file.delete()
     return AppSettings(
-        PreferenceDataStoreFactory.createWithPath(produceFile = { file.absolutePath.toPath() })
+        PreferenceDataStoreFactory.createWithPath(produceFile = { file.absolutePath.toPath() }),
+        TestSecretStore(),
     )
   }
 }

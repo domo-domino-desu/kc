@@ -8,8 +8,10 @@ plugins {
 
 android {
   namespace = "ddd.kc.android"
-  compileSdk = 36
-  buildToolsVersion = "36.0.0"
+  val androidCompileSdk = providers.gradleProperty("ANDROID_COMPILE_SDK").map(String::toInt).get()
+  val androidMinSdk = providers.gradleProperty("ANDROID_MIN_SDK").map(String::toInt).get()
+  compileSdk = androidCompileSdk
+  buildToolsVersion = providers.gradleProperty("ANDROID_BUILD_TOOLS").get()
 
   val appVersionName = providers.gradleProperty("APP_VERSION_NAME").get()
   val appVersionCode = providers.gradleProperty("APP_VERSION_CODE").map(String::toInt).get()
@@ -17,8 +19,8 @@ android {
 
   defaultConfig {
     applicationId = "ddd.kc"
-    minSdk = 29
-    targetSdk = 36
+    minSdk = androidMinSdk
+    targetSdk = androidCompileSdk
     versionCode = appVersionCode
     versionName = appVersionName
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

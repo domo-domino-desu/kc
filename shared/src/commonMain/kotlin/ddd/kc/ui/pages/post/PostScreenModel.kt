@@ -4,13 +4,16 @@ import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Comment
 import ddd.kc.data.model.Creator
-import ddd.kc.data.model.Platform
+import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.PostKey
+import ddd.kc.data.model.QueryError
 import ddd.kc.data.model.allFiles
 import ddd.kc.data.model.creatorId
+import ddd.kc.data.model.creatorKey
 import ddd.kc.data.model.imageFiles
-import ddd.kc.data.network.AuthRequiredException
-import ddd.kc.data.network.PageInfo
+import ddd.kc.data.model.key
+import ddd.kc.data.network.toQueryError
 import ddd.kc.data.repository.CreatorRepository
 import ddd.kc.data.repository.PostRepository
 import ddd.kc.data.translation.TranslationBlockResult
@@ -21,6 +24,7 @@ import ddd.kc.ui.state.PAGER_PREFETCH_DEBOUNCE_MS
 import ddd.kc.ui.state.PAGER_PREVIOUS_PREFETCH_COUNT
 import ddd.kc.ui.state.TranslationBlockState
 import ddd.kc.ui.state.TranslationStatus
+import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import ddd.kc.utils.logging.summarizePost
 import ddd.kc.utils.logging.summarizePostFiles
@@ -40,7 +44,6 @@ class PostScreenModel(
     private val postRepo: PostRepository,
     private val creatorRepo: CreatorRepository,
     private val translationService: TranslationEngine,
-    private val platform: Platform,
     initialPosts: List<Post>,
     startIndex: Int,
     private val initialOffset: Int = 0,
@@ -58,10 +61,20 @@ class PostScreenModel(
     ) {
 
   private var prefetchJob: Job? = null
-  private var favoriteStatusDisabled = false
-  private val loadedDetailIds = mutableSetOf<String>()
-  private val loadingDetailIds = mutableSetOf<String>()
-  private val loadingCommentIds = mutableSetOf<String>()
+  private val updatingFavoritePosts = mutableSetOf<PostKey>()
+  private val loadedDetailIds = mutableSetOf<PostKey>()
+  private val loadingDetailIds = mutableSetOf<PostKey>()
+  private val loadingCommentIds = mutableSetOf<PostKey>()
+  private val favoriteRequestTokens = mutableMapOf<PostKey, Long>()
+
+  private fun beginFavoriteRequest(key: PostKey): Long {
+    val next = (favoriteRequestTokens[key] ?: 0L) + 1L
+    favoriteRequestTokens[key] = next
+    return next
+  }
+
+  private fun isCurrentFavoriteRequest(key: PostKey, token: Long): Boolean =
+      favoriteRequestTokens[key] == token
 
   fun onPageChanged(index: Int) {
     val post = mutableState.value.posts.getOrNull(index)
@@ -109,7 +122,7 @@ class PostScreenModel(
     log.i { "加载更多Post -> 开始(offset=$nextOffset)" }
     mutableState.value = state.copy(isLoadingMore = true)
     screenModelScope.launch {
-      runCatching { fetchPagingPage(nextOffset, forceRefresh = false) }
+      resultOfSuspend { fetchPagingPage(nextOffset, forceRefresh = false) }
           .onSuccess { page ->
             val current = mutableState.value
             val merged =
@@ -149,7 +162,7 @@ class PostScreenModel(
     log.i { "加载上一页Post -> 开始(offset=$previousOffset)" }
     mutableState.value = state.copy(isLoadingPrevious = true)
     screenModelScope.launch {
-      runCatching { fetchPagingPage(previousOffset, forceRefresh = false) }
+      resultOfSuspend { fetchPagingPage(previousOffset, forceRefresh = false) }
           .onSuccess { page ->
             val current = mutableState.value
             val merged =
@@ -181,7 +194,6 @@ class PostScreenModel(
         is PostPagingContext.Popular -> {
           val page =
               postRepo.getPopularPostsPage(
-                  platform = platform,
                   date = context.date,
                   period = context.period,
                   offset = offset,
@@ -193,7 +205,6 @@ class PostScreenModel(
           if (context.query.isBlank()) {
             val page =
                 postRepo.getPopularPostsPage(
-                    platform = platform,
                     date = context.defaultPopularDate,
                     period = "day",
                     offset = offset,
@@ -203,7 +214,6 @@ class PostScreenModel(
           } else {
             val page =
                 postRepo.searchPostsPage(
-                    platform = platform,
                     query = context.query,
                     offset = offset,
                     tag = null,
@@ -214,13 +224,12 @@ class PostScreenModel(
           }
         }
         is PostPagingContext.Tag -> {
-          val page = postRepo.getPostsByTagPage(platform, context.tag, offset, forceRefresh)
+          val page = postRepo.getPostsByTagPage(context.tag, offset, forceRefresh)
           DetailPagingPage(page.items, page.pageInfo)
         }
         is PostPagingContext.Creator -> {
           val page =
               postRepo.getCreatorPostsPage(
-                  platform = platform,
                   service = context.service,
                   creatorId = context.creatorId,
                   offset = offset,
@@ -231,33 +240,30 @@ class PostScreenModel(
       }
 
   fun loadPostDetail(post: Post) {
-    if (post.id in loadedDetailIds || post.id in loadingDetailIds) return
-    loadingDetailIds += post.id
+    if (post.key in loadedDetailIds || post.key in loadingDetailIds) return
+    loadingDetailIds += post.key
     mutableState.value =
         mutableState.value.copy(
-            loadingDetailPostIds = mutableState.value.loadingDetailPostIds + post.id
+            loadingDetailPostIds = mutableState.value.loadingDetailPostIds + post.key
         )
-    log.i {
-      "加载Post详情 -> 开始(platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id})"
-    }
+    log.i { "加载Post详情 -> 开始(service=${post.service},creator=${post.creatorId},post=${post.id})" }
     screenModelScope.launch {
-      runCatching { postRepo.getPost(platform, post.service, post.creatorId, post.id) }
+      resultOfSuspend { postRepo.getPost(post.service, post.creatorId, post.id) }
           .onSuccess { detail ->
-            loadedDetailIds += post.id
+            loadedDetailIds += post.key
             val current = mutableState.value
-            val index =
-                current.posts.indexOfFirst { it.id == post.id && it.service == post.service }
+            val index = current.posts.indexOfFirst { it.key == post.key }
             if (index >= 0) {
               val updated = current.posts.toMutableList()
               updated[index] = detail
               mutableState.value =
                   current.copy(
                       posts = updated,
-                      loadingDetailPostIds = current.loadingDetailPostIds - post.id,
+                      loadingDetailPostIds = current.loadingDetailPostIds - post.key,
                   )
             } else {
               mutableState.value =
-                  current.copy(loadingDetailPostIds = current.loadingDetailPostIds - post.id)
+                  current.copy(loadingDetailPostIds = current.loadingDetailPostIds - post.key)
             }
             log.i { "加载Post详情 -> 成功(${summarizePost(detail)},${summarizePostFiles(detail)})" }
             if (detail.content.isNullOrBlank()) {
@@ -279,67 +285,77 @@ class PostScreenModel(
           }
           .onFailure {
             log.e(it) {
-              "加载Post详情 -> 失败(platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id})"
+              "加载Post详情 -> 失败(service=${post.service},creator=${post.creatorId},post=${post.id})"
             }
             mutableState.value =
                 mutableState.value.copy(
-                    loadingDetailPostIds = mutableState.value.loadingDetailPostIds - post.id
+                    loadingDetailPostIds = mutableState.value.loadingDetailPostIds - post.key
                 )
           }
-      loadingDetailIds -= post.id
+      loadingDetailIds -= post.key
     }
   }
 
   fun loadComments(post: Post) {
-    if (mutableState.value.postComments.containsKey(post.id)) return
-    if (post.id in loadingCommentIds) return
-    loadingCommentIds += post.id
+    if (mutableState.value.postComments.containsKey(post.key)) return
+    if (post.key in loadingCommentIds) return
+    loadingCommentIds += post.key
     screenModelScope.launch {
-      runCatching { postRepo.getPostComments(platform, post.service, post.creatorId, post.id) }
+      resultOfSuspend { postRepo.getPostComments(post.service, post.creatorId, post.id) }
           .onSuccess { comments ->
             val current = mutableState.value
             mutableState.value =
-                current.copy(postComments = current.postComments + (post.id to comments))
+                current.copy(
+                    postComments = current.postComments + (post.key to comments),
+                    postCommentErrors = current.postCommentErrors - post.key,
+                )
             log.i { "加载Post评论 -> 成功(post=${post.id},count=${comments.size})" }
           }
-          .onFailure { log.w(it) { "加载Post评论 -> 失败(post=${post.id})" } }
-      loadingCommentIds -= post.id
+          .onFailure {
+            log.w(it) { "加载Post评论 -> 失败(post=${post.id})" }
+            mutableState.value =
+                mutableState.value.copy(
+                    postCommentErrors =
+                        mutableState.value.postCommentErrors + (post.key to it.toQueryError())
+                )
+          }
+      loadingCommentIds -= post.key
     }
   }
 
   fun getComments(post: Post): List<Comment> =
-      mutableState.value.postComments[post.id] ?: emptyList()
+      mutableState.value.postComments[post.key] ?: emptyList()
 
-  fun requestFullImage(postId: String, fullUrl: String) {
+  fun requestFullImage(postKey: PostKey, fullUrl: String) {
     if (fullUrl.isBlank()) return
     val current = mutableState.value
-    val requested = current.requestedFullImageUrls[postId].orEmpty()
+    val requested = current.requestedFullImageUrls[postKey].orEmpty()
     if (fullUrl in requested) return
     mutableState.value =
         current.copy(
             requestedFullImageUrls =
-                current.requestedFullImageUrls + (postId to (requested + fullUrl))
+                current.requestedFullImageUrls + (postKey to (requested + fullUrl))
         )
   }
 
-  fun requestFullImages(postId: String, fullUrls: Collection<String>) {
+  fun requestFullImages(postKey: PostKey, fullUrls: Collection<String>) {
     val validUrls = fullUrls.filter { it.isNotBlank() }.toSet()
     if (validUrls.isEmpty()) return
     val current = mutableState.value
-    val requested = current.requestedFullImageUrls[postId].orEmpty()
+    val requested = current.requestedFullImageUrls[postKey].orEmpty()
     val merged = requested + validUrls
     if (merged == requested) return
     mutableState.value =
-        current.copy(requestedFullImageUrls = current.requestedFullImageUrls + (postId to merged))
+        current.copy(requestedFullImageUrls = current.requestedFullImageUrls + (postKey to merged))
   }
 
   suspend fun downloadFile(url: String): ByteArray = postRepo.downloadFile(url)
 
   fun loadCreatorInfo(post: Post) {
-    val key = "${post.service}:${post.creatorId}"
+    val key = post.creatorKey
     if (mutableState.value.postCreators.containsKey(key)) return
     screenModelScope.launch {
-      runCatching { creatorRepo.getAllCreators(platform, false) }
+      resultOfSuspend { creatorRepo.getAllCreators(false) }
           .onSuccess { creators ->
             val creator =
                 creators.firstOrNull { it.service == post.service && it.id == post.creatorId }
@@ -356,19 +372,18 @@ class PostScreenModel(
     }
   }
 
-  fun getCreator(post: Post): Creator? =
-      mutableState.value.postCreators["${post.service}:${post.creatorId}"]
+  fun getCreator(post: Post): Creator? = mutableState.value.postCreators[post.creatorKey]
 
   fun translateContent(post: Post) {
     if (!translationService.isEnabled()) return
     val content = post.content?.takeIf { it.isNotBlank() } ?: return
-    val existing = mutableState.value.postTranslations[post.id]
+    val existing = mutableState.value.postTranslations[post.key]
     if (existing?.showTranslation == true) {
       mutableState.value =
           mutableState.value.copy(
               postTranslations =
                   mutableState.value.postTranslations +
-                      (post.id to existing.copy(showTranslation = false))
+                      (post.key to existing.copy(showTranslation = false))
           )
       return
     }
@@ -377,7 +392,7 @@ class PostScreenModel(
           mutableState.value.copy(
               postTranslations =
                   mutableState.value.postTranslations +
-                      (post.id to existing.copy(showTranslation = true))
+                      (post.key to existing.copy(showTranslation = true))
           )
       return
     }
@@ -389,7 +404,7 @@ class PostScreenModel(
           mutableState.value.copy(
               postTranslations =
                   mutableState.value.postTranslations +
-                      (post.id to
+                      (post.key to
                           ContentTranslationState(
                               blocks =
                                   blocks.map {
@@ -402,9 +417,9 @@ class PostScreenModel(
                               showTranslation = true,
                           ))
           )
-      runCatching {
+      resultOfSuspend {
             translationService.translateBlocks(blocks) { index, result ->
-              updatePostTranslationBlock(post.id, index, result)
+              updatePostTranslationBlock(post.key, index, result)
             }
           }
           .onFailure { error ->
@@ -413,12 +428,12 @@ class PostScreenModel(
                 mutableState.value.copy(
                     postTranslations =
                         mutableState.value.postTranslations +
-                            (post.id to
-                                (mutableState.value.postTranslations[post.id]
+                            (post.key to
+                                (mutableState.value.postTranslations[post.key]
                                         ?: ContentTranslationState())
                                     .copy(
                                         blocks =
-                                            (mutableState.value.postTranslations[post.id]?.blocks
+                                            (mutableState.value.postTranslations[post.key]?.blocks
                                                     ?: emptyList())
                                                 .map {
                                                   if (it.status == TranslationStatus.PENDING)
@@ -434,8 +449,8 @@ class PostScreenModel(
           mutableState.value.copy(
               postTranslations =
                   mutableState.value.postTranslations +
-                      (post.id to
-                          (mutableState.value.postTranslations[post.id]
+                      (post.key to
+                          (mutableState.value.postTranslations[post.key]
                                   ?: ContentTranslationState())
                               .copy(isTranslating = false, showTranslation = true))
           )
@@ -443,80 +458,86 @@ class PostScreenModel(
   }
 
   fun loadFavoriteStatus(post: Post) {
-    if (favoriteStatusDisabled) return
-    if (!postRepo.hasSession(platform)) {
-      log.d {
-        "收藏状态 -> 跳过(未登录,platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id})"
-      }
+    if (!postRepo.hasSession()) {
+      log.d { "收藏状态 -> 跳过(未登录,service=${post.service},creator=${post.creatorId},post=${post.id})" }
       return
     }
+    val requestToken = beginFavoriteRequest(post.key)
     screenModelScope.launch {
-      runCatching { postRepo.isFavoritePost(platform, post.service, post.creatorId, post.id) }
+      resultOfSuspend { postRepo.isFavoritePost(post.service, post.creatorId, post.id) }
           .onSuccess { isFavorite ->
+            if (!isCurrentFavoriteRequest(post.key, requestToken)) return@onSuccess
             val current = mutableState.value.favoritePostIds
             mutableState.value =
                 mutableState.value.copy(
-                    favoritePostIds = if (isFavorite) current + post.id else current - post.id,
-                    favoriteErrorMessage = null,
+                    favoritePostIds = if (isFavorite) current + post.key else current - post.key,
+                    favoriteError = null,
                 )
             log.i {
-              "收藏状态 -> 成功(platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id},favorite=$isFavorite)"
+              "收藏状态 -> 成功(service=${post.service},creator=${post.creatorId},post=${post.id},favorite=$isFavorite)"
             }
           }
           .onFailure {
+            if (!isCurrentFavoriteRequest(post.key, requestToken)) return@onFailure
             log.w(it) {
-              "收藏状态 -> 失败(platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id})"
+              "收藏状态 -> 失败(service=${post.service},creator=${post.creatorId},post=${post.id})"
             }
-            if (it is AuthRequiredException) favoriteStatusDisabled = true
-            mutableState.value = mutableState.value.copy(favoriteErrorMessage = it.message)
+            mutableState.value = mutableState.value.copy(favoriteError = it.toQueryError())
           }
     }
   }
 
   fun toggleFavoritePost(post: Post) {
-    if (!postRepo.hasSession(platform)) {
+    if (!postRepo.hasSession()) {
       log.w {
-        "收藏Post -> 失败(未登录,platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id})"
+        "收藏Post -> 失败(未登录,service=${post.service},creator=${post.creatorId},post=${post.id})"
       }
-      mutableState.value =
-          mutableState.value.copy(favoriteErrorMessage = AuthRequiredException().message)
+      mutableState.value = mutableState.value.copy(favoriteError = QueryError.Unauthorized())
       return
     }
+    if (!updatingFavoritePosts.add(post.key)) return
+    val requestToken = beginFavoriteRequest(post.key)
     val current = mutableState.value
-    val wasFavorite = post.id in current.favoritePostIds
+    val wasFavorite = post.key in current.favoritePostIds
     mutableState.value =
         current.copy(
             favoritePostIds =
-                if (wasFavorite) current.favoritePostIds - post.id
-                else current.favoritePostIds + post.id,
-            favoriteErrorMessage = null,
+                if (wasFavorite) current.favoritePostIds - post.key
+                else current.favoritePostIds + post.key,
+            favoriteError = null,
         )
     screenModelScope.launch {
-      runCatching {
-            if (wasFavorite) {
-              postRepo.removeFavoritePost(platform, post.service, post.creatorId, post.id)
-            } else {
-              postRepo.addFavoritePost(platform, post.service, post.creatorId, post.id)
+      try {
+        resultOfSuspend {
+              if (wasFavorite) {
+                postRepo.removeFavoritePost(post.service, post.creatorId, post.id)
+              } else {
+                postRepo.addFavoritePost(post.service, post.creatorId, post.id)
+              }
             }
-          }
-          .onSuccess {
-            log.i {
-              "收藏Post -> 成功(platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id},favorite=${!wasFavorite})"
+            .onSuccess {
+              if (!isCurrentFavoriteRequest(post.key, requestToken)) return@onSuccess
+              log.i {
+                "收藏Post -> 成功(service=${post.service},creator=${post.creatorId},post=${post.id},favorite=${!wasFavorite})"
+              }
             }
-          }
-          .onFailure {
-            log.e(it) {
-              "收藏Post -> 失败(platform=${platform.name},service=${post.service},creator=${post.creatorId},post=${post.id})"
+            .onFailure {
+              if (!isCurrentFavoriteRequest(post.key, requestToken)) return@onFailure
+              log.e(it) {
+                "收藏Post -> 失败(service=${post.service},creator=${post.creatorId},post=${post.id})"
+              }
+              val latest = mutableState.value
+              mutableState.value =
+                  latest.copy(
+                      favoritePostIds =
+                          if (wasFavorite) latest.favoritePostIds + post.key
+                          else latest.favoritePostIds - post.key,
+                      favoriteError = it.toQueryError(),
+                  )
             }
-            val latest = mutableState.value
-            mutableState.value =
-                latest.copy(
-                    favoritePostIds =
-                        if (wasFavorite) latest.favoritePostIds + post.id
-                        else latest.favoritePostIds - post.id,
-                    favoriteErrorMessage = it.message,
-                )
-          }
+      } finally {
+        updatingFavoritePosts -= post.key
+      }
     }
   }
 
@@ -533,12 +554,12 @@ class PostScreenModel(
   }
 
   private fun updatePostTranslationBlock(
-      postId: String,
+      postKey: PostKey,
       index: Int,
       result: TranslationBlockResult,
   ) {
     val currentState = mutableState.value
-    val translation = currentState.postTranslations[postId] ?: return
+    val translation = currentState.postTranslations[postKey] ?: return
     if (index !in translation.blocks.indices) return
     val updatedBlocks = translation.blocks.toMutableList()
     updatedBlocks[index] =
@@ -551,7 +572,7 @@ class PostScreenModel(
           TranslationBlockResult.EmptyResult ->
               updatedBlocks[index].copy(status = TranslationStatus.EMPTY)
           is TranslationBlockResult.Failure -> {
-            log.w(result.cause) { "翻译Post block -> 失败(post=$postId,index=$index)" }
+            log.w(result.cause) { "翻译Post block -> 失败(post=$postKey,index=$index)" }
             updatedBlocks[index].copy(status = TranslationStatus.FAILURE)
           }
         }
@@ -559,7 +580,7 @@ class PostScreenModel(
         currentState.copy(
             postTranslations =
                 currentState.postTranslations +
-                    (postId to translation.copy(blocks = updatedBlocks, showTranslation = true))
+                    (postKey to translation.copy(blocks = updatedBlocks, showTranslation = true))
         )
   }
 }

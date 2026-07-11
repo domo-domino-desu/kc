@@ -1,8 +1,6 @@
 package ddd.kc.ui.pages.post
 
-import ddd.kc.data.model.PlatformSerializable
-
-sealed interface PostPagingContext : PlatformSerializable {
+sealed interface PostPagingContext {
   data object None : PostPagingContext
 
   data class Popular(

@@ -4,6 +4,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -39,7 +40,7 @@ data class Post(
     @SerialName("preview_state") val previewState: String? = null,
     @SerialName("has_full") val hasFull: Boolean? = null,
     @Serializable(with = FlexibleTagsSerializer::class) val tags: List<String>? = null,
-) : PlatformSerializable
+)
 
 val Post.creatorId: String
   get() = artistId ?: user
@@ -49,20 +50,20 @@ data class PostEmbed(
     val url: String? = null,
     val subject: String? = null,
     val description: String? = null,
-) : PlatformSerializable
+)
 
 @Serializable
 data class PostPoll(
     val options: List<PostPollOption> = emptyList(),
-) : PlatformSerializable
+)
 
-@Serializable data class PostPollOption(val text: String = "") : PlatformSerializable
+@Serializable data class PostPollOption(val text: String = "")
 
 @Serializable
 data class PostCaption(
     val language: String? = null,
     val content: String? = null,
-) : PlatformSerializable
+)
 
 fun Post.allFiles(): List<PostFile> = buildList {
   file?.takeIf { it.hasPath() }?.let { add(it) }
@@ -85,7 +86,7 @@ object FlexibleTagsSerializer : KSerializer<List<String>?> {
       JsonNull -> null
       is JsonArray -> jsonDecoder.json.decodeFromJsonElement(delegate, element)
       is JsonPrimitive -> element.content.parsePawchiveTags()
-      else -> null
+      else -> throw SerializationException("Unsupported Pawchive tags JSON shape")
     }
   }
 

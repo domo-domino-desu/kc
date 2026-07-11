@@ -24,13 +24,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import ddd.kc.data.model.Platform
 import ddd.kc.data.settings.AppSettings
 import ddd.kc.data.settings.DownloadFileNameMode
 import ddd.kc.data.translation.TranslationProvider
@@ -70,6 +68,7 @@ import kc.shared.generated.resources.download_subfolder_mode
 import kc.shared.generated.resources.download_subfolder_mode_desc
 import kc.shared.generated.resources.enable_translation
 import kc.shared.generated.resources.enable_translation_desc
+import kc.shared.generated.resources.hide_api_key
 import kc.shared.generated.resources.max_concurrency
 import kc.shared.generated.resources.model
 import kc.shared.generated.resources.openai_api_key_desc
@@ -86,16 +85,17 @@ import kc.shared.generated.resources.save
 import kc.shared.generated.resources.settings
 import kc.shared.generated.resources.settings_discard_changes
 import kc.shared.generated.resources.settings_save_and_exit
+import kc.shared.generated.resources.settings_save_failed
 import kc.shared.generated.resources.settings_saved
 import kc.shared.generated.resources.settings_unsaved_changes_body
 import kc.shared.generated.resources.settings_unsaved_changes_title
+import kc.shared.generated.resources.show_api_key
 import kc.shared.generated.resources.theme_mode
 import kc.shared.generated.resources.theme_mode_desc
 import kc.shared.generated.resources.translation
 import kc.shared.generated.resources.translation_provider_desc
 import kc.shared.generated.resources.translation_target_language
 import kc.shared.generated.resources.translation_target_language_desc
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
 private enum class PendingExitAction {
@@ -132,17 +132,17 @@ private fun pawchiveBaseUrlOptionLabel(option: PawchiveBaseUrlOption): String =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(
+internal fun SettingsScreen(
     appSettings: AppSettings,
+    screenModel: SettingsScreenModel,
     onBack: () -> Unit,
     onGoHome: () -> Unit,
 ) {
-  val scope = rememberCoroutineScope()
   val listState = rememberLazyListState()
+  val saveState by screenModel.state.collectAsState()
 
   val cardWidth by appSettings.cellMinWidthDpFlow().collectAsState(appSettings.cellMinWidthDp())
-  val pawchiveBaseUrl by
-      appSettings.baseUrlFlow(Platform.PAWCHIVE).collectAsState(appSettings.baseUrl())
+  val pawchiveBaseUrl by appSettings.baseUrlFlow().collectAsState(appSettings.baseUrl())
   val language by appSettings.languageFlow().collectAsState(appSettings.language())
   val themeMode by appSettings.themeModeFlow().collectAsState(appSettings.themeMode())
   val translationSettings by
@@ -202,11 +202,21 @@ fun SettingsScreen(
 
   var draft by remember { mutableStateOf(persisted) }
   var initialized by remember { mutableStateOf(false) }
-  var saving by remember { mutableStateOf(false) }
+  val saving = saveState.saving
   var showApiKey by remember { mutableStateOf(false) }
   var saveStatusText by remember { mutableStateOf<String?>(null) }
   var pendingExitAction by remember { mutableStateOf<PendingExitAction?>(null) }
   val savedText = stringResource(Res.string.settings_saved)
+  val saveFailedText = stringResource(Res.string.settings_save_failed)
+
+  LaunchedEffect(saveState.result) {
+    saveStatusText =
+        when (saveState.result) {
+          SettingsSaveResult.SAVED -> savedText
+          SettingsSaveResult.FAILED -> saveFailedText
+          null -> null
+        }
+  }
 
   LaunchedEffect(persisted) {
     if (!initialized) {
@@ -217,7 +227,8 @@ fun SettingsScreen(
     }
   }
 
-  val validationMessage = draft.validationMessage()
+  val validationError = draft.validationError()
+  val validationMessage = validationError?.localizedMessage()
   val hasUnsavedChanges = initialized && draft != persisted
   val triggerDirectoryPicker = rememberPlatformDirectoryPicker { selectedPath ->
     if (selectedPath != null) draft = draft.copy(downloadSavePath = selectedPath)
@@ -240,28 +251,9 @@ fun SettingsScreen(
       saveStatusText = validationMessage
       return
     }
-    saving = true
     saveStatusText = null
-    scope.launch {
-      runCatching {
-            appSettings.setThemeMode(draft.themeMode)
-            appSettings.setLanguage(draft.language)
-            appSettings.setCellMinWidthDp(draft.cardWidthInput.toInt())
-            appSettings.setBaseUrl(Platform.PAWCHIVE, draft.pawchiveBaseUrl)
-            appSettings.setTranslationSettings(draft.toTranslationSettings())
-            appSettings.setDownloadSavePath(draft.downloadSavePath)
-            appSettings.setDownloadAllowMediaIndexing(draft.downloadAllowMediaIndexing)
-            appSettings.setDownloadSubfolderMode(draft.downloadSubfolderMode)
-            appSettings.setDownloadFileNameMode(draft.downloadFileNameMode)
-            appSettings.setDownloadCustomFileNameTemplate(draft.downloadCustomFileNameTemplate)
-          }
-          .onSuccess {
-            saveStatusText = savedText
-            onSaved?.invoke()
-          }
-          .onFailure { error -> saveStatusText = error.message ?: "Save failed" }
-      saving = false
-    }
+    screenModel.clearResult()
+    screenModel.save(draft, onSaved)
   }
 
   NavigationBackHandler(enabled = true) { requestExit(PendingExitAction.Back) }
@@ -520,7 +512,9 @@ private fun TranslationSettingsSection(
                   if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
           )
           TextButton(onClick = onToggleShowApiKey) {
-            Text(if (showApiKey) "Hide API Key" else "Show API Key")
+            Text(
+                stringResource(if (showApiKey) Res.string.hide_api_key else Res.string.show_api_key)
+            )
           }
           SettingsInputRow(
               value = draft.openAiModel,
