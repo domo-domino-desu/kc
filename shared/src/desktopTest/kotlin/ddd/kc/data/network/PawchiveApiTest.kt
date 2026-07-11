@@ -99,19 +99,26 @@ class PawchiveApiTest {
               }
         }
 
-    assertEquals(2, api.getCreators().size)
-    assertEquals(listOf("post1"), api.getRecentPosts(offset = 50).map { it.id })
-    assertTrue(api.searchPosts(query = "art", offset = 0).isNotEmpty())
-    assertTrue(api.getPostsByTag(tag = "nsfw", offset = 0).isNotEmpty())
-    assertTrue(api.getPopularPosts().posts.isNotEmpty())
-    assertTrue(api.getTags().any { it.tag == "nsfw" && it.count > 0 })
-    assertEquals(emptyList(), api.getRecentDMs())
-    val creatorPage = api.getCreatorPostsPage("patreon", "artist", 0)
+    assertEquals(2, api.parseCreators(api.fetchCreatorsBody()).size)
+    assertEquals(
+        listOf("post1"),
+        api.parsePosts(api.fetchRecentPostsBody(offset = 50)).map { it.id },
+    )
+    assertTrue(api.parsePostCards(api.fetchPostSearchBody(query = "art", offset = 0)).isNotEmpty())
+    assertTrue(
+        api.parsePostCards(api.fetchPostSearchBody(query = "", offset = 0, tag = "nsfw"))
+            .isNotEmpty()
+    )
+    assertTrue(api.parsePopularPostsPage(api.fetchPopularPostsBody()).posts.isNotEmpty())
+    assertTrue(api.parseTags(api.fetchTagsBody()).any { it.tag == "nsfw" && it.count > 0 })
+    assertEquals(emptyList(), api.parseDms(api.fetchDmsBody(offset = 0)))
+    val creatorPage =
+        api.parsePostCardsPage(api.fetchCreatorPostsPageBody("patreon", "artist", 0), 0)
     assertTrue(creatorPage.items.isNotEmpty())
     assertTrue(creatorPage.items.all { it.service == "patreon" })
     assertTrue(creatorPage.items.all { it.id.isNotBlank() && it.user.isNotBlank() })
     assertEquals(4, creatorPage.pageInfo?.lastPage)
-    val detail = api.getPost("patreon", "artist", "post1")
+    val detail = api.parsePost(api.fetchPostBody("patreon", "artist", "post1"))
     assertEquals("post1", detail.id)
     assertEquals("detail text", detail.content)
     assertEquals(listOf("Tomoe Umari", "Vtuber", "winner"), detail.tags)
@@ -126,7 +133,9 @@ class PawchiveApiTest {
     )
     assertEquals(
         true,
-        api.getCreatorTags("patreon", "artist").any { it.tag == "Animation" },
+        api.parseCreatorTags(api.fetchCreatorTagsBody("patreon", "artist")).any {
+          it.tag == "Animation"
+        },
     )
     assertEquals(listOf("artist"), api.getFavorites(type = "artist").map { it.id })
     assertEquals(listOf("post1"), api.getFavoritePosts().map { it.id })
@@ -157,7 +166,7 @@ class PawchiveApiTest {
     settings.save(settings.snapshot().copy(pawchiveBaseUrl = "https://pawchive.pw/"))
     val (api, requests) = client(settings) { HttpStatusCode.OK to creatorsJson }
 
-    api.getCreators()
+    api.fetchCreatorsBody()
 
     assertEquals("pawchive.pw", requests.single().url.host)
     assertEquals("https", requests.single().url.protocol.name)

@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -55,7 +54,6 @@ class PostRepository(
     rawBodyQueryStore<OffsetKey, List<Post>>(
         cacheDao = dao,
         namespace = CacheNamespace.PostList,
-        fetcherName = "pawchive-recent-posts",
         cacheKey = { "pawchive:posts:recent:${it.offset}" },
         fetch = { key -> api.fetchRecentPostsBody(offset = key.offset) },
         parse = { _, body -> api.parsePosts(body) },
@@ -66,7 +64,6 @@ class PostRepository(
     rawBodyQueryStore<PopularKey, PopularPage>(
         cacheDao = dao,
         namespace = CacheNamespace.PostList,
-        fetcherName = "pawchive-popular-posts",
         cacheKey = { key ->
           "pawchive:posts:popular:${key.period}:${key.date.orEmpty()}:${key.offset}"
         },
@@ -81,7 +78,6 @@ class PostRepository(
     rawBodyQueryStore<SearchKey, PagedResult<Post>>(
         cacheDao = dao,
         namespace = CacheNamespace.PostList,
-        fetcherName = "pawchive-post-search",
         cacheKey = { key ->
           "pawchive:posts:search:${key.offset}:${key.service.orEmpty()}:${key.tag.orEmpty()}:${key.query}"
         },
@@ -101,7 +97,6 @@ class PostRepository(
     rawBodyQueryStore<CreatorPostsKey, PagedResult<Post>>(
         cacheDao = dao,
         namespace = CacheNamespace.PostList,
-        fetcherName = "pawchive-creator-posts",
         cacheKey = { key ->
           "pawchive:${key.creator.service}:${key.creator.id}:posts:${key.offset}"
         },
@@ -120,7 +115,6 @@ class PostRepository(
     rawBodyQueryStore<PostKey, Post>(
         cacheDao = dao,
         namespace = CacheNamespace.Detail,
-        fetcherName = "pawchive-post-detail",
         cacheKey = { key -> "pawchive:${key.service}:${key.creatorId}:post:${key.id}" },
         fetch = { key ->
           api.fetchPostBody(service = key.service, creatorId = key.creatorId, postId = key.id)
@@ -133,7 +127,6 @@ class PostRepository(
     rawBodyQueryStore<Unit, List<Post>>(
         cacheDao = dao,
         namespace = CacheNamespace.Favorites,
-        fetcherName = "pawchive-favorite-posts",
         cacheKey = { "pawchive:favorites:posts" },
         fetch = {
           json.encodeToString(
@@ -178,25 +171,6 @@ class PostRepository(
       forceRefresh: Boolean,
   ): PopularPage = observePopularPostsPage(date, period, offset, forceRefresh).awaitData()
 
-  fun observePostSearch(
-      query: String,
-      offset: Int,
-      tag: String?,
-      service: String?,
-      forceRefresh: Boolean = false,
-  ): Flow<QueryState<List<Post>>> =
-      observePostSearchPage(query, offset, tag, service, forceRefresh).map { state ->
-        QueryState(
-            data = state.data?.items,
-            isLoading = state.isLoading,
-            isRefreshing = state.isRefreshing,
-            isFromCache = state.isFromCache,
-            isStale = state.isStale,
-            error = state.error,
-            lastUpdatedAtMillis = state.lastUpdatedAtMillis,
-        )
-      }
-
   fun observePostSearchPage(
       query: String,
       offset: Int,
@@ -213,7 +187,8 @@ class PostRepository(
       offset: Int,
       tag: String?,
       service: String?,
-  ): List<Post> = observePostSearch(query, offset, tag, service, forceRefresh = true).awaitData()
+  ): List<Post> =
+      observePostSearchPage(query, offset, tag, service, forceRefresh = true).awaitData().items
 
   suspend fun searchPostsPage(
       query: String,
@@ -229,7 +204,7 @@ class PostRepository(
       offset: Int,
       forceRefresh: Boolean = false,
   ): List<Post> =
-      observePostSearch(
+      observePostSearchPage(
               query = "",
               offset = offset,
               tag = tag,
@@ -237,6 +212,7 @@ class PostRepository(
               forceRefresh = forceRefresh,
           )
           .awaitData()
+          .items
 
   suspend fun getPostsByTagPage(
       tag: String,

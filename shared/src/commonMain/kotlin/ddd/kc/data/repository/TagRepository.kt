@@ -26,7 +26,6 @@ class TagRepository(
     rawBodyQueryStore<Unit, List<Tag>>(
         cacheDao = db.cacheDao(),
         namespace = CacheNamespace.Tags,
-        fetcherName = "pawchive-tags",
         cacheKey = { "pawchive:tags:v1" },
         fetch = { api.fetchTagsBody() },
         parse = { _, body -> api.parseTags(body) },

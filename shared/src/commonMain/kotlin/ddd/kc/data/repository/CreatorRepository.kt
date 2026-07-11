@@ -16,7 +16,6 @@ import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
@@ -40,7 +39,6 @@ class CreatorRepository(
     rawBodyQueryStore<CreatorKey, List<Announcement>>(
         cacheDao = dao,
         namespace = CacheNamespace.Detail,
-        fetcherName = "pawchive-creator-announcements",
         cacheKey = { key -> "pawchive:${key.service}:${key.id}:announcements" },
         fetch = { key ->
           json.encodeToString(
@@ -56,7 +54,6 @@ class CreatorRepository(
     rawBodyQueryStore<CreatorKey, List<Tag>>(
         cacheDao = dao,
         namespace = CacheNamespace.Detail,
-        fetcherName = "pawchive-creator-tags",
         cacheKey = { key -> "pawchive:${key.service}:${key.id}:tags" },
         fetch = { key -> api.fetchCreatorTagsBody(service = key.service, creatorId = key.id) },
         parse = { _, body -> api.parseCreatorTags(body) },
@@ -67,7 +64,6 @@ class CreatorRepository(
     rawBodyQueryStore<CreatorKey, List<Creator>>(
         cacheDao = dao,
         namespace = CacheNamespace.Detail,
-        fetcherName = "pawchive-creator-links",
         cacheKey = { key -> "pawchive:${key.service}:${key.id}:links" },
         fetch = { key ->
           json.encodeToString(
@@ -83,7 +79,6 @@ class CreatorRepository(
     rawBodyQueryStore<DmKey, PagedResult<DM>>(
         cacheDao = dao,
         namespace = CacheNamespace.PostList,
-        fetcherName = "pawchive-dms",
         cacheKey = { key -> "pawchive:dms:${key.offset}:${key.query}" },
         fetch = { key -> api.fetchDmsBody(query = key.query, offset = key.offset) },
         parse = { key, body -> api.parseDmsPage(body, key.offset) },
@@ -94,7 +89,6 @@ class CreatorRepository(
     rawBodyQueryStore<Unit, List<Creator>>(
         cacheDao = dao,
         namespace = CacheNamespace.Favorites,
-        fetcherName = "pawchive-favorite-creators",
         cacheKey = { "pawchive:favorites:creators" },
         fetch = {
           json.encodeToString(
@@ -110,7 +104,6 @@ class CreatorRepository(
     rawBodyQueryStore<Unit, List<Creator>>(
         cacheDao = dao,
         namespace = CacheNamespace.Creators,
-        fetcherName = "pawchive-creators",
         cacheKey = { CREATORS_CACHE_KEY },
         fetch = { api.fetchCreatorsBody() },
         parse = { _, body -> api.parseCreators(body) },
@@ -168,23 +161,6 @@ class CreatorRepository(
       forceRefresh: Boolean = false,
   ): List<Creator> = observeCreatorLinks(service, creatorId, forceRefresh).awaitData()
 
-  fun observeDms(
-      query: String = "",
-      offset: Int = 0,
-      forceRefresh: Boolean = false,
-  ): Flow<QueryState<List<DM>>> =
-      observeDmsPage(query, offset, forceRefresh).map { state ->
-        QueryState(
-            data = state.data?.items,
-            isLoading = state.isLoading,
-            isRefreshing = state.isRefreshing,
-            isFromCache = state.isFromCache,
-            isStale = state.isStale,
-            error = state.error,
-            lastUpdatedAtMillis = state.lastUpdatedAtMillis,
-        )
-      }
-
   fun observeDmsPage(
       query: String = "",
       offset: Int = 0,
@@ -194,7 +170,8 @@ class CreatorRepository(
     emitAll(dmsStore.query(DmKey(query.trim(), offset)))
   }
 
-  suspend fun getRecentDMs(offset: Int): List<DM> = observeDms(offset = offset).awaitData()
+  suspend fun getRecentDMs(offset: Int): List<DM> =
+      observeDmsPage(offset = offset).awaitData().items
 
   suspend fun searchCreators(
       query: String,
@@ -230,7 +207,7 @@ class CreatorRepository(
       }
 
   suspend fun searchDMs(query: String, offset: Int): List<DM> =
-      observeDms(query = query, offset = offset, forceRefresh = true).awaitData()
+      observeDmsPage(query = query, offset = offset, forceRefresh = true).awaitData().items
 
   suspend fun searchDMsPage(
       query: String,

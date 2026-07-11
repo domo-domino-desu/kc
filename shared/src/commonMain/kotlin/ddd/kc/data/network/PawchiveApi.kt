@@ -13,13 +13,9 @@ import ddd.kc.data.model.PopularPage
 import ddd.kc.data.model.PopularProps
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.Tag
-import ddd.kc.utils.logging.KcLog
-import ddd.kc.utils.logging.summarizePost
 import io.ktor.client.request.parameter
 import io.ktor.http.encodeURLPathPart
 import kotlinx.serialization.json.Json
-
-private val log = KcLog.withTag("PawchiveApi")
 
 class PawchiveApi(
     private val gateway: PawchiveHttpGateway,
@@ -34,8 +30,6 @@ class PawchiveApi(
 
   fun parseCreators(body: String): List<Creator> = json.decodeFromString(body)
 
-  suspend fun getCreators(): List<Creator> = parseCreators(fetchCreatorsBody())
-
   suspend fun fetchRecentPostsBody(
       offset: Int = 0,
   ): String =
@@ -47,8 +41,6 @@ class PawchiveApi(
       }
 
   fun parsePosts(body: String): List<Post> = json.decodeFromString(body)
-
-  suspend fun getRecentPosts(offset: Int = 0): List<Post> = parsePosts(fetchRecentPostsBody(offset))
 
   suspend fun fetchPopularPostsBody(
       date: String? = null,
@@ -116,18 +108,6 @@ class PawchiveApi(
           ?.distinct()
           .orEmpty()
 
-  suspend fun getPopularPosts(
-      date: String? = null,
-      period: String? = null,
-      offset: Int? = null,
-  ): PopularPage =
-      parsePopularPostsPage(
-          fetchPopularPostsBody(date, period, offset),
-          date,
-          period,
-          offset ?: 0,
-      )
-
   suspend fun fetchPostSearchBody(
       query: String,
       offset: Int = 0,
@@ -152,13 +132,6 @@ class PawchiveApi(
   fun parsePostCardsPage(body: String, offset: Int = 0): PagedResult<Post> =
       PagedResult(items = parsePostCards(body), pageInfo = parsePageInfo(body, offset))
 
-  suspend fun searchPosts(
-      query: String,
-      offset: Int = 0,
-      tag: String? = null,
-      service: String? = null,
-  ): List<Post> = parsePostCards(fetchPostSearchBody(query, offset, tag, service))
-
   suspend fun searchPostsPage(
       query: String,
       offset: Int = 0,
@@ -166,11 +139,6 @@ class PawchiveApi(
       service: String? = null,
   ): PagedResult<Post> =
       parsePostCardsPage(fetchPostSearchBody(query, offset, tag, service), offset)
-
-  suspend fun getPostsByTag(
-      tag: String,
-      offset: Int = 0,
-  ): List<Post> = searchPosts(query = "", offset = offset, tag = tag)
 
   suspend fun fetchDmsBody(
       query: String = "",
@@ -206,13 +174,6 @@ class PawchiveApi(
   fun parseDmsPage(body: String, offset: Int = 0): PagedResult<DM> =
       PagedResult(items = parseDms(body), pageInfo = parsePageInfo(body, offset))
 
-  suspend fun getRecentDMs(offset: Int = 0): List<DM> = parseDms(fetchDmsBody(offset = offset))
-
-  suspend fun searchDMs(
-      query: String,
-      offset: Int = 0,
-  ): List<DM> = parseDms(fetchDmsBody(query, offset))
-
   suspend fun searchDMsPage(
       query: String = "",
       offset: Int = 0,
@@ -230,8 +191,6 @@ class PawchiveApi(
     }
   }
 
-  suspend fun getTags(): List<Tag> = parseTags(fetchTagsBody())
-
   suspend fun fetchCreatorPostsPageBody(
       service: String,
       creatorId: String,
@@ -244,13 +203,6 @@ class PawchiveApi(
         offset.takeIf { it > 0 }?.let { parameter("o", it) }
       }
 
-  suspend fun getCreatorPostsPage(
-      service: String,
-      creatorId: String,
-      offset: Int = 0,
-  ): PagedResult<Post> =
-      parsePostCardsPage(fetchCreatorPostsPageBody(service, creatorId, offset), offset)
-
   suspend fun fetchPostBody(
       service: String,
       creatorId: String,
@@ -262,15 +214,6 @@ class PawchiveApi(
       )
 
   fun parsePost(body: String): Post = json.decodeFromString(body)
-
-  suspend fun getPost(
-      service: String,
-      creatorId: String,
-      postId: String,
-  ): Post =
-      parsePost(fetchPostBody(service, creatorId, postId)).also {
-        log.i { "请求Post详情 -> 成功(${summarizePost(it)})" }
-      }
 
   suspend fun getPostComments(
       service: String,
@@ -308,11 +251,6 @@ class PawchiveApi(
 
   fun parseCreatorTags(body: String): List<Tag> = parseTags(body)
 
-  suspend fun getCreatorTags(
-      service: String,
-      creatorId: String,
-  ): List<Tag> = parseCreatorTags(fetchCreatorTagsBody(service, creatorId))
-
   suspend fun getCreatorLinks(
       service: String,
       creatorId: String,
@@ -321,17 +259,6 @@ class PawchiveApi(
           gateway.getText(
               "/api/v1/${service.encodeURLPathPart()}/user/${creatorId.encodeURLPathPart()}/links",
               "请求Creator Links(service=$service,creator=$creatorId)",
-          )
-      )
-
-  suspend fun getCreatorProfile(
-      service: String,
-      creatorId: String,
-  ): Creator =
-      decode(
-          gateway.getText(
-              "/api/v1/${service.encodeURLPathPart()}/user/${creatorId.encodeURLPathPart()}/profile",
-              "请求Creator Profile(service=$service,creator=$creatorId)",
           )
       )
 

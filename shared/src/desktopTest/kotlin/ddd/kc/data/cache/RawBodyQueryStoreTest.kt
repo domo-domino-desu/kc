@@ -26,7 +26,6 @@ class RawBodyQueryStoreTest {
         rawBodyQueryStore<String, String>(
             cacheDao = dao,
             namespace = CacheNamespace.PostList,
-            fetcherName = "test-fresh",
             cacheKey = { "key:$it" },
             fetch = {
               calls += 1
@@ -52,7 +51,6 @@ class RawBodyQueryStoreTest {
         rawBodyQueryStore<String, String>(
             cacheDao = dao,
             namespace = CacheNamespace.PostList,
-            fetcherName = "test-stale",
             cacheKey = { "key:$it" },
             fetch = {
               calls += 1
@@ -80,7 +78,6 @@ class RawBodyQueryStoreTest {
         rawBodyQueryStore<String, String>(
             cacheDao = dao,
             namespace = CacheNamespace.PostList,
-            fetcherName = "test-corrupt",
             cacheKey = { "key:$it" },
             fetch = {
               calls += 1
@@ -109,7 +106,6 @@ class RawBodyQueryStoreTest {
         rawBodyQueryStore<String, String>(
             cacheDao = dao,
             namespace = CacheNamespace.PostList,
-            fetcherName = "test-single-flight",
             cacheKey = { "key:$it" },
             fetch = {
               calls += 1

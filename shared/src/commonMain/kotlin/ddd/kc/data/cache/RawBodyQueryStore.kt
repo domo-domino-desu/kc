@@ -143,11 +143,9 @@ class RawBodyQueryStore<Key : Any, Output : Any>(
   private class MutexEntry(val mutex: Mutex, var borrowers: Int = 0)
 }
 
-@Suppress("UNUSED_PARAMETER")
 fun <Key : Any, Output : Any> rawBodyQueryStore(
     cacheDao: CacheDao,
     namespace: CacheNamespace,
-    fetcherName: String,
     cacheKey: (Key) -> String,
     fetch: suspend (Key) -> String,
     parse: (Key, String) -> Output,
