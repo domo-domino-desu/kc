@@ -27,6 +27,3 @@ jobs:
 
       - name: Run tests and static checks
         run: ./gradlew --stacktrace :shared:desktopTest :shared:verifyAboutLibrariesMetadata :androidApp:lintDebug
-
-      - name: Verify generated license metadata is committed
-        run: git diff --exit-code -- shared/src/commonMain/composeResources/files/aboutlibraries.json
