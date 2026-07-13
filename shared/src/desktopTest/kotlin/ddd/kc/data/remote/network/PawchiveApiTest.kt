@@ -2,6 +2,7 @@ package ddd.kc.data.remote.network
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostFile
 import ddd.kc.data.model.allFiles
@@ -592,7 +593,7 @@ class PawchiveApiTest {
     assertTrue(dmsPage.items.first().user.orEmpty().isNotBlank())
     assertTrue(dmsPage.items.first().content.orEmpty().isNotBlank())
     assertTrue(dmsPage.items.any { it.artist?.name.orEmpty().isNotBlank() })
-    assertEquals(null, dmsPage.pageInfo)
+    assertEquals(PageInfo(), dmsPage.pageInfo)
 
     assertEquals(
         4,
