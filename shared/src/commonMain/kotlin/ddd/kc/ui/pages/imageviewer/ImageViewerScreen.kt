@@ -32,7 +32,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
@@ -40,6 +39,7 @@ import com.github.panpf.zoomimage.CoilZoomAsyncImage
 import com.github.panpf.zoomimage.rememberCoilZoomState
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CloseW400Outlined
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.CenterCircularWavyImageLoadingProgress
@@ -50,15 +50,17 @@ import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.close
 import kc.shared.generated.resources.navigation_content_expired
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 
 private val log = KcLog.withTag("ImageViewerScreen")
 
+@Serializable
 class ImageViewerScreen(
     private val windowId: String,
     private val startIndex: Int = 0,
     private val routeKey: String = nextRouteInstanceKey("image-viewer"),
-) : Screen {
+) : AppScreen {
   override val key: String = routeKey
 
   @OptIn(ExperimentalFoundationApi::class)

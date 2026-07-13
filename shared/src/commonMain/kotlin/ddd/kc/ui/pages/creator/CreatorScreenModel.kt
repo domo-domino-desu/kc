@@ -14,15 +14,19 @@ import ddd.kc.data.remote.repository.CreatorRepository
 import ddd.kc.data.remote.repository.PostRepository
 import ddd.kc.data.remote.translation.TranslationBlockResult
 import ddd.kc.data.remote.translation.TranslationEngine
-import ddd.kc.ui.components.state.ContentTranslationState
-import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
-import ddd.kc.ui.components.state.PAGER_NEXT_PREFETCH_COUNT
-import ddd.kc.ui.components.state.PaginationReducer
-import ddd.kc.ui.components.state.PaginationSnapshot
-import ddd.kc.ui.components.state.TranslationBlockState
-import ddd.kc.ui.components.state.TranslationStatus
+import ddd.kc.ui.components.paging.ContentTranslationState
+import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.paging.OffsetPagingMachine
+import ddd.kc.ui.components.paging.OffsetPagingState
+import ddd.kc.ui.components.paging.PAGER_NEXT_PREFETCH_COUNT
+import ddd.kc.ui.components.paging.PAGER_PREFETCH_DEBOUNCE_MS
+import ddd.kc.ui.components.paging.PagingAnchor
+import ddd.kc.ui.components.paging.TranslationBlockState
+import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
@@ -50,6 +54,7 @@ class CreatorScreenModel(
   }
 
   private val requestTokens = mutableMapOf<Pair<RequestKind, CreatorKey>, Long>()
+  private var prefetchJob: Job? = null
 
   private fun beginRequest(kind: RequestKind, key: CreatorKey): Long {
     val next = (requestTokens[kind to key] ?: 0L) + 1L
@@ -62,7 +67,7 @@ class CreatorScreenModel(
 
   private val updatingFavoriteCreators = mutableSetOf<CreatorKey>()
   private val favoriteRequestTokens = mutableMapOf<CreatorKey, Long>()
-  private val postReducer = PaginationReducer<Post, PostKey> { it.key }
+  private val postReducer = OffsetPagingMachine<Post, PostKey> { it.key }
 
   private fun beginFavoriteRequest(key: CreatorKey): Long {
     val next = (favoriteRequestTokens[key] ?: 0L) + 1L
@@ -76,9 +81,29 @@ class CreatorScreenModel(
   fun onPageChanged(index: Int) {
     log.d { "打开Creator -> 切换(index=$index)" }
     mutableState.value = mutableState.value.copy(currentIndex = index)
+    schedulePrefetch(index)
     if (index >= mutableState.value.creators.size - PAGER_NEXT_PREFETCH_COUNT) {
       loadMoreCreators()
     }
+  }
+
+  private fun schedulePrefetch(index: Int) {
+    prefetchJob?.cancel()
+    prefetchJob =
+        screenModelScope.launch {
+          delay(PAGER_PREFETCH_DEBOUNCE_MS)
+          val creators = mutableState.value.creators
+          listOf(index + 1, index + 2, index - 1).forEach { candidateIndex ->
+            creators.getOrNull(candidateIndex)?.let(::prefetchCreatorData)
+          }
+        }
+  }
+
+  private fun prefetchCreatorData(creator: Creator) {
+    loadCreatorPosts(creator)
+    loadCreatorAnnouncements(creator)
+    loadCreatorTags(creator)
+    loadCreatorLinks(creator)
   }
 
   fun previous() {
@@ -98,8 +123,8 @@ class CreatorScreenModel(
 
   fun getCreatorPosts(creator: Creator): List<Post> = getCreatorPostSnapshot(creator).items
 
-  fun getCreatorPostSnapshot(creator: Creator): PaginationSnapshot<Post> =
-      mutableState.value.creatorPostSnapshots[creator.key] ?: PaginationSnapshot()
+  fun getCreatorPostSnapshot(creator: Creator): OffsetPagingState<Post> =
+      mutableState.value.creatorPostSnapshots[creator.key] ?: OffsetPagingState()
 
   fun loadCreatorAnnouncements(creator: Creator, forceRefresh: Boolean = false) {
     if (!forceRefresh && mutableState.value.creatorAnnouncements.containsKey(creator.key)) return
@@ -525,12 +550,14 @@ class CreatorScreenModel(
     }
   }
 
-  fun onCreatorPostVisibleIndex(creator: Creator, firstVisiblePostIndex: Int) {
+  fun onCreatorPostViewportChanged(creator: Creator, anchor: PagingAnchor) {
     val current = getCreatorPostSnapshot(creator)
     val next =
-        postReducer.updateVisiblePage(
+        postReducer.updateViewport(
             current,
-            firstVisibleItemIndex = firstVisiblePostIndex,
+            firstVisibleItemIndex = anchor.index,
+            firstVisibleItemScrollOffset = anchor.offset,
+            anchorKey = anchor.itemKey,
             pageSize = PAGE_SIZE,
         )
     if (next === current || next == current) return

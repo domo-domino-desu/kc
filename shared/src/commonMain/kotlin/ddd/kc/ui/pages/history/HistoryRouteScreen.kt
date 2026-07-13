@@ -22,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.data.local.ActivityHistoryRepository
@@ -30,6 +29,7 @@ import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.key
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.BackAppBar
@@ -45,12 +45,14 @@ import kc.shared.generated.resources.empty_history
 import kc.shared.generated.resources.history
 import kc.shared.generated.resources.history_tab_posts
 import kc.shared.generated.resources.history_tab_users
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
+@Serializable
 class HistoryRouteScreen(
     private val routeKey: String = nextRouteInstanceKey("history"),
-) : Screen {
+) : AppScreen {
   override val key: String = routeKey
 
   @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)

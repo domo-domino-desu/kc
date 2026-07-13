@@ -1,15 +1,22 @@
-package ddd.kc.ui.components.state
+package ddd.kc.ui.components.paging
 
 import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.QueryError
 import ddd.kc.data.remote.network.toQueryError
 
-data class PaginationSnapshot<Item>(
+const val DEFAULT_PAGE_SIZE = 50
+
+data class OffsetPagingState<Item>(
     val items: List<Item> = emptyList(),
     val startOffset: Int = 0,
     val offset: Int = 0,
     val pageInfo: PageInfo? = null,
     val visibleOffset: Int = startOffset,
+    val currentPage: Int = pageInfo?.currentPage ?: 1,
+    val lastPage: Int? = pageInfo?.lastPage,
+    val viewport: PagingAnchor = PagingAnchor(),
+    val navigationEffect: PagingEffect? = null,
+    val transactionId: Long = 0L,
     val loading: Boolean = false,
     val refreshing: Boolean = false,
     val isLoadingPrevious: Boolean = false,
@@ -26,10 +33,23 @@ data class PaginationSnapshot<Item>(
     get() = hasPrevious
 
   val visiblePageInfo: PageInfo?
-    get() = pageInfoForOffset(pageInfo, visibleOffset, DEFAULT_PAGE_SIZE)
-}
+    get() {
+      val info = pageInfo ?: return null
+      val page = currentPage.coerceIn(1, lastPage ?: info.lastPage)
+      return info.copy(
+          currentPage = page,
+          currentOffset = ((page - 1) * DEFAULT_PAGE_SIZE).coerceIn(0, info.lastOffset),
+      )
+    }
 
-const val DEFAULT_PAGE_SIZE = 50
+  fun normalizedForRestore(): OffsetPagingState<Item> =
+      copy(
+          loading = false,
+          refreshing = false,
+          isLoadingPrevious = false,
+          isLoadingMore = false,
+      )
+}
 
 fun pageInfoForOffset(
     pageInfo: PageInfo?,
@@ -44,12 +64,12 @@ fun pageInfoForOffset(
   return info.copy(currentPage = currentPage, currentOffset = currentOffset)
 }
 
-class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
+class OffsetPagingMachine<Item, Key>(private val keyOf: (Item) -> Key) {
 
   fun beginLoad(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       forceRefresh: Boolean,
-  ): PaginationSnapshot<Item> {
+  ): OffsetPagingState<Item> {
     val hasExisting = snapshot.items.isNotEmpty()
     return snapshot.copy(
         loading = !hasExisting,
@@ -62,14 +82,14 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
     )
   }
 
-  fun canLoadMore(snapshot: PaginationSnapshot<Item>, force: Boolean = false): Boolean {
+  fun canLoadMore(snapshot: OffsetPagingState<Item>, force: Boolean = false): Boolean {
     if (!snapshot.hasMore) return false
     if (snapshot.isLoadingMore || snapshot.loading || snapshot.refreshing) return false
     if (!force && snapshot.appendError != null) return false
     return true
   }
 
-  fun canLoadPrevious(snapshot: PaginationSnapshot<Item>, force: Boolean = false): Boolean {
+  fun canLoadPrevious(snapshot: OffsetPagingState<Item>): Boolean {
     if (!snapshot.canAutoLoadPrevious) return false
     if (
         snapshot.isLoadingPrevious ||
@@ -78,48 +98,56 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
             snapshot.refreshing
     )
         return false
-    if (!force && snapshot.prependError != null) return false
     return true
   }
 
   fun beginJump(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       targetOffset: Int,
-  ): PaginationSnapshot<Item> {
-    val hasExisting = snapshot.items.isNotEmpty()
+  ): OffsetPagingState<Item> {
+    val transactionId = snapshot.transactionId + 1
+    val targetPage = targetOffset.coerceAtLeast(0) / DEFAULT_PAGE_SIZE + 1
     return snapshot.copy(
+        items = emptyList(),
         startOffset = targetOffset.coerceAtLeast(0),
+        offset = targetOffset.coerceAtLeast(0),
         visibleOffset = targetOffset.coerceAtLeast(0),
-        loading = !hasExisting,
-        refreshing = hasExisting,
+        currentPage = targetPage,
+        loading = true,
+        refreshing = false,
         isLoadingPrevious = false,
         isLoadingMore = false,
         error = null,
         prependError = null,
         appendError = null,
+        viewport = PagingAnchor(),
+        navigationEffect = PagingEffect.ScrollToTop(transactionId),
+        transactionId = transactionId,
     )
   }
 
-  fun beginPrepend(snapshot: PaginationSnapshot<Item>): PaginationSnapshot<Item> =
+  fun beginPrepend(snapshot: OffsetPagingState<Item>): OffsetPagingState<Item> =
       snapshot.copy(isLoadingPrevious = true, prependError = null)
 
-  fun beginAppend(snapshot: PaginationSnapshot<Item>): PaginationSnapshot<Item> =
+  fun beginAppend(snapshot: OffsetPagingState<Item>): OffsetPagingState<Item> =
       snapshot.copy(isLoadingMore = true, appendError = null)
 
   fun reduceFirstPage(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       items: List<Item>,
       hasMore: Boolean,
       nextOffset: Int,
       pageInfo: PageInfo? = null,
       startOffset: Int = pageInfo?.currentOffset ?: 0,
-  ): PaginationSnapshot<Item> =
+  ): OffsetPagingState<Item> =
       snapshot.copy(
           items = items,
           startOffset = startOffset,
           offset = nextOffset,
           pageInfo = pageInfo,
           visibleOffset = startOffset,
+          currentPage = pageInfo?.currentPage ?: snapshot.currentPage,
+          lastPage = pageInfo?.lastPage ?: snapshot.lastPage,
           loading = false,
           refreshing = false,
           isLoadingPrevious = false,
@@ -131,9 +159,9 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
       )
 
   fun reduceFirstPageError(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       error: Throwable,
-  ): PaginationSnapshot<Item> =
+  ): OffsetPagingState<Item> =
       snapshot.copy(
           loading = false,
           refreshing = false,
@@ -143,29 +171,36 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
       )
 
   fun reduceJumpError(
-      previous: PaginationSnapshot<Item>,
+      previous: OffsetPagingState<Item>,
       error: Throwable,
-  ): PaginationSnapshot<Item> =
+  ): OffsetPagingState<Item> =
       previous.copy(
           loading = false,
           refreshing = false,
           isLoadingPrevious = false,
           isLoadingMore = false,
           error = error.toQueryError(),
+          transactionId = previous.transactionId + 1,
+          navigationEffect =
+              PagingEffect.RestoreViewport(
+                  previous.viewport,
+                  previous.transactionId + 1,
+              ),
       )
 
   fun reducePrepend(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       items: List<Item>,
       hasMore: Boolean,
       startOffset: Int,
       pageInfo: PageInfo? = null,
-  ): PaginationSnapshot<Item> {
+  ): OffsetPagingState<Item> {
     val merged = mergeByKey(items, snapshot.items)
     return snapshot.copy(
         items = merged,
         startOffset = startOffset,
         pageInfo = pageInfo ?: snapshot.pageInfo,
+        lastPage = pageInfo?.lastPage ?: snapshot.lastPage,
         visibleOffset = snapshot.visibleOffset,
         isLoadingPrevious = false,
         hasMore = hasMore,
@@ -174,17 +209,18 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
   }
 
   fun reduceAppend(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       items: List<Item>,
       hasMore: Boolean,
       nextOffset: Int,
       pageInfo: PageInfo? = null,
-  ): PaginationSnapshot<Item> {
+  ): OffsetPagingState<Item> {
     val merged = mergeByKey(snapshot.items, items)
     return snapshot.copy(
         items = merged,
         offset = nextOffset,
         pageInfo = pageInfo ?: snapshot.pageInfo,
+        lastPage = pageInfo?.lastPage ?: snapshot.lastPage,
         isLoadingMore = false,
         hasMore = hasMore,
         appendError = null,
@@ -192,35 +228,46 @@ class PaginationReducer<Item, Key>(private val keyOf: (Item) -> Key) {
   }
 
   fun reduceAppendError(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       error: Throwable,
-  ): PaginationSnapshot<Item> =
+  ): OffsetPagingState<Item> =
       snapshot.copy(
           isLoadingMore = false,
           appendError = error.toQueryError(),
       )
 
   fun reducePrependError(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       error: Throwable,
-  ): PaginationSnapshot<Item> =
+  ): OffsetPagingState<Item> =
       snapshot.copy(
           isLoadingPrevious = false,
           prependError = error.toQueryError(),
       )
 
   fun updateVisiblePage(
-      snapshot: PaginationSnapshot<Item>,
+      snapshot: OffsetPagingState<Item>,
       firstVisibleItemIndex: Int,
       pageSize: Int,
-  ): PaginationSnapshot<Item> {
-    val info = snapshot.pageInfo ?: return snapshot
+  ): OffsetPagingState<Item> {
+    return updateViewport(snapshot, firstVisibleItemIndex, 0, null, pageSize)
+  }
+
+  fun updateViewport(
+      snapshot: OffsetPagingState<Item>,
+      firstVisibleItemIndex: Int,
+      firstVisibleItemScrollOffset: Int,
+      anchorKey: String?,
+      pageSize: Int,
+  ): OffsetPagingState<Item> {
     if (snapshot.items.isEmpty() || pageSize <= 0) return snapshot
-    val relativeIndex =
-        firstVisibleItemIndex.coerceAtLeast(0).coerceAtMost(snapshot.items.lastIndex)
+    val relativeIndex = firstVisibleItemIndex.coerceIn(0, snapshot.items.lastIndex)
     val absoluteOffset = snapshot.startOffset + relativeIndex
-    if (snapshot.visibleOffset == absoluteOffset) return snapshot
-    return snapshot.copy(visibleOffset = absoluteOffset)
+    val page = absoluteOffset / pageSize + 1
+    val viewport =
+        PagingAnchor(anchorKey, relativeIndex, firstVisibleItemScrollOffset.coerceAtLeast(0))
+    if (snapshot.visibleOffset == absoluteOffset && snapshot.viewport == viewport) return snapshot
+    return snapshot.copy(visibleOffset = absoluteOffset, currentPage = page, viewport = viewport)
   }
 
   private fun mergeByKey(existing: List<Item>, incoming: List<Item>): List<Item> {

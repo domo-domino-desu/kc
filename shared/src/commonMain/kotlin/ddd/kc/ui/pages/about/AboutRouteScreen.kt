@@ -40,7 +40,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.generated.AboutMetadata
@@ -53,6 +52,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW4
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.OutputCircleW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ReceiptLongW400Outlined
 import ddd.kc.ui.app.LocalAppSettings
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.platform.PlatformTextFileDestination
@@ -85,6 +85,7 @@ import kotlin.coroutines.resume
 import kotlin.time.Clock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -92,7 +93,8 @@ private const val aboutProjectUrl = "https://github.com/domo-domino-desu/kc"
 private const val kemonosUrl = "https://github.com/Helandy/Kemonos"
 private val aboutHeaderBackground = Color(0xFF12284F)
 
-class AboutRouteScreen : Screen {
+@Serializable
+class AboutRouteScreen : AppScreen {
   override val key: String = "about-route"
 
   @Composable

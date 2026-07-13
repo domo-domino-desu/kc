@@ -18,15 +18,15 @@ import ddd.kc.data.remote.repository.CreatorRepository
 import ddd.kc.data.remote.repository.PostRepository
 import ddd.kc.data.remote.translation.TranslationBlockResult
 import ddd.kc.data.remote.translation.TranslationEngine
-import ddd.kc.ui.components.state.ContentTranslationState
-import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
-import ddd.kc.ui.components.state.PAGER_NEXT_PREFETCH_COUNT
-import ddd.kc.ui.components.state.PAGER_PREFETCH_DEBOUNCE_MS
-import ddd.kc.ui.components.state.PAGER_PREVIOUS_PREFETCH_COUNT
-import ddd.kc.ui.components.state.PaginationReducer
-import ddd.kc.ui.components.state.PaginationSnapshot
-import ddd.kc.ui.components.state.TranslationBlockState
-import ddd.kc.ui.components.state.TranslationStatus
+import ddd.kc.ui.components.paging.ContentTranslationState
+import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.paging.OffsetPagingMachine
+import ddd.kc.ui.components.paging.OffsetPagingState
+import ddd.kc.ui.components.paging.PAGER_NEXT_PREFETCH_COUNT
+import ddd.kc.ui.components.paging.PAGER_PREFETCH_DEBOUNCE_MS
+import ddd.kc.ui.components.paging.PAGER_PREVIOUS_PREFETCH_COUNT
+import ddd.kc.ui.components.paging.TranslationBlockState
+import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import ddd.kc.utils.logging.summarizePost
@@ -56,7 +56,7 @@ class PostScreenModel(
     StateScreenModel<PostPagerUiState>(
         PostPagerUiState(
             paging =
-                PaginationSnapshot(
+                OffsetPagingState(
                     items = initialPosts,
                     startOffset = initialOffset,
                     offset = initialOffset + initialPosts.size,
@@ -66,7 +66,7 @@ class PostScreenModel(
         )
     ) {
 
-  private val pagingReducer = PaginationReducer<Post, PostKey> { it.key }
+  private val pagingReducer = OffsetPagingMachine<Post, PostKey> { it.key }
   private var prefetchJob: Job? = null
   private val updatingFavoritePosts = mutableSetOf<PostKey>()
   private val loadedDetailIds = mutableSetOf<PostKey>()
@@ -159,10 +159,7 @@ class PostScreenModel(
 
   private fun loadPrevious() {
     val state = mutableState.value
-    if (
-        !pagingReducer.canLoadPrevious(state.paging, force = true) ||
-            pagingContext == PostPagingContext.None
-    )
+    if (!pagingReducer.canLoadPrevious(state.paging) || pagingContext == PostPagingContext.None)
         return
     val previousOffset = (state.startOffset - PAGE_SIZE).coerceAtLeast(0)
     log.i { "加载上一页Post -> 开始(offset=$previousOffset)" }

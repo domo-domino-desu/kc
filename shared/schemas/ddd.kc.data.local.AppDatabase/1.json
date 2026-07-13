@@ -2,21 +2,15 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "3237277800155f346741d9a3a9f36cea",
+    "identityHash": "46d0bf0ebab0c97a305c41940603bcb6",
     "entities": [
       {
         "tableName": "kc_cache",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`cacheKey` TEXT NOT NULL, `dataJson` TEXT NOT NULL, `cachedAtMs` INTEGER NOT NULL, PRIMARY KEY(`cacheKey`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`cacheKey` TEXT NOT NULL, `cachedAtMs` INTEGER NOT NULL, PRIMARY KEY(`cacheKey`))",
         "fields": [
           {
             "fieldPath": "cacheKey",
             "columnName": "cacheKey",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "dataJson",
-            "columnName": "dataJson",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -31,6 +25,52 @@
           "autoGenerate": false,
           "columnNames": ["cacheKey"]
         }
+      },
+      {
+        "tableName": "kc_cache_body_chunk",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`cacheKey` TEXT NOT NULL, `chunkIndex` INTEGER NOT NULL, `bodyChunk` TEXT NOT NULL, PRIMARY KEY(`cacheKey`, `chunkIndex`), FOREIGN KEY(`cacheKey`) REFERENCES `kc_cache`(`cacheKey`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "cacheKey",
+            "columnName": "cacheKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chunkIndex",
+            "columnName": "chunkIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bodyChunk",
+            "columnName": "bodyChunk",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": ["cacheKey", "chunkIndex"]
+        },
+        "indices": [
+          {
+            "name": "index_kc_cache_body_chunk_cacheKey",
+            "unique": false,
+            "columnNames": ["cacheKey"],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_kc_cache_body_chunk_cacheKey` ON `${TABLE_NAME}` (`cacheKey`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "kc_cache",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": ["cacheKey"],
+            "referencedColumns": ["cacheKey"]
+          }
+        ]
       },
       {
         "tableName": "kc_creator_history",
@@ -121,7 +161,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3237277800155f346741d9a3a9f36cea')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '46d0bf0ebab0c97a305c41940603bcb6')"
     ]
   }
 }

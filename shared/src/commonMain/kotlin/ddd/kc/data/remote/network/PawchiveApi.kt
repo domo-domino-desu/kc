@@ -155,16 +155,34 @@ class PawchiveApi(
     val doc = Ksoup.parse(body)
     if (doc.selectFirst(".no-results") != null) return emptyList()
     return doc.select(".dm-card, article.dm, .card-list__items article").mapNotNull { element ->
+      val userHref = element.selectFirst(".dms__user-link[href]")?.attr("href").orEmpty()
+      val pathParts = userHref.substringBefore('?').split('/').filter { it.isNotBlank() }
+      val service = element.attr("data-service").ifBlankOrNull() ?: pathParts.getOrNull(0)
+      val user = element.attr("data-user").ifBlankOrNull() ?: pathParts.valueAfter("user")
+      val artistName = element.selectFirst(".dm-card__user")?.text()?.trim()?.ifBlankOrNull()
       val content =
           element.selectFirst(".dm-card__content, .dm__content, .card__content")?.html()
               ?: element.text().takeIf { it.isNotBlank() }
       content?.let {
         DM(
             id = element.attr("data-id").ifBlank { null },
-            service = element.attr("data-service").ifBlank { null },
-            user = element.attr("data-user").ifBlank { null },
+            service = service,
+            user = user,
             content = it,
-            added = element.selectFirst("time")?.attr("datetime"),
+            added =
+                element.selectFirst("time")?.attr("datetime")?.ifBlankOrNull()
+                    ?: element
+                        .selectFirst(".dm-card__added")
+                        ?.text()
+                        ?.substringAfter("Published:", "")
+                        ?.trim()
+                        ?.ifBlankOrNull(),
+            artist =
+                if (service != null && user != null && artistName != null) {
+                  Creator(id = user, service = service, name = artistName)
+                } else {
+                  null
+                },
         )
       }
     }
@@ -221,10 +239,15 @@ class PawchiveApi(
   ): List<Comment> {
     val label = "请求Post评论(service=$service,creator=$creatorId,post=$postId)"
     val body =
-        gateway.getText(
-            "/api/v1/${service.encodeURLPathPart()}/user/${creatorId.encodeURLPathPart()}/post/${postId.encodeURLPathPart()}/comments",
-            label,
-        )
+        try {
+          gateway.getText(
+              "/api/v1/${service.encodeURLPathPart()}/user/${creatorId.encodeURLPathPart()}/post/${postId.encodeURLPathPart()}/comments",
+              label,
+          )
+        } catch (error: PawchiveApiException) {
+          if (error.statusCode == 404) return emptyList()
+          throw error
+        }
     return decode(body)
   }
 

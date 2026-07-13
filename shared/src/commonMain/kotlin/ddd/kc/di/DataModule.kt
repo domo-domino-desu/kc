@@ -37,8 +37,11 @@ fun dataModule() = module {
   single { ImageProgressTracker() }
   single(named(KOIN_QUALIFIER_CACHED_IMAGE_CLIENT)) { createCachedImageHttpClient(get()) }
   single { buildKcHttpClient(get()) }
+  single(named(KOIN_QUALIFIER_PAWCHIVE_CLIENT)) {
+    buildKcHttpClient(get(), followRedirects = false)
+  }
   single { AppSettings(get(), get()) }
-  single { PawchiveHttpGateway(get(), get(), get()) }
+  single { PawchiveHttpGateway(get(named(KOIN_QUALIFIER_PAWCHIVE_CLIENT)), get(), get()) }
   single { PawchiveApi(get(), get()) }
   single { TranslationDispatcher(get()) }
   single { TranslationEngine(get(), get()) }

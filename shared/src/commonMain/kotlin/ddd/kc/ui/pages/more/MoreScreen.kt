@@ -23,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -38,6 +37,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.PersonW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ReceiptLongW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.SettingsW400Outlined
 import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.isAtTop
@@ -69,6 +69,7 @@ import kc.shared.generated.resources.session_cookie_not_configured
 import kc.shared.generated.resources.settings
 import kc.shared.generated.resources.settings_summary
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -90,12 +91,12 @@ object MoreTab : Tab {
   }
 }
 
-class MoreScreen(
-    private val onReselectHandlerChanged: (((() -> Unit)?) -> Unit) = {},
-) : Screen {
+@Serializable
+class MoreScreen : AppScreen {
   @OptIn(ExperimentalMaterial3Api::class)
   @Composable
   override fun Content() {
+    val onReselectHandlerChanged = ddd.kc.ui.app.navigation.LocalRootTabReselectRegistration.current
     val navigator = LocalNavigator.currentOrThrow
     val screenModel = koinInject<MoreScreenModel>()
     val showToast = LocalShowToast.current

@@ -23,13 +23,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.data.model.key
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.BackAppBar
@@ -45,11 +45,13 @@ import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.favorites
 import kc.shared.generated.resources.favorites_tab_creators
 import kc.shared.generated.resources.favorites_tab_posts
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 
+@Serializable
 class FavoritesScreen(
     private val routeKey: String = nextRouteInstanceKey("favorites"),
-) : Screen {
+) : AppScreen {
   override val key: String = routeKey
 
   @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -107,7 +109,7 @@ class FavoritesScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                      items(state.creators, key = { it.key }) { creator ->
+                      items(state.creators, key = { "${it.service}:${it.id}" }) { creator ->
                         CreatorSearchCard(
                             creator = creator,
                             onClick = {
@@ -133,7 +135,10 @@ class FavoritesScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                      items(state.posts, key = { it.key }) { post ->
+                      items(
+                          state.posts,
+                          key = { "${it.service}:${it.artistId ?: it.user}:${it.id}" },
+                      ) { post ->
                         PostCard(
                             post = post,
                             onClick = {

@@ -1,4 +1,4 @@
-package ddd.kc.ui.components.state
+package ddd.kc.ui.components.paging
 
 const val PAGER_NEXT_PREFETCH_COUNT = 3
 const val PAGER_PREVIOUS_PREFETCH_COUNT = 1

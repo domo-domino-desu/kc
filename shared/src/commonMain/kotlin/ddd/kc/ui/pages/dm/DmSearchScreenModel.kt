@@ -7,9 +7,10 @@ import ddd.kc.data.model.DmKey
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.key
 import ddd.kc.data.remote.repository.CreatorRepository
-import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
-import ddd.kc.ui.components.state.PaginationReducer
-import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.paging.OffsetPagingMachine
+import ddd.kc.ui.components.paging.OffsetPagingState
+import ddd.kc.ui.components.paging.PagingAnchor
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
@@ -22,7 +23,7 @@ private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 data class DmSearchState(
     val query: String = "",
-    val paging: PaginationSnapshot<DM> = PaginationSnapshot(),
+    val paging: OffsetPagingState<DM> = OffsetPagingState(),
 ) {
   val dms
     get() = paging.items
@@ -66,7 +67,7 @@ data class DmSearchState(
 class DmSearchScreenModel(
     private val creatorRepo: CreatorRepository,
 ) : StateScreenModel<DmSearchState>(DmSearchState()) {
-  private val reducer = PaginationReducer<DM, DmKey> { it.key }
+  private val reducer = OffsetPagingMachine<DM, DmKey> { it.key }
   private var searchJob: Job? = null
   private var generation = 0L
 
@@ -136,9 +137,15 @@ class DmSearchScreenModel(
     }
   }
 
-  fun onVisibleItemIndex(firstVisibleItemIndex: Int) {
+  fun onViewportChanged(anchor: PagingAnchor) {
     updatePaging(
-        reducer.updateVisiblePage(mutableState.value.paging, firstVisibleItemIndex, PAGE_SIZE)
+        reducer.updateViewport(
+            mutableState.value.paging,
+            anchor.index,
+            anchor.offset,
+            anchor.itemKey,
+            PAGE_SIZE,
+        )
     )
   }
 
@@ -152,7 +159,7 @@ class DmSearchScreenModel(
       offset: Int,
       replace: Boolean = false,
       prepend: Boolean = false,
-      rollback: PaginationSnapshot<DM>? = null,
+      rollback: OffsetPagingState<DM>? = null,
       requestGeneration: Long = generation,
   ) {
     resultOfSuspend { creatorRepo.searchDMsPage(query, offset, forceRefresh = true) }
@@ -203,7 +210,7 @@ class DmSearchScreenModel(
         }
   }
 
-  private fun updatePaging(paging: PaginationSnapshot<DM>) {
+  private fun updatePaging(paging: OffsetPagingState<DM>) {
     mutableState.value = mutableState.value.copy(paging = paging)
   }
 }

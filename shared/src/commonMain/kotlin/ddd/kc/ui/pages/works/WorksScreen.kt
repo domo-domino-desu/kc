@@ -40,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.data.model.key
@@ -50,6 +49,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowLeftW40
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW400Outlined
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
@@ -57,8 +57,8 @@ import ddd.kc.ui.components.PostGridPagingActions
 import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.components.fullWidthItem
 import ddd.kc.ui.components.isAtTop
+import ddd.kc.ui.components.paging.ScrollPosition
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
-import ddd.kc.ui.components.state.ScrollPosition
 import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.ui.pages.recent.PopularDateBoundary
@@ -93,17 +93,18 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
 private val log = KcLog.withTag("WorksScreen")
 
-class WorksScreen(
-    private val onReselectHandlerChanged: (((() -> Unit)?) -> Unit) = {},
-) : Screen {
+@Serializable
+class WorksScreen : AppScreen {
   @OptIn(ExperimentalMaterial3ExpressiveApi::class)
   @Composable
   override fun Content() {
+    val onReselectHandlerChanged = ddd.kc.ui.app.navigation.LocalRootTabReselectRegistration.current
     val worksModel = koinInject<WorksScreenModel>()
     val worksState by worksModel.state.collectAsState()
 
@@ -209,7 +210,9 @@ private fun PopularWorksContent(
               isLoadingPrevious = state.isLoadingPrevious,
               hasMore = state.hasMore,
               canLoadPrevious = state.canAutoLoadPrevious,
+              prependErrorMessage = state.prependError?.localizedMessage(),
               appendErrorMessage = state.appendError?.localizedMessage(),
+              navigationEffect = state.paging.navigationEffect,
           ),
       actions =
           PostGridPagingActions(
@@ -217,7 +220,7 @@ private fun PopularWorksContent(
               onLoadMore = popularModel::loadMore,
               onLoadPrevious = popularModel::loadPrevious,
               onJumpToPage = popularModel::jumpToPage,
-              onVisiblePostIndex = popularModel::onVisiblePostIndex,
+              onViewportChanged = popularModel::onViewportChanged,
               onPostClick = { post ->
                 log.i { "打开Post -> 点击来源(source=popular,${summarizePost(post)})" }
                 navigator.push(
@@ -307,7 +310,9 @@ private fun PostSearchContent(
               isLoadingPrevious = state.isLoadingPrevious,
               hasMore = state.hasMore,
               canLoadPrevious = state.canAutoLoadPrevious,
+              prependErrorMessage = state.prependError?.localizedMessage(),
               appendErrorMessage = state.appendError?.localizedMessage(),
+              navigationEffect = state.paging.navigationEffect,
           ),
       actions =
           PostGridPagingActions(
@@ -315,7 +320,7 @@ private fun PostSearchContent(
               onLoadMore = screenModel::loadMore,
               onLoadPrevious = screenModel::loadPrevious,
               onJumpToPage = screenModel::jumpToPage,
-              onVisiblePostIndex = screenModel::onVisiblePostIndex,
+              onViewportChanged = screenModel::onViewportChanged,
               onPostClick = { post ->
                 log.i { "打开Post -> 点击来源(source=post-search,${summarizePost(post)})" }
                 navigator.push(

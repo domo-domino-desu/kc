@@ -44,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.data.model.key
@@ -52,17 +51,20 @@ import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ExpandMoreW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.SortW400Outlined
 import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.components.AutoLoadEffect
-import ddd.kc.ui.components.AutoLoadPreviousEffect
 import ddd.kc.ui.components.CreatorSearchCard
 import ddd.kc.ui.components.ErrorToastEffect
-import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.PageJumpFabMenu
+import ddd.kc.ui.components.PagedPullRefreshBox
 import ddd.kc.ui.components.SkeletonBlock
 import ddd.kc.ui.components.icons.pawchiveServices
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.loadingFooter
+import ddd.kc.ui.components.paging.PagingAnchor
+import ddd.kc.ui.components.paging.PagingEffect
+import ddd.kc.ui.components.previousPageHeader
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import kc.shared.generated.resources.Res
@@ -72,19 +74,21 @@ import kc.shared.generated.resources.filter_sort
 import kc.shared.generated.resources.search_creators_hint
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
-class CreatorsScreen(
-    private val onReselectHandlerChanged: (((() -> Unit)?) -> Unit) = {},
-) : Screen {
+@Serializable
+class CreatorsScreen : AppScreen {
   @Composable
   override fun Content() {
+    val onReselectHandlerChanged = ddd.kc.ui.app.navigation.LocalRootTabReselectRegistration.current
     val navigator = LocalNavigator.currentOrThrow
     val navigationWindows = LocalNavigationWindowStore.current
     val screenModel = koinInject<CreatorSearchScreenModel>()
     val state by screenModel.state.collectAsState()
     val appendErrorMessage = state.error?.localizedMessage()
+    val prependErrorMessage = state.paging.prependError?.localizedMessage()
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val refresh = { screenModel.refresh() }
@@ -98,10 +102,26 @@ class CreatorsScreen(
         }
 
     LaunchedEffect(Unit) { screenModel.init() }
-    LaunchedEffect(gridState) {
-      snapshotFlow { gridState.firstVisibleItemIndex }
+    LaunchedEffect(gridState, state.creators) {
+      snapshotFlow {
+            val index = (gridState.firstVisibleItemIndex - 2).coerceAtLeast(0)
+            PagingAnchor(
+                itemKey = state.creators.getOrNull(index)?.let { "${it.service}:${it.id}" },
+                index = index,
+                offset = gridState.firstVisibleItemScrollOffset,
+            )
+          }
           .distinctUntilChanged()
-          .collect { index -> screenModel.onVisibleCreatorIndex(index - 2) }
+          .collect(screenModel::onViewportChanged)
+    }
+    LaunchedEffect(state.paging.navigationEffect) {
+      when (val effect = state.paging.navigationEffect) {
+        is PagingEffect.ScrollToTop -> gridState.scrollToItem(0)
+        is PagingEffect.RestoreViewport ->
+            gridState.scrollToItem(effect.anchor.index + 2, effect.anchor.offset)
+        is PagingEffect.RebaseSelection,
+        null -> Unit
+      }
     }
     DisposableEffect(onReselectHandlerChanged) {
       val handler = { latestOnReselect() }
@@ -121,18 +141,14 @@ class CreatorsScreen(
           isLoadingMore = state.isLoadingMore,
           onLoadMore = screenModel::loadMore,
       )
-      AutoLoadPreviousEffect(
-          gridState,
-          state.creators.size,
-          hasPrevious = state.canAutoLoadPrevious,
-          isLoadingPrevious = state.isLoadingPrevious,
-          onLoadPrevious = screenModel::loadPrevious,
-      )
       Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        KcPullRefreshBox(
+        PagedPullRefreshBox(
+            currentPage = state.visiblePageInfo?.currentPage ?: 1,
             enabled = !state.isLoading,
             refreshing = state.result.isRefreshing,
+            loadingPrevious = state.isLoadingPrevious,
             onRefresh = refresh,
+            onLoadPrevious = screenModel::loadPrevious,
             modifier = Modifier.fillMaxSize(),
         ) {
           LazyVerticalGrid(
@@ -228,6 +244,13 @@ class CreatorsScreen(
               }
             }
 
+            previousPageHeader(
+                canLoadPrevious = state.canAutoLoadPrevious,
+                loadingPrevious = state.isLoadingPrevious,
+                errorMessage = prependErrorMessage,
+                onLoadPrevious = screenModel::loadPrevious,
+            )
+
             if (state.isLoading && state.creators.isEmpty()) {
               items(List(64) { it }, key = { "artists-skeleton-$it" }) {
                 SkeletonBlock(
@@ -257,10 +280,7 @@ class CreatorsScreen(
         PageJumpFabMenu(
             pageInfo = state.visiblePageInfo,
             loading = state.isLoading || state.isLoadingMore || state.isLoadingPrevious,
-            onJumpToPage = { page ->
-              screenModel.jumpToPage(page)
-              scope.launch { gridState.scrollToItem(0) }
-            },
+            onJumpToPage = screenModel::jumpToPage,
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         )
       }

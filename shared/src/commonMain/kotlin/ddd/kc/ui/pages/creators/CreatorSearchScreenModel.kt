@@ -9,9 +9,10 @@ import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.key
 import ddd.kc.data.remote.network.asException
 import ddd.kc.data.remote.repository.CreatorRepository
-import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
-import ddd.kc.ui.components.state.PaginationReducer
-import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.paging.OffsetPagingMachine
+import ddd.kc.ui.components.paging.OffsetPagingState
+import ddd.kc.ui.components.paging.PagingAnchor
 import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.order_asc
@@ -67,7 +68,7 @@ data class CreatorSearchState(
     val sortOrder: SortOrder = SortOrder.DESC,
     val allCreators: List<Creator> = emptyList(),
     val filteredCount: Int = 0,
-    val paging: PaginationSnapshot<Creator> = PaginationSnapshot(loading = true),
+    val paging: OffsetPagingState<Creator> = OffsetPagingState(loading = true),
 ) {
   val creators
     get() = paging.items
@@ -105,7 +106,7 @@ data class CreatorSearchState(
 class CreatorSearchScreenModel(
     private val creatorRepo: CreatorRepository,
 ) : StateScreenModel<CreatorSearchState>(CreatorSearchState()) {
-  private val reducer = PaginationReducer<Creator, CreatorKey> { it.key }
+  private val reducer = OffsetPagingMachine<Creator, CreatorKey> { it.key }
   private var searchJob: Job? = null
 
   fun init() {
@@ -174,12 +175,20 @@ class CreatorSearchScreenModel(
   fun jumpToPage(page: Int) {
     val state = mutableState.value
     val targetPage = page.coerceIn(1, state.paging.pageInfo?.lastPage ?: page.coerceAtLeast(1))
-    replaceWindow((targetPage - 1) * PAGE_SIZE)
+    val offset = (targetPage - 1) * PAGE_SIZE
+    updatePaging(reducer.beginJump(state.paging, offset))
+    replaceWindow(offset)
   }
 
-  fun onVisibleCreatorIndex(firstVisibleCreatorIndex: Int) {
+  fun onViewportChanged(anchor: PagingAnchor) {
     updatePaging(
-        reducer.updateVisiblePage(mutableState.value.paging, firstVisibleCreatorIndex, PAGE_SIZE)
+        reducer.updateViewport(
+            mutableState.value.paging,
+            anchor.index,
+            anchor.offset,
+            anchor.itemKey,
+            PAGE_SIZE,
+        )
     )
   }
 
@@ -261,7 +270,7 @@ class CreatorSearchScreenModel(
     )
   }
 
-  private fun updatePaging(paging: PaginationSnapshot<Creator>) {
+  private fun updatePaging(paging: OffsetPagingState<Creator>) {
     mutableState.value = mutableState.value.copy(paging = paging)
   }
 }

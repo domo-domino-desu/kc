@@ -19,15 +19,23 @@ import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okio.Path.Companion.toPath
@@ -51,6 +59,9 @@ class PawchiveApiTest {
 
   private fun client(
       settings: AppSettings = settings(),
+      headersFor: (HttpRequestData) -> Headers = {
+        headersOf(HttpHeaders.ContentType, ContentType.Text.Html.toString())
+      },
       handler: (HttpRequestData) -> Pair<HttpStatusCode, String>,
   ): Pair<PawchiveApi, List<HttpRequestData>> {
     val requests = mutableListOf<HttpRequestData>()
@@ -60,10 +71,14 @@ class PawchiveApiTest {
       respond(
           content = body,
           status = status,
-          headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Html.toString()),
+          headers = headersFor(request),
       )
     }
-    val httpClient = HttpClient(engine) { install(ContentNegotiation) { json(json) } }
+    val httpClient =
+        HttpClient(engine) {
+          followRedirects = false
+          install(ContentNegotiation) { json(json) }
+        }
     val sessionStore = KcSessionStore(TestSecretStore())
     sessionStore.saveSession("session=test_session; path=/")
     val gateway = PawchiveHttpGateway(httpClient, settings, sessionStore)
@@ -81,7 +96,7 @@ class PawchiveApiTest {
                 "/posts" -> TestFixtures.read("pawchive.st__posts__service-patreon.html")
                 "/posts/popular" -> TestFixtures.read("pawchive.st__posts__popular.html")
                 "/posts/tags" -> TestFixtures.read("pawchive.st__posts__tags.html")
-                "/dms" -> TestFixtures.read("pawchive.st__dms__search-test.html")
+                "/dms" -> TestFixtures.read("pawchive.pw__dms.html")
                 "/api/v1/patreon/user/artist" -> creatorPostsJson
                 "/patreon/user/artist" ->
                     TestFixtures.read("pawchive.st__patreon__user__3295915.html")
@@ -111,7 +126,7 @@ class PawchiveApiTest {
     )
     assertTrue(api.parsePopularPostsPage(api.fetchPopularPostsBody()).posts.isNotEmpty())
     assertTrue(api.parseTags(api.fetchTagsBody()).any { it.tag == "nsfw" && it.count > 0 })
-    assertEquals(emptyList(), api.parseDms(api.fetchDmsBody(offset = 0)))
+    assertTrue(api.parseDms(api.fetchDmsBody(offset = 0)).isNotEmpty())
     val creatorPage =
         api.parsePostCardsPage(api.fetchCreatorPostsPageBody("patreon", "artist", 0), 0)
     assertTrue(creatorPage.items.isNotEmpty())
@@ -173,6 +188,308 @@ class PawchiveApiTest {
   }
 
   @Test
+  fun permanentRedirectUpdatesBaseUrlAndRetriesGetWithQuery() = runBlocking {
+    val settings = settings()
+    val (api, requests) =
+        client(
+            settings = settings,
+            headersFor = { request ->
+              if (request.url.host == "pawchive.st") {
+                headersOf(
+                    HttpHeaders.Location,
+                    "https://pawchive.pw${request.url.encodedPathAndQuery}",
+                )
+              } else {
+                headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+              }
+            },
+        ) { request ->
+          if (request.url.host == "pawchive.st") HttpStatusCode.MovedPermanently to ""
+          else HttpStatusCode.OK to postsJson
+        }
+
+    api.fetchRecentPostsBody(offset = 50)
+
+    assertEquals("https://pawchive.pw", settings.baseUrl())
+    assertEquals("https://img.pawchive.pw", settings.cdnUrl())
+    assertEquals(listOf("pawchive.st", "pawchive.pw"), requests.map { it.url.host })
+    assertTrue(requests.all { it.url.parameters["o"] == "50" })
+  }
+
+  @Test
+  fun canonicalEndpointCanSwitchBackToPreviousDomain() = runBlocking {
+    val settings = settings()
+    settings.save(settings.snapshot().copy(pawchiveBaseUrl = "https://pawchive.pw"))
+    val (api, requests) =
+        client(
+            settings = settings,
+            headersFor = { request ->
+              if (request.url.host == "pawchive.pw") {
+                headersOf(
+                    HttpHeaders.Location,
+                    "https://pawchive.st${request.url.encodedPathAndQuery}",
+                )
+              } else {
+                headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+              }
+            },
+        ) { request ->
+          if (request.url.host == "pawchive.pw") HttpStatusCode.MovedPermanently to ""
+          else HttpStatusCode.OK to creatorsJson
+        }
+
+    api.fetchCreatorsBody()
+
+    assertEquals("https://pawchive.st", settings.baseUrl())
+    assertEquals(listOf("pawchive.pw", "pawchive.st"), requests.map { it.url.host })
+  }
+
+  @Test
+  fun permanentRedirectPreservesPostAndDeleteMethodsAndSession() = runBlocking {
+    suspend fun verify(method: HttpMethod, action: suspend (PawchiveApi) -> Unit) {
+      val settings = settings()
+      val (api, requests) =
+          client(
+              settings = settings,
+              headersFor = { request ->
+                if (request.url.host == "pawchive.st") {
+                  headersOf(
+                      HttpHeaders.Location,
+                      "https://pawchive.pw${request.url.encodedPathAndQuery}",
+                  )
+                } else {
+                  headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                }
+              },
+          ) { request ->
+            if (request.url.host == "pawchive.st") HttpStatusCode.PermanentRedirect to ""
+            else HttpStatusCode.OK to "{}"
+          }
+
+      action(api)
+
+      assertEquals(listOf(method, method), requests.map { it.method })
+      assertTrue(requests.all { it.headers[HttpHeaders.Cookie] == "session=test_session" })
+      assertEquals("https://pawchive.pw", settings.baseUrl())
+    }
+
+    verify(HttpMethod.Post) { it.addFavoriteCreator("patreon", "artist") }
+    verify(HttpMethod.Delete) { it.removeFavoriteCreator("patreon", "artist") }
+  }
+
+  @Test
+  fun unknownHttpsCanonicalOriginIsAccepted() = runBlocking {
+    val settings = settings()
+    val (api, requests) =
+        client(
+            settings = settings,
+            headersFor = { request ->
+              if (request.url.host == "pawchive.st") {
+                headersOf(
+                    HttpHeaders.Location,
+                    "https://archive.example${request.url.encodedPathAndQuery}",
+                )
+              } else {
+                headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+              }
+            },
+        ) { request ->
+          if (request.url.host == "pawchive.st") HttpStatusCode.MovedPermanently to ""
+          else HttpStatusCode.OK to creatorsJson
+        }
+
+    api.fetchCreatorsBody()
+
+    assertEquals("https://archive.example", settings.baseUrl())
+    assertEquals(listOf("pawchive.st", "archive.example"), requests.map { it.url.host })
+  }
+
+  @Test
+  fun temporarySameOriginRedirectDoesNotChangeSetting() = runBlocking {
+    val settings = settings()
+    val (api, requests) =
+        client(
+            settings = settings,
+            headersFor = { request ->
+              if (request.url.encodedPath == "/api/v1/creators") {
+                headersOf(HttpHeaders.Location, "https://pawchive.st/maintenance")
+              } else {
+                headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+              }
+            },
+        ) { request ->
+          if (request.url.encodedPath == "/api/v1/creators") HttpStatusCode.Found to ""
+          else HttpStatusCode.OK to creatorsJson
+        }
+
+    api.fetchCreatorsBody()
+
+    assertEquals(AppSettings.PAWCHIVE_DEFAULT_BASE_URL, settings.baseUrl())
+    assertEquals(listOf("/api/v1/creators", "/maintenance"), requests.map { it.url.encodedPath })
+  }
+
+  @Test
+  fun concurrentRedirectsConvergeOnOneCanonicalOrigin() = runBlocking {
+    val settings = settings()
+    val requests = java.util.Collections.synchronizedList(mutableListOf<HttpRequestData>())
+    val engine = MockEngine { request ->
+      requests += request
+      if (request.url.host == "pawchive.st") {
+        respond(
+            content = "",
+            status = HttpStatusCode.MovedPermanently,
+            headers =
+                headersOf(
+                    HttpHeaders.Location,
+                    "https://pawchive.pw${request.url.encodedPathAndQuery}",
+                ),
+        )
+      } else {
+        respond(content = creatorsJson, status = HttpStatusCode.OK)
+      }
+    }
+    val httpClient = HttpClient(engine) { followRedirects = false }
+    val gateway = PawchiveHttpGateway(httpClient, settings, KcSessionStore(TestSecretStore()))
+    val api = PawchiveApi(gateway, json)
+
+    coroutineScope { List(8) { async { api.fetchCreatorsBody() } }.awaitAll() }
+
+    assertEquals("https://pawchive.pw", settings.baseUrl())
+    assertEquals(8, requests.count { it.url.host == "pawchive.pw" })
+  }
+
+  @Test
+  fun lateRedirectDoesNotOverwriteNewerUserEndpoint() = runBlocking {
+    val settings = settings()
+    val oldRequestStarted = CompletableDeferred<Unit>()
+    val releaseOldResponse = CompletableDeferred<Unit>()
+    val requests = java.util.Collections.synchronizedList(mutableListOf<HttpRequestData>())
+    val engine = MockEngine { request ->
+      requests += request
+      if (request.url.host == "pawchive.st") {
+        oldRequestStarted.complete(Unit)
+        releaseOldResponse.await()
+        respond(
+            content = "",
+            status = HttpStatusCode.MovedPermanently,
+            headers =
+                headersOf(
+                    HttpHeaders.Location,
+                    "https://pawchive.pw${request.url.encodedPathAndQuery}",
+                ),
+        )
+      } else {
+        respond(content = creatorsJson, status = HttpStatusCode.OK)
+      }
+    }
+    val httpClient = HttpClient(engine) { followRedirects = false }
+    val api =
+        PawchiveApi(
+            PawchiveHttpGateway(httpClient, settings, KcSessionStore(TestSecretStore())),
+            json,
+        )
+
+    val request = async { api.fetchCreatorsBody() }
+    oldRequestStarted.await()
+    settings.save(settings.snapshot().copy(pawchiveBaseUrl = "https://custom.example"))
+    releaseOldResponse.complete(Unit)
+    request.await()
+
+    assertEquals("https://custom.example", settings.baseUrl())
+    assertEquals(listOf("pawchive.st", "custom.example"), requests.map { it.url.host })
+  }
+
+  @Test
+  fun redirectLoopAndRedirectLimitAreExplicitFailures() = runBlocking {
+    val loopSettings = settings()
+    val (loopApi, loopRequests) =
+        client(
+            settings = loopSettings,
+            headersFor = { request ->
+              val target =
+                  if (request.url.encodedPath == "/api/v1/creators") "/maintenance"
+                  else "/api/v1/creators"
+              headersOf(HttpHeaders.Location, target)
+            },
+        ) {
+          HttpStatusCode.Found to ""
+        }
+
+    assertFailsWith<PawchiveApiException> { loopApi.fetchCreatorsBody() }
+    assertEquals(3, loopRequests.size)
+    assertEquals(AppSettings.PAWCHIVE_DEFAULT_BASE_URL, loopSettings.baseUrl())
+
+    val limitSettings = settings()
+    val (limitApi, limitRequests) =
+        client(
+            settings = limitSettings,
+            headersFor = { request ->
+              val next =
+                  if (request.url.host == "pawchive.st") 1
+                  else request.url.host.removePrefix("hop").substringBefore('.').toInt() + 1
+              headersOf(
+                  HttpHeaders.Location,
+                  "https://hop$next.example${request.url.encodedPathAndQuery}",
+              )
+            },
+        ) {
+          HttpStatusCode.PermanentRedirect to ""
+        }
+
+    assertFailsWith<PawchiveApiException> { limitApi.fetchCreatorsBody() }
+    assertEquals(MAX_EXPECTED_REDIRECT_REQUESTS, limitRequests.size)
+  }
+
+  @Test
+  fun canonicalRedirectValidationRejectsUnsafeOrResourceSpecificTargets() {
+    val source = Url("https://pawchive.st/api/v1/posts?o=50")
+
+    assertNull(
+        canonicalRedirectOrigin(
+            source,
+            Url("http://pawchive.pw/api/v1/posts?o=50"),
+            HttpStatusCode.MovedPermanently,
+        )
+    )
+    assertNull(
+        canonicalRedirectOrigin(
+            source,
+            Url("https://user@pawchive.pw/api/v1/posts?o=50"),
+            HttpStatusCode.MovedPermanently,
+        )
+    )
+    assertNull(
+        canonicalRedirectOrigin(
+            source,
+            Url("https://pawchive.pw/other?o=50"),
+            HttpStatusCode.MovedPermanently,
+        )
+    )
+    assertNull(
+        canonicalRedirectOrigin(
+            source,
+            Url("https://pawchive.pw/api/v1/posts?o=51"),
+            HttpStatusCode.MovedPermanently,
+        )
+    )
+    assertNull(
+        canonicalRedirectOrigin(
+            source,
+            Url("https://pawchive.pw/api/v1/posts?o=50"),
+            HttpStatusCode.Found,
+        )
+    )
+    assertEquals(
+        "https://pawchive.pw",
+        canonicalRedirectOrigin(
+            source,
+            Url("https://pawchive.pw/api/v1/posts?o=50"),
+            HttpStatusCode.PermanentRedirect,
+        ),
+    )
+  }
+
+  @Test
   fun favorites401BecomesAuthRequired() = runBlocking {
     val (api, _) = client { HttpStatusCode.Unauthorized to "{}" }
     assertFailsWith<AuthRequiredException> { api.getFavorites(type = "artist") }
@@ -180,8 +497,14 @@ class PawchiveApiTest {
   }
 
   @Test
-  fun comments404RemainsAnExplicitHttpFailure() = runBlocking {
+  fun comments404BecomesEmptyComments() = runBlocking {
     val (api, _) = client { HttpStatusCode.NotFound to """{"error":"not found"}""" }
+    assertEquals(emptyList(), api.getPostComments("fanbox", "artist", "post1"))
+  }
+
+  @Test
+  fun commentsNon404RemainsAnExplicitHttpFailure() = runBlocking {
+    val (api, _) = client { HttpStatusCode.InternalServerError to """{"error":"server"}""" }
     assertFailsWith<PawchiveApiException> { api.getPostComments("fanbox", "artist", "post1") }
     Unit
   }
@@ -263,8 +586,12 @@ class PawchiveApiTest {
         api.parseCreatorTags(TestFixtures.read("pawchive.st__patreon__user__3295915__tags.html"))
     assertTrue(creatorTags.any { it.tag == "Animation" && it.count > 0 })
 
-    val dmsPage = api.parseDmsPage(TestFixtures.read("pawchive.st__dms__search-test.html"))
-    assertEquals(emptyList(), dmsPage.items)
+    val dmsPage = api.parseDmsPage(TestFixtures.read("pawchive.pw__dms.html"))
+    assertTrue(dmsPage.items.isNotEmpty())
+    assertEquals("patreon", dmsPage.items.first().service)
+    assertTrue(dmsPage.items.first().user.orEmpty().isNotBlank())
+    assertTrue(dmsPage.items.first().content.orEmpty().isNotBlank())
+    assertTrue(dmsPage.items.any { it.artist?.name.orEmpty().isNotBlank() })
     assertEquals(null, dmsPage.pageInfo)
 
     assertEquals(
@@ -308,6 +635,7 @@ class PawchiveApiTest {
   }
 
   private companion object {
+    const val MAX_EXPECTED_REDIRECT_REQUESTS = 6
     const val creatorsJson =
         """[
           {"id":"artist","name":"Artist One","service":"patreon","indexed":10,"updated":20,"favorited":5,"public_id":"artist_one"},

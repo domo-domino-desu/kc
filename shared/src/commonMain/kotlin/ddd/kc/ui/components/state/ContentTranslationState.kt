@@ -1,4 +1,4 @@
-package ddd.kc.ui.components.state
+package ddd.kc.ui.components.paging
 
 data class TranslationBlockState(
     val originalHtml: String,

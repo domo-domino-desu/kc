@@ -10,9 +10,10 @@ import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.key
 import ddd.kc.data.remote.repository.PostRepository
 import ddd.kc.data.remote.repository.awaitData
-import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
-import ddd.kc.ui.components.state.PaginationReducer
-import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.paging.OffsetPagingMachine
+import ddd.kc.ui.components.paging.OffsetPagingState
+import ddd.kc.ui.components.paging.PagingAnchor
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlin.time.Clock
@@ -41,7 +42,7 @@ data class PopularPostsState(
     val date: String? = defaultPopularDate(PopularPeriod.DAY),
     val info: PopularInfo? = null,
     val props: PopularProps? = null,
-    val paging: PaginationSnapshot<Post> = PaginationSnapshot(loading = true),
+    val paging: OffsetPagingState<Post> = OffsetPagingState(loading = true),
 ) {
   val posts
     get() = paging.items
@@ -97,7 +98,7 @@ data class PopularPostsState(
 class PopularPostsScreenModel(
     private val postRepo: PostRepository,
 ) : StateScreenModel<PopularPostsState>(PopularPostsState()) {
-  private val reducer = PaginationReducer<Post, PostKey> { it.key }
+  private val reducer = OffsetPagingMachine<Post, PostKey> { it.key }
   private var generation: Long = 0
 
   fun load(forceRefresh: Boolean = false) {
@@ -138,9 +139,15 @@ class PopularPostsScreenModel(
     }
   }
 
-  fun onVisiblePostIndex(firstVisiblePostIndex: Int) {
+  fun onViewportChanged(anchor: PagingAnchor) {
     updatePaging(
-        reducer.updateVisiblePage(mutableState.value.paging, firstVisiblePostIndex, PAGE_SIZE)
+        reducer.updateViewport(
+            mutableState.value.paging,
+            anchor.index,
+            anchor.offset,
+            anchor.itemKey,
+            PAGE_SIZE,
+        )
     )
   }
 
@@ -183,7 +190,7 @@ class PopularPostsScreenModel(
         mutableState.value.copy(
             date = normalizedDate,
             period = period,
-            paging = PaginationSnapshot(loading = true),
+            paging = OffsetPagingState(loading = true),
         )
     screenModelScope.launch { loadPage(offset = 0, forceRefresh = false, replace = true) }
   }
@@ -279,7 +286,7 @@ class PopularPostsScreenModel(
         }
   }
 
-  private fun updatePaging(paging: PaginationSnapshot<Post>) {
+  private fun updatePaging(paging: OffsetPagingState<Post>) {
     mutableState.value = mutableState.value.copy(paging = paging)
   }
 

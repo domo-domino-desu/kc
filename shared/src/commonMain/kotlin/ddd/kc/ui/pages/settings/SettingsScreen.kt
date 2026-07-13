@@ -201,6 +201,7 @@ internal fun SettingsScreen(
       }
 
   var draft by remember { mutableStateOf(persisted) }
+  var previousPersisted by remember { mutableStateOf(persisted) }
   var initialized by remember { mutableStateOf(false) }
   val saving = saveState.saving
   var showApiKey by remember { mutableStateOf(false) }
@@ -221,9 +222,11 @@ internal fun SettingsScreen(
   LaunchedEffect(persisted) {
     if (!initialized) {
       draft = persisted
+      previousPersisted = persisted
       initialized = true
-    } else if (draft == persisted) {
-      draft = persisted
+    } else {
+      draft = mergePersistedSettingsDraft(draft, previousPersisted, persisted)
+      previousPersisted = persisted
     }
   }
 

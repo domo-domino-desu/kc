@@ -27,7 +27,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.DmKey
 import ddd.kc.data.model.key
@@ -35,33 +34,37 @@ import ddd.kc.data.remote.translation.TranslationBlock
 import ddd.kc.data.remote.translation.TranslationBlockResult
 import ddd.kc.data.remote.translation.TranslationEngine
 import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.components.AutoLoadEffect
-import ddd.kc.ui.components.AutoLoadPreviousEffect
 import ddd.kc.ui.components.DmCard
 import ddd.kc.ui.components.ErrorToastEffect
-import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.ListLoadingSkeleton
 import ddd.kc.ui.components.PageJumpFabMenu
+import ddd.kc.ui.components.PagedPullRefreshBox
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.loadingFooter
+import ddd.kc.ui.components.paging.ContentTranslationState
+import ddd.kc.ui.components.paging.PagingAnchor
+import ddd.kc.ui.components.paging.PagingEffect
+import ddd.kc.ui.components.paging.TranslationBlockState
+import ddd.kc.ui.components.paging.TranslationStatus
+import ddd.kc.ui.components.previousPageHeader
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
-import ddd.kc.ui.components.state.ContentTranslationState
-import ddd.kc.ui.components.state.TranslationBlockState
-import ddd.kc.ui.components.state.TranslationStatus
 import ddd.kc.ui.pages.recent.RecentDMsScreenModel
 import ddd.kc.utils.coroutines.resultOfSuspend
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.search_dms_hint
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
-class DmScreen(
-    private val onReselectHandlerChanged: (((() -> Unit)?) -> Unit) = {},
-) : Screen {
+@Serializable
+class DmScreen : AppScreen {
   @Composable
   override fun Content() {
+    val onReselectHandlerChanged = ddd.kc.ui.app.navigation.LocalRootTabReselectRegistration.current
     val searchModel = koinInject<DmSearchScreenModel>()
     val recentModel = koinInject<RecentDMsScreenModel>()
     val translationService = koinInject<TranslationEngine>()
@@ -96,16 +99,45 @@ class DmScreen(
       searchModel.init()
       recentModel.load()
     }
-    LaunchedEffect(listState, searchState.query.isBlank()) {
-      snapshotFlow { listState.firstVisibleItemIndex }
+    LaunchedEffect(listState, searchState.query.isBlank(), searchState.dms, recentState.items) {
+      snapshotFlow {
+            val index = (listState.firstVisibleItemIndex - 1).coerceAtLeast(0)
+            val itemKey =
+                if (searchState.query.isBlank()) {
+                  recentState.items.getOrNull(index)?.let {
+                    "${it.service}:${it.user}:${it.id}:${it.hash}"
+                  }
+                } else {
+                  searchState.dms.getOrNull(index)?.let {
+                    "${it.service}:${it.user}:${it.id}:${it.hash}"
+                  }
+                }
+            PagingAnchor(
+                itemKey = itemKey,
+                index = index,
+                offset = listState.firstVisibleItemScrollOffset,
+            )
+          }
           .distinctUntilChanged()
-          .collect { index ->
+          .collect { anchor ->
             if (searchState.query.isBlank()) {
-              recentModel.onVisibleItemIndex(index - 1)
+              recentModel.onViewportChanged(anchor)
             } else {
-              searchModel.onVisibleItemIndex(index - 1)
+              searchModel.onViewportChanged(anchor)
             }
           }
+    }
+    val navigationEffect =
+        if (searchState.query.isBlank()) recentState.navigationEffect
+        else searchState.paging.navigationEffect
+    LaunchedEffect(navigationEffect, searchState.query.isBlank()) {
+      when (val effect = navigationEffect) {
+        is PagingEffect.ScrollToTop -> listState.scrollToItem(0)
+        is PagingEffect.RestoreViewport ->
+            listState.scrollToItem(effect.anchor.index + 1, effect.anchor.offset)
+        is PagingEffect.RebaseSelection,
+        null -> Unit
+      }
     }
     DisposableEffect(onReselectHandlerChanged) {
       val handler = { latestOnReselect() }
@@ -117,6 +149,8 @@ class DmScreen(
     ErrorToastEffect(searchState.prependError?.localizedMessage())
     val recentAppendErrorMessage = recentState.appendError?.localizedMessage()
     val searchAppendErrorMessage = searchState.appendError?.localizedMessage()
+    val recentPrependErrorMessage = recentState.prependError?.localizedMessage()
+    val searchPrependErrorMessage = searchState.prependError?.localizedMessage()
 
     val translateDm: (DM) -> Unit = translateDm@{ dm ->
       if (!translationService.isEnabled()) return@translateDm
@@ -189,11 +223,19 @@ class DmScreen(
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { paddingValues ->
       val isSearchMode = searchState.query.isNotBlank()
       Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        KcPullRefreshBox(
+        PagedPullRefreshBox(
+            currentPage =
+                if (isSearchMode) searchState.visiblePageInfo?.currentPage ?: 1
+                else recentState.visiblePageInfo?.currentPage ?: 1,
             enabled = if (isSearchMode) !searchState.isLoading else !recentState.loading,
             refreshing =
                 if (isSearchMode) searchState.result.isRefreshing else recentState.refreshing,
+            loadingPrevious =
+                if (isSearchMode) searchState.isLoadingPrevious else recentState.isLoadingPrevious,
             onRefresh = refresh,
+            onLoadPrevious = {
+              if (isSearchMode) searchModel.loadPrevious() else recentModel.loadPrevious()
+            },
             modifier = Modifier.fillMaxSize(),
         ) {
           LazyColumn(
@@ -212,11 +254,29 @@ class DmScreen(
               )
             }
 
+            val canLoadPrevious =
+                if (isSearchMode) searchState.canAutoLoadPrevious
+                else recentState.canAutoLoadPrevious
+            val loadingPrevious =
+                if (isSearchMode) searchState.isLoadingPrevious else recentState.isLoadingPrevious
+            previousPageHeader(
+                canLoadPrevious = canLoadPrevious,
+                loadingPrevious = loadingPrevious,
+                errorMessage =
+                    if (isSearchMode) searchPrependErrorMessage else recentPrependErrorMessage,
+                onLoadPrevious = {
+                  if (isSearchMode) searchModel.loadPrevious() else recentModel.loadPrevious()
+                },
+            )
+
             if (searchState.query.isBlank()) {
               if (recentState.loading && recentState.items.isEmpty()) {
                 item(key = "recent-dms-skeleton") { ListLoadingSkeleton(itemHeightDp = 96) }
               } else {
-                items(recentState.items, key = { it.key }) { dm ->
+                items(
+                    recentState.items,
+                    key = { "${it.service}:${it.user}:${it.hash}:${it.id}:${it.added}" },
+                ) { dm ->
                   DmCard(
                       dm = dm,
                       translationState = dmTranslations[dm.translationKey()],
@@ -231,7 +291,10 @@ class DmScreen(
             } else if (searchState.isLoading && searchState.dms.isEmpty()) {
               item(key = "search-dms-skeleton") { ListLoadingSkeleton(itemHeightDp = 96) }
             } else {
-              items(searchState.dms, key = { it.key }) { dm ->
+              items(
+                  searchState.dms,
+                  key = { "${it.service}:${it.user}:${it.hash}:${it.id}:${it.added}" },
+              ) { dm ->
                 DmCard(
                     dm = dm,
                     translationState = dmTranslations[dm.translationKey()],
@@ -259,7 +322,6 @@ class DmScreen(
                 },
             onJumpToPage = { page ->
               if (isSearchMode) searchModel.jumpToPage(page) else recentModel.jumpToPage(page)
-              scope.launch { listState.scrollToItem(0) }
             },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         )
@@ -276,13 +338,6 @@ class DmScreen(
           isLoadingMore = recentState.isLoadingMore,
           onLoadMore = recentModel::loadMore,
       )
-      AutoLoadPreviousEffect(
-          listState = listState,
-          totalItems = recentState.items.size,
-          hasPrevious = recentState.canAutoLoadPrevious,
-          isLoadingPrevious = recentState.isLoadingPrevious,
-          onLoadPrevious = recentModel::loadPrevious,
-      )
     } else {
       AutoLoadEffect(
           listState = listState,
@@ -290,13 +345,6 @@ class DmScreen(
           hasMore = searchState.hasMore,
           isLoadingMore = searchState.isLoadingMore,
           onLoadMore = searchModel::loadMore,
-      )
-      AutoLoadPreviousEffect(
-          listState = listState,
-          totalItems = searchState.dms.size,
-          hasPrevious = searchState.canAutoLoadPrevious,
-          isLoadingPrevious = searchState.isLoadingPrevious,
-          onLoadPrevious = searchModel::loadPrevious,
       )
     }
   }

@@ -1,8 +1,6 @@
 package ddd.kc.ui.app.navigation
 
 import androidx.compose.ui.platform.UriHandler
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.Navigator
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.key
@@ -10,7 +8,7 @@ import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.post.PostRouteScreen
 
 class KcLinkUriHandler(
-    private val navigator: Navigator,
+    private val openInternal: (AppScreen) -> Unit,
     private val fallback: UriHandler,
     private val navigationWindows: NavigationWindowStore,
 ) : UriHandler {
@@ -20,11 +18,11 @@ class KcLinkUriHandler(
       fallback.openUri(uri)
       return
     }
-    navigator.push(target)
+    openInternal(target)
   }
 }
 
-internal fun parseKcRouteTarget(url: String, navigationWindows: NavigationWindowStore): Screen? {
+internal fun parseKcRouteTarget(url: String, navigationWindows: NavigationWindowStore): AppScreen? {
   val route = parseKcRoute(url) ?: return null
   return when (route) {
     is KcRoute.PostRoute -> {

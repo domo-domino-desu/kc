@@ -1,18 +1,22 @@
 package ddd.kc.data.remote.cache
 
 import ddd.kc.data.local.dao.CacheDao
-import ddd.kc.data.local.entity.CacheEntity
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.remote.network.asException
 import ddd.kc.data.remote.network.toQueryError
 import ddd.kc.utils.currentTimeMs
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.Json
 
-private val cacheLog = KcLog.withTag("RawBodyQueryStore")
+private val typedCacheLog = KcLog.withTag("TypedQueryStore")
 
 enum class CacheNamespace(val ttlMillis: Long) {
   Creators(24 * 60 * 60 * 1000L),
@@ -22,17 +26,18 @@ enum class CacheNamespace(val ttlMillis: Long) {
   Favorites(5 * 60 * 1000L),
 }
 
-data class CachedResource<T : Any>(
+private data class CachedResource<T : Any>(
     val value: T,
     val updatedAtMillis: Long,
 )
 
-/** Room-backed stale-while-revalidate cache with one network request per resource key. */
-class RawBodyQueryStore<Key : Any, Output : Any>(
+/** Room-backed typed stale-while-revalidate cache with one network request per resource key. */
+class TypedQueryStore<Key : Any, Output : Any>(
     private val cacheDao: CacheDao,
+    private val json: Json,
+    private val serializer: KSerializer<Output>,
     private val cacheKey: (Key) -> String,
-    private val fetch: suspend (Key) -> String,
-    private val parse: (Key, String) -> Output,
+    private val fetch: suspend (Key) -> Output,
     private val ttlMillis: Long,
 ) {
   private val mutexRegistryLock = Mutex()
@@ -44,7 +49,7 @@ class RawBodyQueryStore<Key : Any, Output : Any>(
       forceRefresh: Boolean = false,
   ): Flow<QueryState<Output>> = flow {
     val resolvedKey = cacheKey(key)
-    val initial = readCached(key, resolvedKey)
+    val initial = readCached(resolvedKey)
     val initialStale = initial == null || isStale(initial)
     if (initial != null) {
       emit(
@@ -67,17 +72,16 @@ class RawBodyQueryStore<Key : Any, Output : Any>(
       val fresh =
           try {
             fetchMutex.withLock {
-              val latest = readCached(key, resolvedKey)
+              val latest = readCached(resolvedKey)
               if (
                   latest != null && latest.updatedAtMillis >= requestStartedAt && !isStale(latest)
               ) {
                 latest
               } else {
-                val rawBody = fetch(key)
-                val parsed = parse(key, rawBody)
+                val value = fetch(key)
                 val cachedAt = currentTimeMs()
-                cacheDao.upsert(CacheEntity(resolvedKey, rawBody, cachedAt))
-                CachedResource(parsed, cachedAt)
+                cacheDao.upsertBody(resolvedKey, json.encodeToString(serializer, value), cachedAt)
+                CachedResource(value, cachedAt)
               }
             }
           } finally {
@@ -108,14 +112,23 @@ class RawBodyQueryStore<Key : Any, Output : Any>(
     }
   }
 
-  private suspend fun readCached(key: Key, resolvedKey: String): CachedResource<Output>? {
-    val entity = cacheDao.findByKey(resolvedKey) ?: return null
+  suspend fun queryOnce(key: Key, forceRefresh: Boolean = false): Output {
+    val state =
+        query(key, forceRefresh = forceRefresh)
+            .filter { it.data != null || it.error != null }
+            .first()
+    state.error?.let { throw it.asException() }
+    return requireNotNull(state.data)
+  }
+
+  private suspend fun readCached(resolvedKey: String): CachedResource<Output>? {
+    val cached = cacheDao.findBodyByKey(resolvedKey) ?: return null
     return try {
-      CachedResource(parse(key, entity.dataJson), entity.cachedAtMs)
+      CachedResource(json.decodeFromString(serializer, cached.body), cached.cachedAtMs)
     } catch (error: CancellationException) {
       throw error
     } catch (error: Throwable) {
-      cacheLog.w(error) { "缓存解析失败，删除损坏条目(keyHash=${resolvedKey.hashCode()})" }
+      typedCacheLog.w(error) { "typed缓存解析失败，删除损坏条目(keyHash=${resolvedKey.hashCode()})" }
       cacheDao.delete(resolvedKey)
       null
     }
@@ -143,17 +156,19 @@ class RawBodyQueryStore<Key : Any, Output : Any>(
   private class MutexEntry(val mutex: Mutex, var borrowers: Int = 0)
 }
 
-fun <Key : Any, Output : Any> rawBodyQueryStore(
+fun <Key : Any, Output : Any> typedQueryStore(
     cacheDao: CacheDao,
+    json: Json,
+    serializer: KSerializer<Output>,
     namespace: CacheNamespace,
     cacheKey: (Key) -> String,
-    fetch: suspend (Key) -> String,
-    parse: (Key, String) -> Output,
-): RawBodyQueryStore<Key, Output> =
-    RawBodyQueryStore(
+    fetch: suspend (Key) -> Output,
+): TypedQueryStore<Key, Output> =
+    TypedQueryStore(
         cacheDao = cacheDao,
+        json = json,
+        serializer = serializer,
         cacheKey = cacheKey,
         fetch = fetch,
-        parse = parse,
         ttlMillis = namespace.ttlMillis,
     )

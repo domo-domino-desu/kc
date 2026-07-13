@@ -13,13 +13,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.data.model.key
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.DetailAppBar
@@ -31,14 +31,16 @@ import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.utils.logging.KcLog
 import ddd.kc.utils.logging.summarizePost
+import kotlinx.serialization.Serializable
 import org.koin.core.parameter.parametersOf
 
 private val log = KcLog.withTag("TagPostsScreen")
 
+@Serializable
 class TagPostsScreen(
     private val tag: String,
     private val routeKey: String = nextRouteInstanceKey("tag-posts"),
-) : Screen {
+) : AppScreen {
   override val key: String = routeKey
 
   @OptIn(ExperimentalMaterial3Api::class)
@@ -70,7 +72,9 @@ class TagPostsScreen(
                     isLoadingPrevious = state.isLoadingPrevious,
                     hasMore = state.hasMore,
                     canLoadPrevious = state.canAutoLoadPrevious,
+                    prependErrorMessage = state.prependError?.localizedMessage(),
                     appendErrorMessage = state.appendError?.localizedMessage(),
+                    navigationEffect = state.navigationEffect,
                 ),
             actions =
                 PostGridPagingActions(
@@ -78,7 +82,7 @@ class TagPostsScreen(
                     onLoadMore = { screenModel.loadMore() },
                     onLoadPrevious = { screenModel.loadPrevious() },
                     onJumpToPage = { page -> screenModel.jumpToPage(page) },
-                    onVisiblePostIndex = screenModel::onVisiblePostIndex,
+                    onViewportChanged = screenModel::onViewportChanged,
                     onPostClick = { post ->
                       log.i { "打开Post -> 点击来源(source=tag,${summarizePost(post)})" }
                       navigator.push(

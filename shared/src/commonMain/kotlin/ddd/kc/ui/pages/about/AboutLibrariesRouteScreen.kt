@@ -15,18 +15,20 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
 import com.mikepenz.aboutlibraries.ui.compose.produceLibraries
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.utils.coroutines.resultOfSuspend
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.about_libraries
 import kc.shared.generated.resources.about_libraries_load_failed
 import kc.shared.generated.resources.about_libraries_metadata_source
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 
-class AboutLibrariesRouteScreen : Screen {
+@Serializable
+class AboutLibrariesRouteScreen : AppScreen {
   override val key: String = "about-libraries-route"
 
   @Composable

@@ -148,6 +148,18 @@ internal data class SettingsDraft(
   }
 }
 
+internal fun mergePersistedSettingsDraft(
+    draft: SettingsDraft,
+    previousPersisted: SettingsDraft,
+    currentPersisted: SettingsDraft,
+): SettingsDraft =
+    when {
+      draft == previousPersisted -> currentPersisted
+      draft.pawchiveBaseUrl == previousPersisted.pawchiveBaseUrl ->
+          draft.copy(pawchiveBaseUrl = currentPersisted.pawchiveBaseUrl)
+      else -> draft
+    }
+
 internal enum class SettingsValidationError {
   CARD_WIDTH_NOT_NUMBER,
   CHUNK_LIMIT_NOT_NUMBER,

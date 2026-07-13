@@ -1,7 +1,7 @@
 package ddd.kc.ui.pages.works
 
 import cafe.adriel.voyager.core.model.StateScreenModel
-import ddd.kc.ui.components.state.ScrollPosition
+import ddd.kc.ui.components.paging.ScrollPosition
 
 data class WorksScreenState(
     val selectedIndex: Int = 0,

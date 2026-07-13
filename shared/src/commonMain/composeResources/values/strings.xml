@@ -82,6 +82,9 @@
   <string name="page_navigation">Page navigation</string>
   <string name="page_first">First page</string>
   <string name="page_previous">Previous page</string>
+  <string name="load_previous_here">Load the previous page here</string>
+  <string name="loading_previous_page">Loading the previous page</string>
+  <string name="previous_page_failed">Failed to load the previous page</string>
   <string name="page_next">Next page</string>
   <string name="page_last">Last page</string>
   <string name="page_number">Page %1$d</string>

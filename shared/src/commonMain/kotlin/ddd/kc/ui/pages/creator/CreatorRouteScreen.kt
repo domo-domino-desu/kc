@@ -21,7 +21,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -30,6 +29,7 @@ import ddd.kc.data.model.Creator
 import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.key
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.pages.post.PostPagingContext
@@ -37,22 +37,34 @@ import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.ui.pages.tagposts.TagPostsScreen
 import ddd.kc.utils.logging.KcLog
 import ddd.kc.utils.logging.summarizePost
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 
 private val log = KcLog.withTag("CreatorRouteScreen")
 
-class CreatorRouteScreen(
+@Serializable
+class CreatorRouteScreen
+private constructor(
     private val windowId: String,
-    private val resourceKey: CreatorKey,
+    private val service: String,
+    private val creatorId: String,
     private val startIndex: Int,
     private val routeKey: String = nextRouteInstanceKey("creator"),
-) : Screen {
+) : AppScreen {
+  constructor(
+      windowId: String,
+      resourceKey: CreatorKey,
+      startIndex: Int,
+      routeKey: String = nextRouteInstanceKey("creator"),
+  ) : this(windowId, resourceKey.service, resourceKey.id, startIndex, routeKey)
+
   override val key: String = routeKey
 
   @OptIn(ExperimentalFoundationApi::class)
   @Composable
   override fun Content() {
+    val resourceKey = CreatorKey(service, creatorId)
     val navigator = LocalNavigator.currentOrThrow
     val navigationWindows = LocalNavigationWindowStore.current
     val creators =

@@ -7,7 +7,10 @@ import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
 
-expect fun buildKcHttpClient(cookieStorage: AcceptAllCookiesStorage): HttpClient
+expect fun buildKcHttpClient(
+    cookieStorage: AcceptAllCookiesStorage,
+    followRedirects: Boolean = true,
+): HttpClient
 
 internal fun HttpClientConfig<*>.configureKcHttpClient(cookieStorage: AcceptAllCookiesStorage) {
   install(HttpCookies) { storage = cookieStorage }

@@ -3,8 +3,10 @@ package ddd.kc.ui.app.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -19,13 +21,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CommentW400Outlined
@@ -45,6 +45,7 @@ import kc.shared.generated.resources.tab_creators
 import kc.shared.generated.resources.tab_dm
 import kc.shared.generated.resources.tab_more
 import kc.shared.generated.resources.tab_works
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 
 private val navRailMinWidth = 960.dp
@@ -107,11 +108,12 @@ private fun tabs() =
 /**
  * Single root screen. Tab content is rendered inline; detail screens push onto the root navigator.
  */
-class MainScreen : Screen {
+@Serializable
+class MainScreen : AppScreen {
   @Composable
   override fun Content() {
-    var selectedTabName by rememberSaveable { mutableStateOf(MainTab.Creators.name) }
-    val selectedTab = MainTab.valueOf(selectedTabName)
+    val tabNavigation = LocalKcTabNavigationController.current
+    val selectedTab = tabNavigation.selectedTab
     var currentTabReselectHandler by remember { mutableStateOf<(() -> Unit)?>(null) }
     val onReselectHandlerChanged = remember {
       { handler: (() -> Unit)? -> currentTabReselectHandler = handler }
@@ -121,7 +123,7 @@ class MainScreen : Screen {
       when (resolveMainTabSelectionAction(targetTab, selectedTab)) {
         MainTabSelectionAction.SelectTab -> {
           currentTabReselectHandler = null
-          selectedTabName = targetTab.name
+          tabNavigation.select(targetTab)
         }
         MainTabSelectionAction.RepeatCurrentTab -> currentTabReselectHandler?.invoke()
       }
@@ -134,6 +136,7 @@ class MainScreen : Screen {
             onReselectHandlerChanged = onReselectHandlerChanged,
             onTabSelected = onTabSelected,
             stateHolder = stateHolder,
+            showNavigation = tabNavigation.currentDepth == 1,
         )
       } else {
         BottomBarLayout(
@@ -141,6 +144,7 @@ class MainScreen : Screen {
             onReselectHandlerChanged = onReselectHandlerChanged,
             onTabSelected = onTabSelected,
             stateHolder = stateHolder,
+            showNavigation = tabNavigation.currentDepth == 1,
         )
       }
     }
@@ -153,24 +157,28 @@ private fun BottomBarLayout(
     onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
     onTabSelected: (MainTab) -> Unit,
     stateHolder: SaveableStateHolder,
+    showNavigation: Boolean,
 ) {
   val tabList = tabs()
   Scaffold(
       containerColor = MaterialTheme.colorScheme.surface,
+      contentWindowInsets = if (showNavigation) WindowInsets.safeDrawing else WindowInsets(0.dp),
       bottomBar = {
-        NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-          tabList.forEach { tab ->
-            NavigationBarItem(
-                selected = selectedTab == tab.key,
-                onClick = { onTabSelected(tab.key) },
-                icon = {
-                  Icon(
-                      imageVector = if (selectedTab == tab.key) tab.selectedIcon else tab.icon,
-                      contentDescription = tab.label,
-                  )
-                },
-                label = { Text(tab.label) },
-            )
+        if (showNavigation) {
+          NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+            tabList.forEach { tab ->
+              NavigationBarItem(
+                  selected = selectedTab == tab.key,
+                  onClick = { onTabSelected(tab.key) },
+                  icon = {
+                    Icon(
+                        imageVector = if (selectedTab == tab.key) tab.selectedIcon else tab.icon,
+                        contentDescription = tab.label,
+                    )
+                  },
+                  label = { Text(tab.label) },
+              )
+            }
           }
         }
       },
@@ -187,24 +195,30 @@ private fun RailLayout(
     onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
     onTabSelected: (MainTab) -> Unit,
     stateHolder: SaveableStateHolder,
+    showNavigation: Boolean,
 ) {
   val tabList = tabs()
-  Row(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-    NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
-      tabList.forEach { tab ->
-        NavigationRailItem(
-            selected = selectedTab == tab.key,
-            onClick = { onTabSelected(tab.key) },
-            icon = {
-              Icon(
-                  imageVector = if (selectedTab == tab.key) tab.selectedIcon else tab.icon,
-                  contentDescription = tab.label,
-              )
-            },
-            label = { Text(tab.label) },
-        )
-      }
-    }
+  Row(
+      modifier =
+          Modifier.fillMaxSize()
+              .then(if (showNavigation) Modifier.safeDrawingPadding() else Modifier)
+  ) {
+    if (showNavigation)
+        NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
+          tabList.forEach { tab ->
+            NavigationRailItem(
+                selected = selectedTab == tab.key,
+                onClick = { onTabSelected(tab.key) },
+                icon = {
+                  Icon(
+                      imageVector = if (selectedTab == tab.key) tab.selectedIcon else tab.icon,
+                      contentDescription = tab.label,
+                  )
+                },
+                label = { Text(tab.label) },
+            )
+          }
+        }
     Box(modifier = Modifier.fillMaxSize().weight(1f)) {
       TabContent(selectedTab, onReselectHandlerChanged, stateHolder)
     }
@@ -219,12 +233,40 @@ private fun TabContent(
 ) {
   // SaveableStateProvider preserves each tab's rememberSaveable state (scroll pos etc.)
   // across tab switches and root navigator pushes.
-  stateHolder.SaveableStateProvider(key = selectedTab) {
+  stateHolder.SaveableStateProvider(key = selectedTab.name) {
     when (selectedTab) {
-      MainTab.Creators -> Navigator(CreatorsScreen(onReselectHandlerChanged))
-      MainTab.Works -> Navigator(WorksScreen(onReselectHandlerChanged))
-      MainTab.Dm -> Navigator(DmScreen(onReselectHandlerChanged))
-      MainTab.More -> Navigator(MoreScreen(onReselectHandlerChanged))
+      MainTab.Creators ->
+          Navigator(CreatorsScreen()) { navigator ->
+            RegisterTabNavigator(MainTab.Creators, navigator, onReselectHandlerChanged)
+          }
+      MainTab.Works ->
+          Navigator(WorksScreen()) { navigator ->
+            RegisterTabNavigator(MainTab.Works, navigator, onReselectHandlerChanged)
+          }
+      MainTab.Dm ->
+          Navigator(DmScreen()) { navigator ->
+            RegisterTabNavigator(MainTab.Dm, navigator, onReselectHandlerChanged)
+          }
+      MainTab.More ->
+          Navigator(MoreScreen()) { navigator ->
+            RegisterTabNavigator(MainTab.More, navigator, onReselectHandlerChanged)
+          }
     }
+  }
+}
+
+@Composable
+private fun RegisterTabNavigator(
+    tab: MainTab,
+    navigator: Navigator,
+    onReselectHandlerChanged: ((() -> Unit)?) -> Unit,
+) {
+  val tabNavigation = LocalKcTabNavigationController.current
+  tabNavigation.register(tab, navigator)
+  tabNavigation.updateDepth(tab, navigator.size)
+  androidx.compose.runtime.CompositionLocalProvider(
+      LocalRootTabReselectRegistration provides onReselectHandlerChanged
+  ) {
+    cafe.adriel.voyager.navigator.CurrentScreen()
   }
 }

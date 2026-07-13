@@ -1,4 +1,4 @@
-package ddd.kc.ui.components.state
+package ddd.kc.ui.components.paging
 
 data class ScrollPosition(
     val index: Int = 0,

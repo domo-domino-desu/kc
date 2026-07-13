@@ -6,9 +6,10 @@ import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.key
 import ddd.kc.data.remote.repository.PostRepository
-import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
-import ddd.kc.ui.components.state.PaginationReducer
-import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.paging.OffsetPagingMachine
+import ddd.kc.ui.components.paging.OffsetPagingState
+import ddd.kc.ui.components.paging.PagingAnchor
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
@@ -18,9 +19,9 @@ private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 class TagPostsScreenModel(
     private val postRepo: PostRepository,
     private val tag: String,
-) : StateScreenModel<PaginationSnapshot<Post>>(PaginationSnapshot()) {
+) : StateScreenModel<OffsetPagingState<Post>>(OffsetPagingState()) {
 
-  private val reducer = PaginationReducer<Post, PostKey> { it.key }
+  private val reducer = OffsetPagingMachine<Post, PostKey> { it.key }
   private val log = KcLog.withTag("TagPostsScreenModel")
   private var generation = 0L
 
@@ -135,11 +136,13 @@ class TagPostsScreenModel(
     }
   }
 
-  fun onVisiblePostIndex(firstVisiblePostIndex: Int) {
+  fun onViewportChanged(anchor: PagingAnchor) {
     mutableState.value =
-        reducer.updateVisiblePage(
+        reducer.updateViewport(
             mutableState.value,
-            firstVisibleItemIndex = firstVisiblePostIndex,
+            firstVisibleItemIndex = anchor.index,
+            firstVisibleItemScrollOffset = anchor.offset,
+            anchorKey = anchor.itemKey,
             pageSize = PAGE_SIZE,
         )
   }

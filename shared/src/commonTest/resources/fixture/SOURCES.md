@@ -4,6 +4,7 @@
 
 | Fixture | 下载 URL |
 |---|---|
+| `pawchive.pw__dms.html` | `https://pawchive.pw/dms` |
 | `pawchive.st__dms__search-test.html` | `https://pawchive.st/dms?q=search-test` |
 | `pawchive.st__patreon__user__3295915.html` | `https://pawchive.st/patreon/user/3295915` |
 | `pawchive.st__patreon__user__3295915__tags.html` | `https://pawchive.st/patreon/user/3295915/tags` |

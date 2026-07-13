@@ -7,9 +7,10 @@ import ddd.kc.data.model.DmKey
 import ddd.kc.data.model.key
 import ddd.kc.data.remote.repository.CreatorRepository
 import ddd.kc.data.remote.repository.awaitData
-import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
-import ddd.kc.ui.components.state.PaginationReducer
-import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.paging.OffsetPagingMachine
+import ddd.kc.ui.components.paging.OffsetPagingState
+import ddd.kc.ui.components.paging.PagingAnchor
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.launch
@@ -18,10 +19,10 @@ private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 class RecentDMsScreenModel(
     private val creatorRepo: CreatorRepository,
-) : StateScreenModel<PaginationSnapshot<DM>>(PaginationSnapshot()) {
+) : StateScreenModel<OffsetPagingState<DM>>(OffsetPagingState()) {
 
   private val log = KcLog.withTag("RecentDMsScreenModel")
-  private val reducer = PaginationReducer<DM, DmKey> { it.key }
+  private val reducer = OffsetPagingMachine<DM, DmKey> { it.key }
   private var generation: Long = 0
 
   fun load(forceRefresh: Boolean = false) {
@@ -72,12 +73,14 @@ class RecentDMsScreenModel(
     }
   }
 
-  fun onVisibleItemIndex(firstVisibleItemIndex: Int) {
+  fun onViewportChanged(anchor: PagingAnchor) {
     mutableState.value =
-        reducer.updateVisiblePage(
+        reducer.updateViewport(
             mutableState.value,
-            firstVisibleItemIndex = firstVisibleItemIndex,
-            pageSize = PAGE_SIZE,
+            anchor.index,
+            anchor.offset,
+            anchor.itemKey,
+            PAGE_SIZE,
         )
   }
 
@@ -86,7 +89,7 @@ class RecentDMsScreenModel(
       forceRefresh: Boolean,
       firstPage: Boolean,
       prepend: Boolean = false,
-      rollbackSnapshot: PaginationSnapshot<DM>? = null,
+      rollbackSnapshot: OffsetPagingState<DM>? = null,
       requestGeneration: Long = generation,
   ) {
     resultOfSuspend {

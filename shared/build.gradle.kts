@@ -99,6 +99,14 @@ kotlin {
       }
     }
 
+    val commonTest by getting {
+      dependencies {
+        implementation(kotlin("test"))
+        implementation(libs.kotlinx.coroutines.test)
+        implementation(libs.kotlinx.serialization.json)
+      }
+    }
+
     val desktopMain by getting {
       dependencies {
         implementation(libs.ktor.client.okhttp)

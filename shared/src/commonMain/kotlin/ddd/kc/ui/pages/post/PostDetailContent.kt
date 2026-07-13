@@ -68,7 +68,7 @@ import ddd.kc.ui.components.DetailAppBar
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.SkeletonBlock
-import ddd.kc.ui.components.state.ContentTranslationState
+import ddd.kc.ui.components.paging.ContentTranslationState
 import ddd.kc.utils.collapseConsecutiveBlankLines
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.comments_count

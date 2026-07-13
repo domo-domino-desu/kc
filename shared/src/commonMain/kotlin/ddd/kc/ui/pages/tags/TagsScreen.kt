@@ -39,7 +39,6 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -50,12 +49,13 @@ import ddd.kc.data.remote.repository.TagRepository
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
 import ddd.kc.ui.app.i18n.localizedMessage
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.KcPullRefreshBox
 import ddd.kc.ui.components.SkeletonBlock
 import ddd.kc.ui.components.isAtTop
+import ddd.kc.ui.components.paging.ScrollPosition
 import ddd.kc.ui.components.rememberQuery
-import ddd.kc.ui.components.state.ScrollPosition
 import ddd.kc.ui.pages.tagposts.TagPostsScreen
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.filter_tags_hint
@@ -65,6 +65,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -102,7 +103,8 @@ object TagsTab : Tab {
   }
 }
 
-class TagsScreen : Screen {
+@Serializable
+class TagsScreen : AppScreen {
   @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
   @Composable
   override fun Content() {

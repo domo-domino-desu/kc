@@ -10,9 +10,10 @@ import ddd.kc.data.model.key
 import ddd.kc.data.remote.network.asException
 import ddd.kc.data.remote.repository.PostRepository
 import ddd.kc.data.remote.repository.awaitData
-import ddd.kc.ui.components.state.DEFAULT_PAGE_SIZE
-import ddd.kc.ui.components.state.PaginationReducer
-import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
+import ddd.kc.ui.components.paging.OffsetPagingMachine
+import ddd.kc.ui.components.paging.OffsetPagingState
+import ddd.kc.ui.components.paging.PagingAnchor
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
@@ -26,7 +27,7 @@ private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 data class PostSearchState(
     val query: String = "",
     val defaultPopularDate: String? = null,
-    val paging: PaginationSnapshot<Post> = PaginationSnapshot(),
+    val paging: OffsetPagingState<Post> = OffsetPagingState(),
 ) {
   val posts
     get() = paging.items
@@ -73,7 +74,7 @@ data class PostSearchState(
 class PostSearchScreenModel(
     private val postRepo: PostRepository,
 ) : StateScreenModel<PostSearchState>(PostSearchState()) {
-  private val reducer = PaginationReducer<Post, PostKey> { it.key }
+  private val reducer = OffsetPagingMachine<Post, PostKey> { it.key }
   private var searchJob: Job? = null
   private var generation = 0L
 
@@ -140,9 +141,15 @@ class PostSearchScreenModel(
     }
   }
 
-  fun onVisiblePostIndex(firstVisiblePostIndex: Int) {
+  fun onViewportChanged(anchor: PagingAnchor) {
     updatePaging(
-        reducer.updateVisiblePage(mutableState.value.paging, firstVisiblePostIndex, PAGE_SIZE)
+        reducer.updateViewport(
+            mutableState.value.paging,
+            anchor.index,
+            anchor.offset,
+            anchor.itemKey,
+            PAGE_SIZE,
+        )
     )
   }
 
@@ -202,7 +209,7 @@ class PostSearchScreenModel(
       offset: Int,
       replace: Boolean = false,
       prepend: Boolean = false,
-      rollback: PaginationSnapshot<Post>? = null,
+      rollback: OffsetPagingState<Post>? = null,
       requestGeneration: Long = generation,
   ) {
     val requestQuery = mutableState.value.query
@@ -270,7 +277,7 @@ class PostSearchScreenModel(
         }
   }
 
-  private fun updatePaging(paging: PaginationSnapshot<Post>) {
+  private fun updatePaging(paging: OffsetPagingState<Post>) {
     mutableState.value = mutableState.value.copy(paging = paging)
   }
 }

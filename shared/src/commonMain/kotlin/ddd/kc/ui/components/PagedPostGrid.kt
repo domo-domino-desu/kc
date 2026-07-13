@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,8 +22,9 @@ import androidx.compose.ui.unit.dp
 import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.key
+import ddd.kc.ui.components.paging.PagingAnchor
+import ddd.kc.ui.components.paging.PagingEffect
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
 
 data class PostGridPagingState(
     val posts: List<Post>,
@@ -35,7 +35,9 @@ data class PostGridPagingState(
     val isLoadingPrevious: Boolean,
     val hasMore: Boolean,
     val canLoadPrevious: Boolean,
+    val prependErrorMessage: String? = null,
     val appendErrorMessage: String? = null,
+    val navigationEffect: PagingEffect? = null,
 )
 
 data class PostGridPagingActions(
@@ -43,7 +45,7 @@ data class PostGridPagingActions(
     val onLoadMore: () -> Unit,
     val onLoadPrevious: () -> Unit,
     val onJumpToPage: (Int) -> Unit,
-    val onVisiblePostIndex: (Int) -> Unit,
+    val onViewportChanged: (PagingAnchor) -> Unit,
     val onPostClick: (Post) -> Unit,
 )
 
@@ -59,10 +61,13 @@ fun PagedPostGrid(
     leadingContent: LazyGridScope.() -> Unit = {},
 ) {
   Box(modifier = modifier) {
-    KcPullRefreshBox(
+    PagedPullRefreshBox(
+        currentPage = state.visiblePageInfo?.currentPage ?: 1,
         enabled = !state.loading,
         refreshing = state.refreshing,
+        loadingPrevious = state.isLoadingPrevious,
         onRefresh = actions.onRefresh,
+        onLoadPrevious = actions.onLoadPrevious,
         modifier = Modifier.fillMaxSize(),
     ) {
       LazyVerticalGrid(
@@ -74,10 +79,16 @@ fun PagedPostGrid(
           horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         leadingContent()
+        previousPageHeader(
+            canLoadPrevious = state.canLoadPrevious,
+            loadingPrevious = state.isLoadingPrevious,
+            errorMessage = state.prependErrorMessage,
+            onLoadPrevious = actions.onLoadPrevious,
+        )
         if (state.loading && state.posts.isEmpty()) {
           gridSkeletonItems()
         } else {
-          items(state.posts, key = { it.key }) { post ->
+          items(state.posts, key = { "${it.service}:${it.artistId ?: it.user}:${it.id}" }) { post ->
             PostCard(
                 post = post,
                 onClick = { actions.onPostClick(post) },
@@ -91,7 +102,17 @@ fun PagedPostGrid(
         state = state,
         actions = actions,
         gridState = gridState,
-        leadingItemCount = leadingItemCount,
+        leadingItemCount =
+            leadingItemCount +
+                if (
+                    state.canLoadPrevious ||
+                        state.isLoadingPrevious ||
+                        !state.prependErrorMessage.isNullOrBlank()
+                ) {
+                  1
+                } else {
+                  0
+                },
     )
   }
 }
@@ -103,11 +124,33 @@ fun BoxScope.PostGridPagingControls(
     gridState: LazyGridState,
     leadingItemCount: Int = 0,
 ) {
-  val scope = rememberCoroutineScope()
   LaunchedEffect(gridState, leadingItemCount) {
-    snapshotFlow { gridState.firstVisibleItemIndex }
+    snapshotFlow {
+          val relativeIndex = (gridState.firstVisibleItemIndex - leadingItemCount).coerceAtLeast(0)
+          PagingAnchor(
+              itemKey =
+                  state.posts.getOrNull(relativeIndex)?.let {
+                    "${it.service}:${it.artistId ?: it.user}:${it.id}"
+                  },
+              index = relativeIndex,
+              offset = gridState.firstVisibleItemScrollOffset,
+          )
+        }
         .distinctUntilChanged()
-        .collect { index -> actions.onVisiblePostIndex(index - leadingItemCount) }
+        .collect(actions.onViewportChanged)
+  }
+  LaunchedEffect(state.navigationEffect, leadingItemCount) {
+    when (val effect = state.navigationEffect) {
+      is PagingEffect.ScrollToTop -> gridState.scrollToItem(0)
+      is PagingEffect.RestoreViewport -> {
+        gridState.scrollToItem(
+            (effect.anchor.index + leadingItemCount).coerceAtLeast(0),
+            effect.anchor.offset,
+        )
+      }
+      is PagingEffect.RebaseSelection,
+      null -> Unit
+    }
   }
   AutoLoadEffect(
       gridState,
@@ -116,20 +159,10 @@ fun BoxScope.PostGridPagingControls(
       isLoadingMore = state.isLoadingMore,
       onLoadMore = actions.onLoadMore,
   )
-  AutoLoadPreviousEffect(
-      gridState,
-      state.posts.size,
-      hasPrevious = state.canLoadPrevious,
-      isLoadingPrevious = state.isLoadingPrevious,
-      onLoadPrevious = actions.onLoadPrevious,
-  )
   PageJumpFabMenu(
       pageInfo = state.visiblePageInfo,
       loading = state.loading || state.isLoadingMore || state.isLoadingPrevious,
-      onJumpToPage = { page ->
-        actions.onJumpToPage(page)
-        scope.launch { gridState.scrollToItem(0) }
-      },
+      onJumpToPage = actions.onJumpToPage,
       modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
   )
 }

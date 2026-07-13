@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class AppSettings(
     private val dataStore: DataStore<Preferences>,
@@ -26,6 +28,7 @@ class AppSettings(
 ) {
   private val preferences = MutableStateFlow(defaultPreferences())
   private val _loadState = MutableStateFlow<SettingsLoadState>(SettingsLoadState.Loading)
+  private val mutationMutex = Mutex()
   val loadState: StateFlow<SettingsLoadState> = _loadState
 
   suspend fun init() {
@@ -95,35 +98,54 @@ class AppSettings(
   fun translationSettingsFlow() = preferences.map { it.translationSettings }.distinctUntilChanged()
 
   /** Commits the complete non-secret snapshot in one DataStore transaction. */
-  suspend fun save(value: AppPreferences) {
-    val normalized = normalize(value)
-    val apiKey = normalized.translationSettings.openAiConfig.apiKey.trim()
-    if (apiKey.isBlank()) secretStore.delete(OPENAI_API_KEY_SECRET)
-    else secretStore.put(OPENAI_API_KEY_SECRET, apiKey)
+  suspend fun save(value: AppPreferences) =
+      mutationMutex.withLock {
+        val normalized = normalize(value)
+        val apiKey = normalized.translationSettings.openAiConfig.apiKey.trim()
+        if (apiKey.isBlank()) secretStore.delete(OPENAI_API_KEY_SECRET)
+        else secretStore.put(OPENAI_API_KEY_SECRET, apiKey)
 
-    dataStore.edit { persisted ->
-      persisted[CELL_MIN_WIDTH_DP] = normalized.cellMinWidthDp
-      persisted[DOWNLOAD_SAVE_PATH] = normalized.downloadSavePath
-      persisted[DOWNLOAD_ALLOW_MEDIA_INDEXING] = normalized.downloadAllowMediaIndexing
-      persisted[DOWNLOAD_SUBFOLDER_MODE] = normalized.downloadSubfolderMode.persistedValue
-      persisted[DOWNLOAD_FILE_NAME_MODE] = normalized.downloadFileNameMode.persistedValue
-      persisted[DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE] = normalized.downloadCustomFileNameTemplate
-      persisted[PAWCHIVE_BASE_URL] = normalized.pawchiveBaseUrl
-      persisted[THEME_MODE] = normalized.themeMode.persistedValue
-      persisted[UI_LANGUAGE] = normalized.language.persistedValue
-      val translation = normalized.translationSettings
-      persisted[TRANSLATION_ENABLED] = translation.enabled
-      persisted[TRANSLATION_PROVIDER] = translation.provider.persistedValue
-      persisted[TRANSLATION_TARGET_LANG] = translation.targetLanguageCode
-      persisted[TRANSLATION_CHUNK_WORD_LIMIT] = translation.chunkWordLimit
-      persisted[TRANSLATION_MAX_CONCURRENCY] = translation.maxConcurrency
-      persisted[OPENAI_TRANSLATION_BASE_URL] = translation.openAiConfig.baseUrl
-      persisted.remove(OPENAI_TRANSLATION_API_KEY)
-      persisted[OPENAI_TRANSLATION_MODEL] = translation.openAiConfig.model
-      persisted[OPENAI_TRANSLATION_PROMPT] = translation.openAiConfig.promptTemplate
-    }
-    publish(normalized)
-  }
+        dataStore.edit { persisted ->
+          persisted[CELL_MIN_WIDTH_DP] = normalized.cellMinWidthDp
+          persisted[DOWNLOAD_SAVE_PATH] = normalized.downloadSavePath
+          persisted[DOWNLOAD_ALLOW_MEDIA_INDEXING] = normalized.downloadAllowMediaIndexing
+          persisted[DOWNLOAD_SUBFOLDER_MODE] = normalized.downloadSubfolderMode.persistedValue
+          persisted[DOWNLOAD_FILE_NAME_MODE] = normalized.downloadFileNameMode.persistedValue
+          persisted[DOWNLOAD_CUSTOM_FILE_NAME_TEMPLATE] = normalized.downloadCustomFileNameTemplate
+          persisted[PAWCHIVE_BASE_URL] = normalized.pawchiveBaseUrl
+          persisted[THEME_MODE] = normalized.themeMode.persistedValue
+          persisted[UI_LANGUAGE] = normalized.language.persistedValue
+          val translation = normalized.translationSettings
+          persisted[TRANSLATION_ENABLED] = translation.enabled
+          persisted[TRANSLATION_PROVIDER] = translation.provider.persistedValue
+          persisted[TRANSLATION_TARGET_LANG] = translation.targetLanguageCode
+          persisted[TRANSLATION_CHUNK_WORD_LIMIT] = translation.chunkWordLimit
+          persisted[TRANSLATION_MAX_CONCURRENCY] = translation.maxConcurrency
+          persisted[OPENAI_TRANSLATION_BASE_URL] = translation.openAiConfig.baseUrl
+          persisted.remove(OPENAI_TRANSLATION_API_KEY)
+          persisted[OPENAI_TRANSLATION_MODEL] = translation.openAiConfig.model
+          persisted[OPENAI_TRANSLATION_PROMPT] = translation.openAiConfig.promptTemplate
+        }
+        publish(normalized)
+      }
+
+  /**
+   * Replaces only the Pawchive endpoint when it still matches [expectedBaseUrl]. This prevents a
+   * late redirect response from overwriting a newer user choice or another redirect.
+   */
+  suspend fun updateBaseUrlFromRedirect(
+      expectedBaseUrl: String,
+      redirectedBaseUrl: String,
+  ): Boolean =
+      mutationMutex.withLock {
+        val expected = normalizeBaseUrl(expectedBaseUrl)
+        if (preferences.value.pawchiveBaseUrl != expected) return@withLock false
+        val redirected = normalizeBaseUrl(redirectedBaseUrl)
+        if (redirected == expected) return@withLock true
+        dataStore.edit { persisted -> persisted[PAWCHIVE_BASE_URL] = redirected }
+        publish(preferences.value.copy(pawchiveBaseUrl = redirected))
+        true
+      }
 
   private fun publish(value: AppPreferences) {
     preferences.value = value

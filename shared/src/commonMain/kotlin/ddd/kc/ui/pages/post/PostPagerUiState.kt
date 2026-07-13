@@ -6,11 +6,11 @@ import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.QueryError
-import ddd.kc.ui.components.state.ContentTranslationState
-import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.paging.ContentTranslationState
+import ddd.kc.ui.components.paging.OffsetPagingState
 
 data class PostPagerUiState(
-    val paging: PaginationSnapshot<Post> = PaginationSnapshot(),
+    val paging: OffsetPagingState<Post> = OffsetPagingState(),
     val currentIndex: Int = 0,
     val favoritePostIds: Set<PostKey> = emptySet(),
     val favoriteError: QueryError? = null,

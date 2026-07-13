@@ -29,9 +29,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ddd.kc.data.model.DM
 import ddd.kc.ui.app.LocalAppSettings
-import ddd.kc.ui.components.state.ContentTranslationState
-import ddd.kc.ui.components.state.TranslationBlockState
-import ddd.kc.ui.components.state.TranslationStatus
+import ddd.kc.ui.components.paging.ContentTranslationState
+import ddd.kc.ui.components.paging.TranslationBlockState
+import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.utils.collapseConsecutiveBlankLines
 
 private val urlRegex = Regex("""https?://[^\s<>"']+""")

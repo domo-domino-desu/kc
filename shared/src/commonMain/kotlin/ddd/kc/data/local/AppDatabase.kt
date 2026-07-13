@@ -6,12 +6,19 @@ import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
 import ddd.kc.data.local.dao.CacheDao
 import ddd.kc.data.local.dao.HistoryDao
+import ddd.kc.data.local.entity.CacheBodyChunkEntity
 import ddd.kc.data.local.entity.CacheEntity
 import ddd.kc.data.local.entity.CreatorHistoryEntity
 import ddd.kc.data.local.entity.PostHistoryEntity
 
 @Database(
-    entities = [CacheEntity::class, CreatorHistoryEntity::class, PostHistoryEntity::class],
+    entities =
+        [
+            CacheEntity::class,
+            CacheBodyChunkEntity::class,
+            CreatorHistoryEntity::class,
+            PostHistoryEntity::class,
+        ],
     version = 1,
     exportSchema = true,
 )

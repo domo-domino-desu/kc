@@ -1,5 +1,8 @@
 pre-commit:
   commands:
+    version_code:
+      run: awk -F= 'BEGIN{OFS=FS}/^APP_VERSION_CODE=/{++$2}1' gradle.properties > gradle.properties.tmp && mv gradle.properties.tmp gradle.properties
+      stage_fixed: true
     treefmt:
       run: git diff --cached --name-only --diff-filter=d -z | xargs -0 -r treefmt
       stage_fixed: true

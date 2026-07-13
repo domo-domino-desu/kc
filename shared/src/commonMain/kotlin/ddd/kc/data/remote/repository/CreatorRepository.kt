@@ -9,7 +9,7 @@ import ddd.kc.data.model.PagedResult
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.Tag
 import ddd.kc.data.remote.cache.CacheNamespace
-import ddd.kc.data.remote.cache.rawBodyQueryStore
+import ddd.kc.data.remote.cache.typedQueryStore
 import ddd.kc.data.remote.network.PawchiveApi
 import ddd.kc.utils.logging.KcLog
 import kotlin.coroutines.CoroutineContext
@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private val log = KcLog.withTag("CreatorRepository")
@@ -36,77 +35,72 @@ class CreatorRepository(
     get() = db.cacheDao()
 
   private val announcementsStore by lazy {
-    rawBodyQueryStore<CreatorKey, List<Announcement>>(
+    typedQueryStore<CreatorKey, List<Announcement>>(
         cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Announcement.serializer()),
         namespace = CacheNamespace.Detail,
         cacheKey = { key -> "pawchive:${key.service}:${key.id}:announcements" },
-        fetch = { key ->
-          json.encodeToString(
-              ListSerializer(Announcement.serializer()),
-              api.getCreatorAnnouncements(service = key.service, creatorId = key.id),
-          )
-        },
-        parse = { _, body -> json.decodeFromString(body) },
+        fetch = { key -> api.getCreatorAnnouncements(service = key.service, creatorId = key.id) },
     )
   }
 
   private val creatorTagsStore by lazy {
-    rawBodyQueryStore<CreatorKey, List<Tag>>(
+    typedQueryStore<CreatorKey, List<Tag>>(
         cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Tag.serializer()),
         namespace = CacheNamespace.Detail,
         cacheKey = { key -> "pawchive:${key.service}:${key.id}:tags" },
-        fetch = { key -> api.fetchCreatorTagsBody(service = key.service, creatorId = key.id) },
-        parse = { _, body -> api.parseCreatorTags(body) },
+        fetch = { key ->
+          api.parseCreatorTags(api.fetchCreatorTagsBody(service = key.service, creatorId = key.id))
+        },
     )
   }
 
   private val creatorLinksStore by lazy {
-    rawBodyQueryStore<CreatorKey, List<Creator>>(
+    typedQueryStore<CreatorKey, List<Creator>>(
         cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Creator.serializer()),
         namespace = CacheNamespace.Detail,
         cacheKey = { key -> "pawchive:${key.service}:${key.id}:links" },
-        fetch = { key ->
-          json.encodeToString(
-              ListSerializer(Creator.serializer()),
-              api.getCreatorLinks(service = key.service, creatorId = key.id),
-          )
-        },
-        parse = { _, body -> json.decodeFromString(body) },
+        fetch = { key -> api.getCreatorLinks(service = key.service, creatorId = key.id) },
     )
   }
 
   private val dmsStore by lazy {
-    rawBodyQueryStore<DmKey, PagedResult<DM>>(
+    typedQueryStore<DmKey, PagedResult<DM>>(
         cacheDao = dao,
+        json = json,
+        serializer = PagedResult.serializer(DM.serializer()),
         namespace = CacheNamespace.PostList,
         cacheKey = { key -> "pawchive:dms:${key.offset}:${key.query}" },
-        fetch = { key -> api.fetchDmsBody(query = key.query, offset = key.offset) },
-        parse = { key, body -> api.parseDmsPage(body, key.offset) },
+        fetch = { key ->
+          api.parseDmsPage(api.fetchDmsBody(query = key.query, offset = key.offset), key.offset)
+        },
     )
   }
 
   private val favoriteCreatorsStore by lazy {
-    rawBodyQueryStore<Unit, List<Creator>>(
+    typedQueryStore<Unit, List<Creator>>(
         cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Creator.serializer()),
         namespace = CacheNamespace.Favorites,
         cacheKey = { "pawchive:favorites:creators" },
-        fetch = {
-          json.encodeToString(
-              ListSerializer(Creator.serializer()),
-              api.getFavorites(type = "artist"),
-          )
-        },
-        parse = { _, body -> json.decodeFromString(body) },
+        fetch = { api.getFavorites(type = "artist") },
     )
   }
 
   private val creatorsStore by lazy {
-    rawBodyQueryStore<Unit, List<Creator>>(
+    typedQueryStore<Unit, List<Creator>>(
         cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Creator.serializer()),
         namespace = CacheNamespace.Creators,
         cacheKey = { CREATORS_CACHE_KEY },
-        fetch = { api.fetchCreatorsBody() },
-        parse = { _, body -> api.parseCreators(body) },
+        fetch = { api.parseCreators(api.fetchCreatorsBody()) },
     )
   }
 

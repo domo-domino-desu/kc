@@ -27,7 +27,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -42,15 +41,16 @@ import ddd.kc.data.model.imageFiles
 import ddd.kc.data.model.key
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.ui.app.LocalAppSettings
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.LocalShowToast
+import ddd.kc.ui.components.paging.ContentTranslationState
 import ddd.kc.ui.components.platform.PlatformBinaryFileDestination
 import ddd.kc.ui.components.platform.PlatformBinaryFileWriteRequest
 import ddd.kc.ui.components.platform.PlatformBinaryFileWriteResult
 import ddd.kc.ui.components.platform.buildPostDownloadTarget
 import ddd.kc.ui.components.platform.rememberPlatformBinaryFileWriter
-import ddd.kc.ui.components.state.ContentTranslationState
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.imageviewer.ImageViewerScreen
 import ddd.kc.ui.pages.tagposts.TagPostsScreen
@@ -63,27 +63,59 @@ import kc.shared.generated.resources.download_save_path_required
 import kc.shared.generated.resources.download_saved
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 
 private val log = KcLog.withTag("PostRouteScreen")
 
-class PostRouteScreen(
+@Serializable
+class PostRouteScreen
+private constructor(
     private val windowId: String,
-    private val resourceKey: PostKey,
+    private val service: String,
+    private val creatorId: String,
+    private val postId: String,
     private val startIndex: Int,
     private val source: String = "unknown",
     private val initialOffset: Int = 0,
     private val initialHasMore: Boolean = false,
-    private val pagingContext: PostPagingContext = PostPagingContext.None,
+    private val pagingContextJson: String = Json.encodeToString(PostPagingContext.None),
     private val routeKey: String = nextRouteInstanceKey("post"),
-) : Screen {
+) : AppScreen {
+  constructor(
+      windowId: String,
+      resourceKey: PostKey,
+      startIndex: Int,
+      source: String = "unknown",
+      initialOffset: Int = 0,
+      initialHasMore: Boolean = false,
+      pagingContext: PostPagingContext = PostPagingContext.None,
+      routeKey: String = nextRouteInstanceKey("post"),
+  ) : this(
+      windowId,
+      resourceKey.service,
+      resourceKey.creatorId,
+      resourceKey.id,
+      startIndex,
+      source,
+      initialOffset,
+      initialHasMore,
+      Json.encodeToString(pagingContext),
+      routeKey,
+  )
+
   override val key: String = routeKey
 
   @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
   @Composable
   override fun Content() {
+    val resourceKey = PostKey(service, creatorId, postId)
+    val pagingContext = Json.decodeFromString<PostPagingContext>(pagingContextJson)
     val navigator = LocalNavigator.currentOrThrow
     val navigationWindows = LocalNavigationWindowStore.current
     val posts =
@@ -121,7 +153,7 @@ class PostRouteScreen(
     LaunchedEffect(pagerState.currentPage) { screenModel.onPageChanged(pagerState.currentPage) }
     LaunchedEffect(state.currentIndex) {
       if (pagerState.currentPage != state.currentIndex) {
-        pagerState.animateScrollToPage(state.currentIndex)
+        pagerState.scrollToPage(state.currentIndex)
       }
     }
 
@@ -158,7 +190,15 @@ class PostRouteScreen(
       // Tracks each page's LazyListState for scroll-to-top
       val pageListStates = remember { mutableStateOf<Map<Int, LazyListState>>(emptyMap()) }
 
-      HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+      HorizontalPager(
+          state = pagerState,
+          key = { page ->
+            state.posts.getOrNull(page)?.let { post ->
+              "${post.service}:${post.creatorId}:${post.id}"
+            } ?: "missing:$page"
+          },
+          modifier = Modifier.fillMaxSize(),
+      ) { page ->
         val post = state.posts.getOrNull(page) ?: return@HorizontalPager
         val listState = rememberLazyListState()
         LaunchedEffect(post.service, post.creatorId, post.id) {

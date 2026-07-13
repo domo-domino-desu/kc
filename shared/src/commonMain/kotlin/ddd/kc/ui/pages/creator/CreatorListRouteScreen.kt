@@ -11,24 +11,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import ddd.kc.data.model.key
+import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
 import ddd.kc.ui.components.BackAppBar
 import ddd.kc.ui.components.CreatorSearchCard
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.navigation_content_expired
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 
+@Serializable
 class CreatorListRouteScreen(
     private val title: String,
     private val windowId: String,
     private val showFavoriteCount: Boolean,
     private val routeKey: String = nextRouteInstanceKey("creator-list"),
-) : Screen {
+) : AppScreen {
   override val key: String = routeKey
 
   @Composable

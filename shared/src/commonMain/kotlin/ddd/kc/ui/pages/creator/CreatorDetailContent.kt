@@ -44,7 +44,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,9 +79,9 @@ import ddd.kc.ui.components.gridSkeletonItems
 import ddd.kc.ui.components.icons.rememberServiceIconDefinition
 import ddd.kc.ui.components.icons.serviceIconVector
 import ddd.kc.ui.components.loadingFooter
-import ddd.kc.ui.components.state.ContentTranslationState
-import ddd.kc.ui.components.state.TranslationBlockState
-import ddd.kc.ui.components.state.TranslationStatus
+import ddd.kc.ui.components.paging.ContentTranslationState
+import ddd.kc.ui.components.paging.TranslationBlockState
+import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.utils.collapseConsecutiveBlankLines
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.add_favorite
@@ -93,7 +92,6 @@ import kc.shared.generated.resources.linked_accounts
 import kc.shared.generated.resources.no_announcements
 import kc.shared.generated.resources.no_tags
 import kc.shared.generated.resources.remove_favorite
-import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(
@@ -165,13 +163,6 @@ internal fun CreatorDetailPage(
   }
 
   val shareUrl = "$baseUrl/${creator.service}/user/${creator.id}"
-  if (selectedTab == 0) {
-    LaunchedEffect(gridState, creator.key, selectedTab) {
-      snapshotFlow { gridState.firstVisibleItemIndex }
-          .distinctUntilChanged()
-          .collect { index -> screenModel.onCreatorPostVisibleIndex(creator, index - 2) }
-    }
-  }
   Scaffold(
       topBar = {
         DetailAppBar(
@@ -316,7 +307,7 @@ internal fun CreatorDetailPage(
               if (isLoadingPosts && posts.isEmpty()) {
                 gridSkeletonItems()
               } else {
-                items(posts, key = { it.key }) { post ->
+                items(posts, key = { "${it.service}:${it.artistId ?: it.user}:${it.id}" }) { post ->
                   PostCard(
                       post = post,
                       onClick = {
@@ -397,7 +388,9 @@ internal fun CreatorDetailPage(
                       isLoadingPrevious = postSnapshot.isLoadingPrevious,
                       hasMore = postSnapshot.hasMore,
                       canLoadPrevious = postSnapshot.canAutoLoadPrevious,
+                      prependErrorMessage = postSnapshot.prependError?.localizedMessage(),
                       appendErrorMessage = postSnapshot.appendError?.localizedMessage(),
+                      navigationEffect = postSnapshot.navigationEffect,
                   ),
               actions =
                   PostGridPagingActions(
@@ -405,8 +398,8 @@ internal fun CreatorDetailPage(
                       onLoadMore = { screenModel.loadMoreCreatorPosts(creator) },
                       onLoadPrevious = { screenModel.loadPreviousCreatorPosts(creator) },
                       onJumpToPage = { page -> screenModel.jumpCreatorPostsToPage(creator, page) },
-                      onVisiblePostIndex = { index ->
-                        screenModel.onCreatorPostVisibleIndex(creator, index)
+                      onViewportChanged = { anchor ->
+                        screenModel.onCreatorPostViewportChanged(creator, anchor)
                       },
                       onPostClick = {},
                   ),

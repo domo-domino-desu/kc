@@ -73,6 +73,8 @@ ui -> domain -> data
 
 ## 约定
 
+- 使用 `nix develop` 运行 `adb` 等命令。
+- 图标只用最合适的，不要只在已有图标里硬凑。请任意添加图标到 SymbolCraft。
 - 不保留 Kemono、Coomer 或其他相似站点的历史平台抽象。
 - `shared/src/commonTest/resources/fixture/` 下的网页 fixture 必须是从真实 Pawchive 网站下载的完整响应页面。
 - 禁止手工编造、拼接、缩减或“修得更适合 parser”的 HTML。

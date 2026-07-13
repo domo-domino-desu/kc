@@ -10,7 +10,7 @@ import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.remote.cache.CacheNamespace
-import ddd.kc.data.remote.cache.rawBodyQueryStore
+import ddd.kc.data.remote.cache.typedQueryStore
 import ddd.kc.data.remote.media.downloadMedia
 import ddd.kc.data.remote.network.PawchiveApi
 import ddd.kc.data.remote.network.asException
@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 private val log = KcLog.withTag("PostRepository")
@@ -52,90 +53,104 @@ class PostRepository(
     get() = db.cacheDao()
 
   private val recentStore by lazy {
-    rawBodyQueryStore<OffsetKey, List<Post>>(
+    typedQueryStore<OffsetKey, List<Post>>(
         cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Post.serializer()),
         namespace = CacheNamespace.PostList,
         cacheKey = { "pawchive:posts:recent:${it.offset}" },
-        fetch = { key -> api.fetchRecentPostsBody(offset = key.offset) },
-        parse = { _, body -> api.parsePosts(body) },
+        fetch = { key -> api.parsePosts(api.fetchRecentPostsBody(offset = key.offset)) },
     )
   }
 
   private val popularStore by lazy {
-    rawBodyQueryStore<PopularKey, PopularPage>(
+    typedQueryStore<PopularKey, PopularPage>(
         cacheDao = dao,
+        json = json,
+        serializer = PopularPage.serializer(),
         namespace = CacheNamespace.PostList,
         cacheKey = { key ->
           "pawchive:posts:popular:${key.period}:${key.date.orEmpty()}:${key.offset}"
         },
         fetch = { key ->
-          api.fetchPopularPostsBody(date = key.date, period = key.period, offset = key.offset)
+          api.parsePopularPostsPage(
+              api.fetchPopularPostsBody(date = key.date, period = key.period, offset = key.offset),
+              key.date,
+              key.period,
+              key.offset,
+          )
         },
-        parse = { key, body -> api.parsePopularPostsPage(body, key.date, key.period, key.offset) },
     )
   }
 
   private val searchStore by lazy {
-    rawBodyQueryStore<SearchKey, PagedResult<Post>>(
+    typedQueryStore<SearchKey, PagedResult<Post>>(
         cacheDao = dao,
+        json = json,
+        serializer = PagedResult.serializer(Post.serializer()),
         namespace = CacheNamespace.PostList,
         cacheKey = { key ->
           "pawchive:posts:search:${key.offset}:${key.service.orEmpty()}:${key.tag.orEmpty()}:${key.query}"
         },
         fetch = { key ->
-          api.fetchPostSearchBody(
-              query = key.query,
-              offset = key.offset,
-              tag = key.tag,
-              service = key.service,
+          api.parsePostCardsPage(
+              api.fetchPostSearchBody(
+                  query = key.query,
+                  offset = key.offset,
+                  tag = key.tag,
+                  service = key.service,
+              ),
+              key.offset,
           )
         },
-        parse = { key, body -> api.parsePostCardsPage(body, key.offset) },
     )
   }
 
   private val creatorPostsStore by lazy {
-    rawBodyQueryStore<CreatorPostsKey, PagedResult<Post>>(
+    typedQueryStore<CreatorPostsKey, PagedResult<Post>>(
         cacheDao = dao,
+        json = json,
+        serializer = PagedResult.serializer(Post.serializer()),
         namespace = CacheNamespace.PostList,
         cacheKey = { key ->
           "pawchive:${key.creator.service}:${key.creator.id}:posts:${key.offset}"
         },
         fetch = { key ->
-          api.fetchCreatorPostsPageBody(
-              service = key.creator.service,
-              creatorId = key.creator.id,
-              offset = key.offset,
+          api.parsePostCardsPage(
+              api.fetchCreatorPostsPageBody(
+                  service = key.creator.service,
+                  creatorId = key.creator.id,
+                  offset = key.offset,
+              ),
+              key.offset,
           )
         },
-        parse = { key, body -> api.parsePostCardsPage(body, key.offset) },
     )
   }
 
   private val postStore by lazy {
-    rawBodyQueryStore<PostKey, Post>(
+    typedQueryStore<PostKey, Post>(
         cacheDao = dao,
+        json = json,
+        serializer = Post.serializer(),
         namespace = CacheNamespace.Detail,
         cacheKey = { key -> "pawchive:${key.service}:${key.creatorId}:post:${key.id}" },
         fetch = { key ->
-          api.fetchPostBody(service = key.service, creatorId = key.creatorId, postId = key.id)
+          api.parsePost(
+              api.fetchPostBody(service = key.service, creatorId = key.creatorId, postId = key.id)
+          )
         },
-        parse = { _, body -> api.parsePost(body) },
     )
   }
 
   private val favoritePostsStore by lazy {
-    rawBodyQueryStore<Unit, List<Post>>(
+    typedQueryStore<Unit, List<Post>>(
         cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Post.serializer()),
         namespace = CacheNamespace.Favorites,
         cacheKey = { "pawchive:favorites:posts" },
-        fetch = {
-          json.encodeToString(
-              kotlinx.serialization.builtins.ListSerializer(Post.serializer()),
-              api.getFavoritePosts(),
-          )
-        },
-        parse = { _, body -> json.decodeFromString(body) },
+        fetch = { api.getFavoritePosts() },
     )
   }
 

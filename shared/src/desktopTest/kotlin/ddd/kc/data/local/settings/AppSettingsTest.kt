@@ -79,6 +79,35 @@ class AppSettingsTest {
     assertNull(dataStore.data.first()[stringPreferencesKey("openai_translation_api_key")])
   }
 
+  @Test
+  fun redirectUpdateIsAtomicAndPersisted() = runBlocking {
+    val file =
+        File.createTempFile("kc-redirect-settings-test", ".preferences_pb").also(File::delete)
+    val dataStore =
+        PreferenceDataStoreFactory.createWithPath(produceFile = { file.absolutePath.toPath() })
+    val settings = AppSettings(dataStore, TestSecretStore())
+
+    assertEquals(
+        true,
+        settings.updateBaseUrlFromRedirect(
+            expectedBaseUrl = "https://pawchive.st",
+            redirectedBaseUrl = "https://pawchive.pw/",
+        ),
+    )
+    assertEquals("https://pawchive.pw", settings.baseUrl())
+    assertEquals(
+        false,
+        settings.updateBaseUrlFromRedirect(
+            expectedBaseUrl = "https://pawchive.st",
+            redirectedBaseUrl = "https://late.example",
+        ),
+    )
+
+    val reloaded = AppSettings(dataStore, TestSecretStore())
+    reloaded.init()
+    assertEquals("https://pawchive.pw", reloaded.baseUrl())
+  }
+
   private fun tempSettings(): AppSettings {
     val file = File.createTempFile("kc-settings-test", ".preferences_pb")
     file.delete()

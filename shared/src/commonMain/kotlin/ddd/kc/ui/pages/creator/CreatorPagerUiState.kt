@@ -6,8 +6,8 @@ import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.QueryError
 import ddd.kc.data.model.Tag
-import ddd.kc.ui.components.state.ContentTranslationState
-import ddd.kc.ui.components.state.PaginationSnapshot
+import ddd.kc.ui.components.paging.ContentTranslationState
+import ddd.kc.ui.components.paging.OffsetPagingState
 
 data class CreatorPagerUiState(
     val creators: List<Creator> = emptyList(),
@@ -22,7 +22,7 @@ data class CreatorPagerUiState(
     val loadingCreatorPostIds: Set<CreatorKey> = emptySet(),
     val loadingCreatorAnnouncementIds: Set<CreatorKey> = emptySet(),
     val loadingCreatorTagIds: Set<CreatorKey> = emptySet(),
-    val creatorPostSnapshots: Map<CreatorKey, PaginationSnapshot<Post>> = emptyMap(),
+    val creatorPostSnapshots: Map<CreatorKey, OffsetPagingState<Post>> = emptyMap(),
     val creatorAnnouncements: Map<CreatorKey, List<Announcement>> = emptyMap(),
     val creatorTags: Map<CreatorKey, List<Tag>> = emptyMap(),
     val creatorLinks: Map<CreatorKey, List<Creator>> = emptyMap(),
