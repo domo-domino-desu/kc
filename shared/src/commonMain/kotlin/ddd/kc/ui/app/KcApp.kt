@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import ddd.kc.data.local.settings.AppSettings
 import ddd.kc.data.local.settings.SettingsLoadState
+import ddd.kc.ui.app.challenge.PawchiveChallengeOverlayHost
 import ddd.kc.ui.app.i18n.ProvideAppLocale
 import ddd.kc.ui.app.navigation.RootNavigator
 import ddd.kc.ui.components.AppFeedbackHost
@@ -48,7 +49,12 @@ fun KcApp(externalKcLinkEvents: Flow<String> = emptyFlow()) {
                   Text(state.cause.message ?: "Settings initialization failed")
                 }
             is SettingsLoadState.Ready ->
-                AppFeedbackHost { RootNavigator(externalKcLinkEvents = externalKcLinkEvents) }
+                AppFeedbackHost {
+                  Box(modifier = Modifier.fillMaxSize()) {
+                    RootNavigator(externalKcLinkEvents = externalKcLinkEvents)
+                    PawchiveChallengeOverlayHost(modifier = Modifier.fillMaxSize())
+                  }
+                }
           }
         }
       }

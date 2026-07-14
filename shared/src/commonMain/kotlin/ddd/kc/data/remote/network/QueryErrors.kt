@@ -3,6 +3,7 @@ package ddd.kc.data.remote.network
 import ddd.kc.data.model.QueryError
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.CancellationException
 import kotlinx.io.IOException
 
 class QueryException(val error: QueryError) :
@@ -12,7 +13,10 @@ fun QueryError.asException(): QueryException = QueryException(this)
 
 fun Throwable.toQueryError(): QueryError =
     when (this) {
+      is CancellationException -> throw this
       is QueryException -> error
+      is PawchiveCfChallengeException -> QueryError.CfChallenge(cfRay = cfRay, cause = this)
+      is PawchiveChallengeCancelledException -> QueryError.ChallengeCancelled(cause = this)
       is AuthRequiredException -> QueryError.Unauthorized(cause = this)
       is PawchiveApiException ->
           when (statusCode) {

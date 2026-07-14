@@ -5,4 +5,8 @@ class PawchiveApiException(
     message: String,
 ) : RuntimeException(message)
 
-class PawchiveGuardException : RuntimeException("Request blocked by upstream guard")
+class PawchiveCfChallengeException(
+    val cfRay: String?,
+) : RuntimeException("Cloudflare challenge remains active")
+
+class PawchiveChallengeCancelledException : RuntimeException("Cloudflare challenge was cancelled")

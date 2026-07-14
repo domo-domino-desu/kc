@@ -12,12 +12,17 @@ import ddd.kc.data.remote.network.KcSessionStore
 import ddd.kc.data.remote.network.PawchiveApi
 import ddd.kc.data.remote.network.PawchiveHttpGateway
 import ddd.kc.data.remote.network.buildKcHttpClient
+import ddd.kc.data.remote.network.challenge.PawchiveCfSessionStore
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeController
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeCoordinator
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeProbeVerifier
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeResolver
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeSessionStorage
 import ddd.kc.data.remote.repository.CreatorRepository
 import ddd.kc.data.remote.repository.PostRepository
 import ddd.kc.data.remote.repository.TagRepository
 import ddd.kc.data.remote.translation.TranslationDispatcher
 import ddd.kc.data.remote.translation.TranslationEngine
-import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import org.koin.core.qualifier.named
@@ -31,17 +36,54 @@ fun dataModule() = module {
       coerceInputValues = true
     }
   }
-  single { AcceptAllCookiesStorage() }
   single<SecretStore> { KSafeSecretStore(get(named(KOIN_QUALIFIER_SESSION_VAULT))) }
-  single { KcSessionStore(get()) }
-  single { ImageProgressTracker() }
-  single(named(KOIN_QUALIFIER_CACHED_IMAGE_CLIENT)) { createCachedImageHttpClient(get()) }
-  single { buildKcHttpClient(get()) }
-  single(named(KOIN_QUALIFIER_PAWCHIVE_CLIENT)) {
-    buildKcHttpClient(get(), followRedirects = false)
-  }
   single { AppSettings(get(), get()) }
-  single { PawchiveHttpGateway(get(named(KOIN_QUALIFIER_PAWCHIVE_CLIENT)), get(), get()) }
+  single { KcSessionStore(get()) }
+  single { PawchiveCfSessionStore(get(), get()) }
+  single { buildKcHttpClient() }
+  single(named(KOIN_QUALIFIER_PAWCHIVE_CLIENT)) {
+    buildKcHttpClient(
+        followRedirects = false,
+        useDefaultUserAgent = false,
+    )
+  }
+  single(named(KOIN_QUALIFIER_PAWCHIVE_PROBE_CLIENT)) {
+    buildKcHttpClient(
+        followRedirects = true,
+        useDefaultUserAgent = false,
+    )
+  }
+  single { PawchiveChallengeSessionStorage() }
+  single {
+    PawchiveChallengeProbeVerifier(
+        client = get(named(KOIN_QUALIFIER_PAWCHIVE_PROBE_CLIENT)),
+        cfSessionStore = get(),
+        loginSessionStore = get(),
+    )
+  }
+  single {
+    PawchiveChallengeCoordinator(
+        sessionStorage = get(),
+        cfSessionStore = get(),
+        loginSessionStore = get(),
+        probeVerifier = get(),
+    )
+  }
+  single<PawchiveChallengeController> { get<PawchiveChallengeCoordinator>() }
+  single<PawchiveChallengeResolver> { get<PawchiveChallengeCoordinator>() }
+  single { ImageProgressTracker() }
+  single(named(KOIN_QUALIFIER_CACHED_IMAGE_CLIENT)) {
+    createCachedImageHttpClient(get(), get(), get(), get())
+  }
+  single {
+    PawchiveHttpGateway(
+        get(named(KOIN_QUALIFIER_PAWCHIVE_CLIENT)),
+        get(),
+        get(),
+        get(),
+        get(),
+    )
+  }
   single { PawchiveApi(get(), get()) }
   single { TranslationDispatcher(get()) }
   single { TranslationEngine(get(), get()) }

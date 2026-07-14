@@ -27,6 +27,15 @@ sealed interface QueryError {
       override val cause: Throwable? = null,
   ) : QueryError
 
+  data class CfChallenge(
+      val cfRay: String? = null,
+      override val cause: Throwable? = null,
+  ) : QueryError
+
+  data class ChallengeCancelled(
+      override val cause: Throwable? = null,
+  ) : QueryError
+
   data class RateLimited(
       override val cause: Throwable? = null,
   ) : QueryError

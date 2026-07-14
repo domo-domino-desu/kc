@@ -2,17 +2,16 @@ package ddd.kc.data.remote.network
 
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
-import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
-import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
 
 expect fun buildKcHttpClient(
-    cookieStorage: AcceptAllCookiesStorage,
     followRedirects: Boolean = true,
+    useDefaultUserAgent: Boolean = true,
 ): HttpClient
 
-internal fun HttpClientConfig<*>.configureKcHttpClient(cookieStorage: AcceptAllCookiesStorage) {
-  install(HttpCookies) { storage = cookieStorage }
-  defaultRequest { headers[HttpHeaders.UserAgent] = "Mozilla/5.0 (compatible; KC/1.0)" }
+internal fun HttpClientConfig<*>.configureKcHttpClient(useDefaultUserAgent: Boolean) {
+  if (useDefaultUserAgent) {
+    defaultRequest { headers[HttpHeaders.UserAgent] = "Mozilla/5.0 (compatible; KC/1.0)" }
+  }
 }

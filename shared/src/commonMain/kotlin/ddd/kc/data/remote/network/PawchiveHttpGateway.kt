@@ -1,11 +1,17 @@
 package ddd.kc.data.remote.network
 
 import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.remote.network.challenge.PawchiveCfSessionStore
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeClassifier
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeResolver
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeSignal
+import ddd.kc.data.remote.network.challenge.PawchiveOriginPolicy
+import ddd.kc.data.remote.network.challenge.combineCookieHeaders
 import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.header
+import io.ktor.client.request.headers
 import io.ktor.client.request.request
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
@@ -16,7 +22,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import io.ktor.http.isSuccess
-import io.ktor.http.takeFrom
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -27,6 +32,8 @@ class PawchiveHttpGateway(
     private val client: HttpClient,
     private val settings: AppSettings,
     private val sessionStore: KcSessionStore,
+    private val cfSessionStore: PawchiveCfSessionStore,
+    private val challengeResolver: PawchiveChallengeResolver,
 ) {
   private val endpointMutex = Mutex()
 
@@ -65,23 +72,71 @@ class PawchiveHttpGateway(
     var directRedirectUrl: Url? = null
     val visitedUrls = mutableSetOf<String>()
     var redirectCount = 0
+    var challengeRetryCount = 0
 
     while (true) {
+      val requestUrl = directRedirectUrl ?: Url(baseUrl + path)
+      val siteOrigin = requireNotNull(PawchiveOriginPolicy.normalizedSiteOrigin(baseUrl))
+      val cfContext =
+          if (PawchiveOriginPolicy.isTrustedRequest(requestUrl.toString(), siteOrigin)) {
+            cfSessionStore.load(siteOrigin)
+          } else {
+            null
+          }
       val response =
           client.request {
             this.method = method
-            url(baseUrl + path)
-            if (authenticated) header(HttpHeaders.Cookie, sessionStore.cookieHeader())
+            url(requestUrl)
+            headers {
+              cfContext?.let { this[HttpHeaders.UserAgent] = it.userAgent }
+              this[HttpHeaders.Accept] = "text/html,application/xhtml+xml"
+              this[HttpHeaders.AcceptLanguage] = "en-US,en;q=0.9"
+              val cookies =
+                  combineCookieHeaders(
+                      cfContext?.cookieHeader.orEmpty(),
+                      if (authenticated && cfContext != null) sessionStore.cookieHeader() else "",
+                  )
+              if (cookies.isNotBlank()) this[HttpHeaders.Cookie] = cookies
+            }
             block()
-            directRedirectUrl?.let { url.takeFrom(it.toString()) }
           }
-      val requestUrl = response.call.request.url
-      if (!visitedUrls.add(requestUrl.toString())) {
+      val finalRequestUrl = response.call.request.url
+      if (!visitedUrls.add(finalRequestUrl.toString())) {
         discardBody(response)
         throw redirectFailure(label, response.status, "检测到重定向循环")
       }
 
-      if (!response.status.isRedirectStatus()) return requireSuccess(response, label)
+      if (PawchiveOriginPolicy.isTrustedRequest(finalRequestUrl.toString(), siteOrigin)) {
+        cfSessionStore.mergeSetCookieHeaders(
+            siteOrigin,
+            response.headers.getAll(HttpHeaders.SetCookie).orEmpty(),
+        )
+      }
+
+      if (!response.status.isRedirectStatus()) {
+        val body = response.bodyAsText()
+        val challenge =
+            PawchiveChallengeClassifier.classify(response.status.value, response.headers, body)
+        if (challenge != null) {
+          if (challengeRetryCount >= 1) {
+            throw PawchiveCfChallengeException(challenge.cfRay)
+          }
+          val resolved =
+              challengeResolver.awaitResolution(
+                  PawchiveChallengeSignal(
+                      requestUrl = finalRequestUrl.toString(),
+                      siteOrigin = siteOrigin,
+                      cfRay = challenge.cfRay,
+                  )
+              )
+          if (!resolved) throw PawchiveChallengeCancelledException()
+          challengeRetryCount++
+          visitedUrls.remove(finalRequestUrl.toString())
+          directRedirectUrl = finalRequestUrl
+          continue
+        }
+        return requireSuccess(response, label, body)
+      }
       if (++redirectCount > MAX_REDIRECTS) {
         discardBody(response)
         throw redirectFailure(label, response.status, "重定向次数超过上限")
@@ -93,15 +148,15 @@ class PawchiveHttpGateway(
         throw redirectFailure(label, response.status, "Location 不是有效的 HTTPS URL")
       }
 
-      val canonicalOrigin = canonicalRedirectOrigin(requestUrl, target, response.status)
+      val canonicalOrigin = canonicalRedirectOrigin(finalRequestUrl, target, response.status)
       if (canonicalOrigin != null) {
         discardBody(response)
-        baseUrl = adoptCanonicalOrigin(requestUrl.origin(), canonicalOrigin)
-        directRedirectUrl = Url(baseUrl + requestUrl.encodedPathAndQuery)
+        baseUrl = adoptCanonicalOrigin(finalRequestUrl.origin(), canonicalOrigin)
+        directRedirectUrl = Url(baseUrl + finalRequestUrl.encodedPathAndQuery)
         continue
       }
 
-      if (!canFollowWithoutPersisting(method, requestUrl, target, response.status)) {
+      if (!canFollowWithoutPersisting(method, finalRequestUrl, target, response.status)) {
         discardBody(response)
         throw redirectFailure(label, response.status, "拒绝非 canonical 重定向")
       }
@@ -125,17 +180,17 @@ class PawchiveHttpGateway(
         redirectedOrigin
       }
 
-  private suspend fun requireSuccess(response: HttpResponse, label: String): String {
+  private fun requireSuccess(response: HttpResponse, label: String, body: String): String {
     if (response.status == HttpStatusCode.Unauthorized) {
       gatewayLog.w { "$label -> 需要登录" }
       throw AuthRequiredException()
     }
     if (!response.status.isSuccess()) {
-      val bodyLength = resultOfSuspend { response.bodyAsText() }.getOrDefault("").length
+      val bodyLength = body.length
       gatewayLog.w { "$label -> 失败(status=${response.status.value},bodyLength=$bodyLength)" }
       throw PawchiveApiException(response.status.value, "HTTP ${response.status.value}")
     }
-    return response.bodyAsText()
+    return body
   }
 
   private suspend fun discardBody(response: HttpResponse) {

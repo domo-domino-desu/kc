@@ -2172,6 +2172,36 @@
       "funding": []
     },
     {
+      "uniqueId": "io.github.kdroidfilter:composewebview",
+      "artifactVersion": "1.0.0-beta-01",
+      "name": "ComposeWebView",
+      "description": "Compose Multiplatform WebView library for Desktop, Android and iOS",
+      "website": "https://github.com/kdroidFilter/ComposeDesktopNativeWebiew",
+      "developers": [{ "name": "kdroidFilter" }],
+      "scm": {
+        "connection": "scm:git:git://github.com/kdroidFilter/ComposeDesktopNativeWebiew.git",
+        "developerConnection": "scm:git:ssh://git@github.com/kdroidFilter/ComposeDesktopNativeWebiew.git",
+        "url": "https://github.com/kdroidFilter/ComposeDesktopNativeWebiew"
+      },
+      "licenses": ["MIT"],
+      "funding": []
+    },
+    {
+      "uniqueId": "io.github.kdroidfilter:wrywebview",
+      "artifactVersion": "1.0.0-beta-01",
+      "name": "WryWebView",
+      "description": "Native WebView bindings for JVM using Wry (Rust)",
+      "website": "https://github.com/kdroidFilter/ComposeDesktopNativeWebiew",
+      "developers": [{ "name": "kdroidFilter" }],
+      "scm": {
+        "connection": "scm:git:git://github.com/kdroidFilter/ComposeDesktopNativeWebiew.git",
+        "developerConnection": "scm:git:ssh://git@github.com/kdroidFilter/ComposeDesktopNativeWebiew.git",
+        "url": "https://github.com/kdroidFilter/ComposeDesktopNativeWebiew"
+      },
+      "licenses": ["MIT"],
+      "funding": []
+    },
+    {
       "uniqueId": "io.github.panpf.zoomimage:zoomimage-compose-coil3",
       "artifactVersion": "1.4.0",
       "name": "ZoomImage",

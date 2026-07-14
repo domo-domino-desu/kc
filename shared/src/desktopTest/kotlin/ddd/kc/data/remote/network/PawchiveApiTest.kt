@@ -9,6 +9,8 @@ import ddd.kc.data.model.allFiles
 import ddd.kc.data.model.canLoadFullImage
 import ddd.kc.data.model.fullUrl
 import ddd.kc.data.model.thumbnailUrl
+import ddd.kc.data.remote.network.challenge.PawchiveCfSessionStore
+import ddd.kc.data.remote.network.challenge.PawchiveChallengeResolver
 import ddd.kc.fake.TestFixtures
 import ddd.kc.fake.TestSecretStore
 import io.ktor.client.HttpClient
@@ -82,7 +84,7 @@ class PawchiveApiTest {
         }
     val sessionStore = KcSessionStore(TestSecretStore())
     sessionStore.saveSession("session=test_session; path=/")
-    val gateway = PawchiveHttpGateway(httpClient, settings, sessionStore)
+    val gateway = gateway(httpClient, settings, sessionStore)
     return PawchiveApi(gateway, json) to requests
   }
 
@@ -350,7 +352,7 @@ class PawchiveApiTest {
       }
     }
     val httpClient = HttpClient(engine) { followRedirects = false }
-    val gateway = PawchiveHttpGateway(httpClient, settings, KcSessionStore(TestSecretStore()))
+    val gateway = gateway(httpClient, settings, KcSessionStore(TestSecretStore()))
     val api = PawchiveApi(gateway, json)
 
     coroutineScope { List(8) { async { api.fetchCreatorsBody() } }.awaitAll() }
@@ -386,7 +388,7 @@ class PawchiveApiTest {
     val httpClient = HttpClient(engine) { followRedirects = false }
     val api =
         PawchiveApi(
-            PawchiveHttpGateway(httpClient, settings, KcSessionStore(TestSecretStore())),
+            gateway(httpClient, settings, KcSessionStore(TestSecretStore())),
             json,
         )
 
@@ -398,6 +400,22 @@ class PawchiveApiTest {
 
     assertEquals("https://custom.example", settings.baseUrl())
     assertEquals(listOf("pawchive.st", "custom.example"), requests.map { it.url.host })
+  }
+
+  private fun gateway(
+      client: HttpClient,
+      settings: AppSettings,
+      sessionStore: KcSessionStore,
+      challengeResolver: PawchiveChallengeResolver = PawchiveChallengeResolver { true },
+  ): PawchiveHttpGateway {
+    val cfSessionStore = PawchiveCfSessionStore(TestSecretStore(), json)
+    return PawchiveHttpGateway(
+        client,
+        settings,
+        sessionStore,
+        cfSessionStore,
+        challengeResolver,
+    )
   }
 
   @Test
