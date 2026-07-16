@@ -98,3 +98,13 @@ internal fun hrefQueryParam(href: String, name: String): String? =
         ?.ifBlank { null }
 
 internal fun String?.ifBlankOrNull(): String? = this?.takeIf { it.isNotBlank() }
+
+/** Pawchive DM cards currently expose no message id, so derive one from the source body. */
+internal fun stableDmContentHash(content: String): String {
+  var hash = -3750763034362895579L // FNV-1a 64-bit offset basis as a signed Long.
+  content.forEach { char ->
+    hash = hash xor char.code.toLong()
+    hash *= 1099511628211L
+  }
+  return hash.toULong().toString(16)
+}

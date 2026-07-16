@@ -8,6 +8,7 @@ import ddd.kc.data.model.PostFile
 import ddd.kc.data.model.allFiles
 import ddd.kc.data.model.canLoadFullImage
 import ddd.kc.data.model.fullUrl
+import ddd.kc.data.model.key
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.data.remote.network.challenge.PawchiveCfSessionStore
 import ddd.kc.data.remote.network.challenge.PawchiveChallengeResolver
@@ -611,7 +612,11 @@ class PawchiveApiTest {
     assertTrue(dmsPage.items.first().user.orEmpty().isNotBlank())
     assertTrue(dmsPage.items.first().content.orEmpty().isNotBlank())
     assertTrue(dmsPage.items.any { it.artist?.name.orEmpty().isNotBlank() })
-    assertEquals(PageInfo(), dmsPage.pageInfo)
+    val repeatedCreatorMonth =
+        dmsPage.items.groupBy { Triple(it.service, it.user, it.added) }.values.first { it.size > 1 }
+    assertEquals(repeatedCreatorMonth.size, repeatedCreatorMonth.map { it.hash }.distinct().size)
+    assertEquals(repeatedCreatorMonth.size, repeatedCreatorMonth.map { it.key }.distinct().size)
+    assertEquals(PageInfo(lastPage = 2, lastOffset = 50), dmsPage.pageInfo)
 
     assertEquals(
         4,

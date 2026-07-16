@@ -2,6 +2,7 @@ package ddd.kc.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,19 +24,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import be.digitalia.compose.htmlconverter.htmlToAnnotatedString
 import ddd.kc.data.model.DM
 import ddd.kc.ui.app.LocalAppSettings
+import ddd.kc.ui.components.icons.rememberServiceIconDefinition
+import ddd.kc.ui.components.icons.serviceIconVector
 import ddd.kc.ui.components.paging.ContentTranslationState
 import ddd.kc.ui.components.paging.TranslationBlockState
 import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.utils.collapseConsecutiveBlankLines
-
-private val urlRegex = Regex("""https?://[^\s<>"']+""")
 
 @Composable
 fun DmCard(
@@ -42,6 +45,7 @@ fun DmCard(
     modifier: Modifier = Modifier,
     translationState: ContentTranslationState? = null,
     onTranslate: (() -> Unit)? = null,
+    onCreatorClick: (() -> Unit)? = null,
 ) {
   val baseUrl = LocalAppSettings.current.baseUrl()
   val userId = dm.user.orEmpty()
@@ -56,33 +60,42 @@ fun DmCard(
       modifier = modifier.fillMaxWidth(),
   ) {
     Column(modifier = Modifier.padding(12.dp)) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
+      Row(verticalAlignment = Alignment.Top) {
         NetworkImage(
             url = avatarUrl,
-            modifier = Modifier.size(36.dp).clip(CircleShape),
+            modifier =
+                Modifier.size(36.dp)
+                    .clip(CircleShape)
+                    .then(
+                        if (onCreatorClick != null) Modifier.clickable(onClick = onCreatorClick)
+                        else Modifier
+                    ),
             contentScale = ContentScale.Crop,
         )
         Spacer(Modifier.width(10.dp))
-        Text(
-            text = displayName,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+              text = displayName,
+              style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier =
+                  if (onCreatorClick != null) Modifier.clickable(onClick = onCreatorClick)
+                  else Modifier,
+          )
+          if (service.isNotBlank() || !dm.added.isNullOrBlank()) {
+            Spacer(Modifier.height(2.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+              if (service.isNotBlank()) DmServiceChip(service)
+              if (!dm.added.isNullOrBlank()) DmMetadataChip(dm.added.take(10))
+            }
+          }
+        }
         if (onTranslate != null && !dm.content.isNullOrBlank()) {
           TranslateIconButton(
               onClick = onTranslate,
               isTranslating = translationState?.isTranslating == true,
               isActive = translationState?.showTranslation == true,
-          )
-        }
-        if (!dm.added.isNullOrBlank()) {
-          Spacer(Modifier.width(8.dp))
-          Text(
-              text = dm.added.take(10),
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
       }
@@ -97,7 +110,7 @@ fun DmCard(
         }
       } else {
         SelectionContainer {
-          LinkifiedDmText(
+          DmHtmlText(
               text =
                   dm.content?.takeIf { it.isNotBlank() }?.let(::collapseConsecutiveBlankLines)
                       ?: "(no content)",
@@ -110,10 +123,49 @@ fun DmCard(
 }
 
 @Composable
+private fun DmServiceChip(service: String) {
+  val serviceIcon = rememberServiceIconDefinition(service)
+  DmMetadataChip(
+      text = serviceIcon.label,
+      icon = serviceIconVector(serviceIcon.icon),
+  )
+}
+
+@Composable
+private fun DmMetadataChip(text: String, icon: ImageVector? = null) {
+  Surface(
+      shape = RoundedCornerShape(999.dp),
+      color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+      border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+  ) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+      if (icon != null) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.size(12.dp),
+        )
+      }
+      Text(
+          text = text,
+          style = MaterialTheme.typography.labelSmall,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+      )
+    }
+  }
+}
+
+@Composable
 private fun DmTranslatedBlockItem(block: TranslationBlockState, showDivider: Boolean) {
   SelectionContainer {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-      LinkifiedDmText(text = collapseConsecutiveBlankLines(block.originalHtml))
+      DmHtmlText(text = collapseConsecutiveBlankLines(block.originalHtml))
       Spacer(Modifier.height(6.dp))
       Text(
           text =
@@ -138,36 +190,12 @@ private fun DmTranslatedBlockItem(block: TranslationBlockState, showDivider: Boo
 }
 
 @Composable
-private fun LinkifiedDmText(text: String, modifier: Modifier = Modifier) {
-  val uriHandler = LocalUriHandler.current
-  val parts = remember(text) { splitUrlParts(text) }
-  Column(modifier = modifier.fillMaxWidth()) {
-    parts.forEach { part ->
-      Text(
-          text = part.value,
-          style = MaterialTheme.typography.bodySmall,
-          color =
-              if (part.isUrl) MaterialTheme.colorScheme.primary
-              else MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier =
-              if (part.isUrl) Modifier.clickable { uriHandler.openUri(part.value) } else Modifier,
-      )
-    }
-  }
-}
-
-private data class UrlPart(val value: String, val isUrl: Boolean)
-
-private fun splitUrlParts(text: String): List<UrlPart> {
-  val collapsedText = collapseConsecutiveBlankLines(text)
-  val parts = mutableListOf<UrlPart>()
-  var cursor = 0
-  urlRegex.findAll(collapsedText).forEach { match ->
-    if (match.range.first > cursor)
-        parts += UrlPart(collapsedText.substring(cursor, match.range.first), false)
-    parts += UrlPart(match.value, true)
-    cursor = match.range.last + 1
-  }
-  if (cursor < collapsedText.length) parts += UrlPart(collapsedText.substring(cursor), false)
-  return parts
+private fun DmHtmlText(text: String, modifier: Modifier = Modifier) {
+  val annotatedText = remember(text) { htmlToAnnotatedString(text) }
+  Text(
+      text = annotatedText,
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = modifier.fillMaxWidth(),
+  )
 }

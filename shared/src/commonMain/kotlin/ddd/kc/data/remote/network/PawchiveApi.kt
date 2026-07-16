@@ -169,6 +169,7 @@ class PawchiveApi(
             service = service,
             user = user,
             content = it,
+            hash = element.attr("data-hash").ifBlankOrNull() ?: stableDmContentHash(it),
             added =
                 element.selectFirst("time")?.attr("datetime")?.ifBlankOrNull()
                     ?: element

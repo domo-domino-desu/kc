@@ -27,6 +27,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
+import ddd.kc.data.model.Creator
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.DmKey
 import ddd.kc.data.model.key
@@ -35,6 +38,7 @@ import ddd.kc.data.remote.translation.TranslationBlockResult
 import ddd.kc.data.remote.translation.TranslationEngine
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.app.navigation.AppScreen
+import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.components.AutoLoadEffect
 import ddd.kc.ui.components.DmCard
 import ddd.kc.ui.components.ErrorToastEffect
@@ -50,6 +54,7 @@ import ddd.kc.ui.components.paging.TranslationBlockState
 import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.ui.components.previousPageHeader
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
+import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.recent.RecentDMsScreenModel
 import ddd.kc.utils.coroutines.resultOfSuspend
 import kc.shared.generated.resources.Res
@@ -68,11 +73,32 @@ class DmScreen : AppScreen {
     val searchModel = koinInject<DmSearchScreenModel>()
     val recentModel = koinInject<RecentDMsScreenModel>()
     val translationService = koinInject<TranslationEngine>()
+    val navigator = LocalNavigator.currentOrThrow
+    val navigationWindows = LocalNavigationWindowStore.current
     val searchState by searchModel.state.collectAsState()
     val recentState by recentModel.state.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val dmTranslations = remember { mutableStateMapOf<DmKey, ContentTranslationState>() }
+    val openCreator: (DM) -> Unit = openCreator@{ dm ->
+      val service = dm.service?.takeIf { it.isNotBlank() } ?: return@openCreator
+      val userId = dm.user?.takeIf { it.isNotBlank() } ?: return@openCreator
+      val creator =
+          dm.artist?.takeIf { it.service == service && it.id == userId }
+              ?: Creator(
+                  id = userId,
+                  name = dm.artist?.name?.takeIf { it.isNotBlank() } ?: userId,
+                  service = service,
+                  publicId = userId,
+              )
+      navigator.push(
+          CreatorRouteScreen(
+              navigationWindows.putCreators(listOf(creator)),
+              creator.key,
+              startIndex = 0,
+          )
+      )
+    }
     val refresh = {
       if (searchState.query.isBlank()) {
         recentModel.load(forceRefresh = true)
@@ -281,6 +307,10 @@ class DmScreen : AppScreen {
                       dm = dm,
                       translationState = dmTranslations[dm.translationKey()],
                       onTranslate = { translateDm(dm) },
+                      onCreatorClick =
+                          if (!dm.service.isNullOrBlank() && !dm.user.isNullOrBlank()) {
+                            { openCreator(dm) }
+                          } else null,
                   )
                 }
                 loadingFooter(
@@ -299,6 +329,10 @@ class DmScreen : AppScreen {
                     dm = dm,
                     translationState = dmTranslations[dm.translationKey()],
                     onTranslate = { translateDm(dm) },
+                    onCreatorClick =
+                        if (!dm.service.isNullOrBlank() && !dm.user.isNullOrBlank()) {
+                          { openCreator(dm) }
+                        } else null,
                 )
               }
               loadingFooter(
