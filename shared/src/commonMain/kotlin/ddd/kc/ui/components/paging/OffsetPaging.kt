@@ -132,6 +132,16 @@ class OffsetPagingMachine<Item, Key>(private val keyOf: (Item) -> Key) {
   fun beginAppend(snapshot: OffsetPagingState<Item>): OffsetPagingState<Item> =
       snapshot.copy(isLoadingMore = true, appendError = null)
 
+  fun consumeNavigationEffect(
+      snapshot: OffsetPagingState<Item>,
+      transactionId: Long,
+  ): OffsetPagingState<Item> =
+      if (snapshot.navigationEffect?.transactionId == transactionId) {
+        snapshot.copy(navigationEffect = null)
+      } else {
+        snapshot
+      }
+
   fun reduceFirstPage(
       snapshot: OffsetPagingState<Item>,
       items: List<Item>,

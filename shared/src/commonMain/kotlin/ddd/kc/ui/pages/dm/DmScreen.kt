@@ -70,14 +70,20 @@ class DmScreen : AppScreen {
   @Composable
   override fun Content() {
     val onReselectHandlerChanged = ddd.kc.ui.app.navigation.LocalRootTabReselectRegistration.current
+    val screenModel = koinInject<DmScreenModel>()
     val searchModel = koinInject<DmSearchScreenModel>()
     val recentModel = koinInject<RecentDMsScreenModel>()
     val translationService = koinInject<TranslationEngine>()
     val navigator = LocalNavigator.currentOrThrow
     val navigationWindows = LocalNavigationWindowStore.current
+    val screenState by screenModel.state.collectAsState()
     val searchState by searchModel.state.collectAsState()
     val recentState by recentModel.state.collectAsState()
-    val listState = rememberLazyListState()
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = screenState.scrollPosition.index,
+            initialFirstVisibleItemScrollOffset = screenState.scrollPosition.offset,
+        )
     val scope = rememberCoroutineScope()
     val dmTranslations = remember { mutableStateMapOf<DmKey, ContentTranslationState>() }
     val openCreator: (DM) -> Unit = openCreator@{ dm ->
@@ -125,6 +131,11 @@ class DmScreen : AppScreen {
       searchModel.init()
       recentModel.load()
     }
+    LaunchedEffect(listState) {
+      snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+          .distinctUntilChanged()
+          .collect { (index, offset) -> screenModel.onScrollPositionChanged(index, offset) }
+    }
     LaunchedEffect(listState, searchState.query.isBlank(), searchState.dms, recentState.items) {
       snapshotFlow {
             val index = (listState.firstVisibleItemIndex - 1).coerceAtLeast(0)
@@ -158,9 +169,22 @@ class DmScreen : AppScreen {
         else searchState.paging.navigationEffect
     LaunchedEffect(navigationEffect, searchState.query.isBlank()) {
       when (val effect = navigationEffect) {
-        is PagingEffect.ScrollToTop -> listState.scrollToItem(0)
-        is PagingEffect.RestoreViewport ->
-            listState.scrollToItem(effect.anchor.index + 1, effect.anchor.offset)
+        is PagingEffect.ScrollToTop -> {
+          listState.scrollToItem(0)
+          if (searchState.query.isBlank()) {
+            recentModel.onNavigationEffectHandled(effect.transactionId)
+          } else {
+            searchModel.onNavigationEffectHandled(effect.transactionId)
+          }
+        }
+        is PagingEffect.RestoreViewport -> {
+          listState.scrollToItem(effect.anchor.index + 1, effect.anchor.offset)
+          if (searchState.query.isBlank()) {
+            recentModel.onNavigationEffectHandled(effect.transactionId)
+          } else {
+            searchModel.onNavigationEffectHandled(effect.transactionId)
+          }
+        }
         is PagingEffect.RebaseSelection,
         null -> Unit
       }

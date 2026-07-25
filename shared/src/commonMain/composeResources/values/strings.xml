@@ -101,6 +101,8 @@
   <string name="login_title">Log In</string>
   <string name="login_username">Username</string>
   <string name="login_password">Password</string>
+  <string name="login_method_account">Account</string>
+  <string name="login_method_session">Session cookie</string>
   <string name="back">Back</string>
   <string name="home">Home</string>
   <string name="translate_action">Translate</string>
@@ -159,7 +161,7 @@
   <string name="session_cookie_configured">Session cookie configured</string>
   <string name="session_cookie_not_configured">Session cookie not configured</string>
   <string name="logout_confirm_title">Log out?</string>
-  <string name="logout_confirm_body">Clear the current session cookie</string>
+  <string name="logout_confirm_body">Clear the current login session</string>
   <string name="settings_summary">Appearance, translation, and downloads</string>
   <string name="about_summary">Version, licenses, and logs</string>
   <string name="history">Browsing History</string>
@@ -225,7 +227,8 @@
   <string name="reset">Reset</string>
   <string name="close_without_saving">Close without saving</string>
   <string name="error_network">Network connection failed. Try again later.</string>
-  <string name="error_unauthorized">Configure a Pawchive session cookie first.</string>
+  <string name="error_unauthorized">Log in to Pawchive first.</string>
+  <string name="error_invalid_credentials">Username or password is incorrect.</string>
   <string name="error_cloudflare_challenge">Cloudflare verification is still required.</string>
   <string name="error_cloudflare_challenge_cancelled">Cloudflare verification was cancelled.</string>
   <string name="error_rate_limited">Too many requests. Try again later.</string>

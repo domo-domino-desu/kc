@@ -23,6 +23,8 @@ class PawchiveApi(
 ) {
   fun hasSession(): Boolean = gateway.hasSession()
 
+  suspend fun login(username: String, password: String) = gateway.login(username, password)
+
   private inline fun <reified T> decode(body: String): T = json.decodeFromString(body)
 
   suspend fun fetchCreatorsBody(): String = gateway.getText("/api/v1/creators", "请求Creators")

@@ -18,6 +18,7 @@ fun Throwable.toQueryError(): QueryError =
       is PawchiveCfChallengeException -> QueryError.CfChallenge(cfRay = cfRay, cause = this)
       is PawchiveChallengeCancelledException -> QueryError.ChallengeCancelled(cause = this)
       is AuthRequiredException -> QueryError.Unauthorized(cause = this)
+      is InvalidCredentialsException -> QueryError.InvalidCredentials(cause = this)
       is PawchiveApiException ->
           when (statusCode) {
             401 -> QueryError.Unauthorized(cause = this)

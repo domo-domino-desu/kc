@@ -11,14 +11,17 @@ import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.headers
 import io.ktor.client.request.request
+import io.ktor.client.request.setBody
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import io.ktor.http.isSuccess
@@ -40,6 +43,106 @@ class PawchiveHttpGateway(
   fun hasSession(): Boolean = sessionStore.hasSession()
 
   fun clearSession() = sessionStore.clearSession()
+
+  suspend fun login(username: String, password: String) {
+    if (username.isBlank() || password.isBlank()) throw InvalidCredentialsException()
+
+    var baseUrl = currentBaseUrl()
+    var canonicalRedirectCount = 0
+    var challengeRetryCount = 0
+
+    while (true) {
+      val requestUrl = Url("$baseUrl/account/login")
+      val siteOrigin = requireNotNull(PawchiveOriginPolicy.normalizedSiteOrigin(baseUrl))
+      val cfContext = cfSessionStore.load(siteOrigin)
+      val response =
+          client.request {
+            method = HttpMethod.Post
+            url(requestUrl)
+            headers {
+              this[HttpHeaders.UserAgent] = cfContext.userAgent
+              this[HttpHeaders.Accept] = "text/html,application/xhtml+xml"
+              this[HttpHeaders.AcceptLanguage] = "en-US,en;q=0.9"
+              if (cfContext.cookieHeader.isNotBlank()) {
+                this[HttpHeaders.Cookie] = cfContext.cookieHeader
+              }
+            }
+            setBody(
+                FormDataContent(
+                    Parameters.build {
+                      append("username", username)
+                      append("password", password)
+                      append("location", "/artists")
+                    }
+                )
+            )
+          }
+      val finalRequestUrl = response.call.request.url
+      val setCookieHeaders = response.headers.getAll(HttpHeaders.SetCookie).orEmpty()
+      cfSessionStore.mergeSetCookieHeaders(siteOrigin, setCookieHeaders)
+
+      if (!response.status.isRedirectStatus()) {
+        val body = response.bodyAsText()
+        val challenge =
+            PawchiveChallengeClassifier.classify(response.status.value, response.headers, body)
+        if (challenge != null) {
+          if (challengeRetryCount >= 1) {
+            throw PawchiveCfChallengeException(challenge.cfRay)
+          }
+          val resolved =
+              challengeResolver.awaitResolution(
+                  PawchiveChallengeSignal(
+                      requestUrl = finalRequestUrl.toString(),
+                      siteOrigin = siteOrigin,
+                      cfRay = challenge.cfRay,
+                  )
+              )
+          if (!resolved) throw PawchiveChallengeCancelledException()
+          challengeRetryCount++
+          continue
+        }
+        requireSuccess(response, "账号密码登录", body)
+        throw PawchiveApiException(response.status.value, "登录响应缺少重定向")
+      }
+
+      val target = parseRedirectTarget(response)
+      if (target == null) {
+        discardBody(response)
+        throw redirectFailure("账号密码登录", response.status, "Location 不是有效的 HTTPS URL")
+      }
+      val canonicalOrigin = canonicalRedirectOrigin(finalRequestUrl, target, response.status)
+      if (canonicalOrigin != null) {
+        discardBody(response)
+        if (++canonicalRedirectCount > MAX_REDIRECTS) {
+          throw redirectFailure("账号密码登录", response.status, "重定向次数超过上限")
+        }
+        baseUrl = adoptCanonicalOrigin(finalRequestUrl.origin(), canonicalOrigin)
+        continue
+      }
+
+      if (response.status != HttpStatusCode.Found && response.status != HttpStatusCode.SeeOther) {
+        discardBody(response)
+        throw redirectFailure("账号密码登录", response.status, "非预期的登录重定向")
+      }
+      if (target.origin() != finalRequestUrl.origin()) {
+        discardBody(response)
+        throw redirectFailure("账号密码登录", response.status, "拒绝跨站登录重定向")
+      }
+      if (target.encodedPath.trimEnd('/') == "/account/login") {
+        discardBody(response)
+        throw InvalidCredentialsException()
+      }
+
+      val session = sessionCookieValue(setCookieHeaders)
+      discardBody(response)
+      if (session.isNullOrBlank()) {
+        throw PawchiveApiException(response.status.value, "登录响应缺少 session cookie")
+      }
+      sessionStore.saveSession(session)
+      gatewayLog.i { "账号密码登录 -> 成功(host=${finalRequestUrl.host})" }
+      return
+    }
+  }
 
   suspend fun getText(
       path: String,
@@ -278,3 +381,11 @@ internal fun Url.origin(): String {
       if (specifiedPort == 0 || specifiedPort == protocol.defaultPort) "" else ":$specifiedPort"
   return "${protocol.name}://$renderedHost$portSuffix"
 }
+
+private fun sessionCookieValue(setCookieHeaders: List<String>): String? =
+    setCookieHeaders.firstNotNullOfOrNull { setCookie ->
+      val pair = setCookie.substringBefore(';').trim()
+      val name = pair.substringBefore('=', "").trim()
+      if (!name.equals("session", ignoreCase = true)) null
+      else pair.substringAfter('=', "").trim().takeIf(String::isNotBlank)
+    }

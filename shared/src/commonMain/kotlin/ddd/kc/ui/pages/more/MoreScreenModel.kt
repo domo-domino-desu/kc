@@ -18,6 +18,7 @@ data class SessionUiState(
     val loggedIn: Boolean,
     val session: String,
     val operationInProgress: Boolean = false,
+    val loginSucceeded: Boolean = false,
     val error: QueryError? = null,
 )
 
@@ -37,8 +38,49 @@ class MoreScreenModel(
         mutableState.value.copy(
             loggedIn = sessionStore.hasSession(),
             session = sessionStore.getSession().orEmpty(),
+            loginSucceeded = false,
             error = null,
         )
+  }
+
+  fun login(username: String, password: String) {
+    if (mutableState.value.operationInProgress) return
+    mutableState.value =
+        mutableState.value.copy(
+            operationInProgress = true,
+            loginSucceeded = false,
+            error = null,
+        )
+    screenModelScope.launch {
+      log.i { "账号密码登录 -> 开始" }
+      resultOfSuspend { api.login(username, password) }
+          .onSuccess {
+            postRepo.clearFavoritesCache()
+            creatorRepo.clearFavoritesCache()
+            log.i { "账号密码登录 -> 成功" }
+            mutableState.value =
+                mutableState.value.copy(
+                    loggedIn = true,
+                    session = sessionStore.getSession().orEmpty(),
+                    operationInProgress = false,
+                    loginSucceeded = true,
+                    error = null,
+                )
+          }
+          .onFailure {
+            log.w(it) { "账号密码登录 -> 失败" }
+            mutableState.value =
+                mutableState.value.copy(
+                    operationInProgress = false,
+                    loginSucceeded = false,
+                    error = it.toQueryError(),
+                )
+          }
+    }
+  }
+
+  fun consumeLoginSuccess() {
+    mutableState.value = mutableState.value.copy(loginSucceeded = false)
   }
 
   fun clearError() {
@@ -47,7 +89,12 @@ class MoreScreenModel(
 
   fun logout() {
     if (mutableState.value.operationInProgress) return
-    mutableState.value = mutableState.value.copy(operationInProgress = true, error = null)
+    mutableState.value =
+        mutableState.value.copy(
+            operationInProgress = true,
+            loginSucceeded = false,
+            error = null,
+        )
     screenModelScope.launch {
       log.i { "退出登录 -> 开始" }
       resultOfSuspend { api.logout() }

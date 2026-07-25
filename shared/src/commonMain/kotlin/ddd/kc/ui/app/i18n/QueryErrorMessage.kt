@@ -8,6 +8,7 @@ import kc.shared.generated.resources.error_cloudflare_challenge
 import kc.shared.generated.resources.error_cloudflare_challenge_cancelled
 import kc.shared.generated.resources.error_forbidden
 import kc.shared.generated.resources.error_http
+import kc.shared.generated.resources.error_invalid_credentials
 import kc.shared.generated.resources.error_network
 import kc.shared.generated.resources.error_parse
 import kc.shared.generated.resources.error_rate_limited
@@ -20,6 +21,7 @@ fun QueryError.localizedMessage(): String =
     when (this) {
       is QueryError.Network -> stringResource(Res.string.error_network)
       is QueryError.Unauthorized -> stringResource(Res.string.error_unauthorized)
+      is QueryError.InvalidCredentials -> stringResource(Res.string.error_invalid_credentials)
       is QueryError.CfChallenge -> stringResource(Res.string.error_cloudflare_challenge)
       is QueryError.ChallengeCancelled ->
           stringResource(Res.string.error_cloudflare_challenge_cancelled)

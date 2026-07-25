@@ -20,6 +20,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.HttpRequestData
+import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -189,6 +190,94 @@ class PawchiveApiTest {
 
     assertEquals("pawchive.pw", requests.single().url.host)
     assertEquals("https", requests.single().url.protocol.name)
+  }
+
+  @Test
+  fun accountLoginFollowsCanonicalRedirectAndSavesIssuedSession() = runBlocking {
+    val settings = settings()
+    val sessionStore = KcSessionStore(TestSecretStore())
+    val requests = mutableListOf<HttpRequestData>()
+    val engine = MockEngine { request ->
+      requests += request
+      if (request.url.host == "pawchive.st") {
+        respond(
+            content = "",
+            status = HttpStatusCode.MovedPermanently,
+            headers =
+                headersOf(
+                    HttpHeaders.Location,
+                    "https://pawchive.pw/account/login",
+                ),
+        )
+      } else {
+        respond(
+            content = "",
+            status = HttpStatusCode.Found,
+            headers =
+                Headers.build {
+                  append(HttpHeaders.Location, "/artists?logged_in=yes")
+                  append(
+                      HttpHeaders.SetCookie,
+                      "session=issued-session; HttpOnly; Path=/; SameSite=Lax",
+                  )
+                },
+        )
+      }
+    }
+    val api =
+        PawchiveApi(
+            gateway(
+                HttpClient(engine) { followRedirects = false },
+                settings,
+                sessionStore,
+            ),
+            json,
+        )
+
+    api.login("alice+test", "p&a ss")
+
+    assertEquals("issued-session", sessionStore.getSession())
+    assertEquals("https://pawchive.pw", settings.baseUrl())
+    assertEquals(listOf("pawchive.st", "pawchive.pw"), requests.map { it.url.host })
+    assertTrue(requests.all { it.method == HttpMethod.Post })
+    requests.forEach { request ->
+      val form = (request.body as FormDataContent).formData
+      assertEquals("alice+test", form["username"])
+      assertEquals("p&a ss", form["password"])
+      assertEquals("/artists", form["location"])
+    }
+  }
+
+  @Test
+  fun rejectedAccountLoginDoesNotSaveFlashSessionCookie() = runBlocking {
+    val sessionStore = KcSessionStore(TestSecretStore())
+    val engine = MockEngine {
+      respond(
+          content = "",
+          status = HttpStatusCode.Found,
+          headers =
+              Headers.build {
+                append(HttpHeaders.Location, "/account/login?location=/artists")
+                append(
+                    HttpHeaders.SetCookie,
+                    "session=flash-message-session; HttpOnly; Path=/; SameSite=Lax",
+                )
+              },
+      )
+    }
+    val api =
+        PawchiveApi(
+            gateway(
+                HttpClient(engine) { followRedirects = false },
+                settings(),
+                sessionStore,
+            ),
+            json,
+        )
+
+    assertFailsWith<InvalidCredentialsException> { api.login("alice", "wrong") }
+
+    assertNull(sessionStore.getSession())
   }
 
   @Test

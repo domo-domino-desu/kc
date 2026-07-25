@@ -2,6 +2,7 @@ package ddd.kc.di
 
 import ddd.kc.ui.pages.creator.CreatorScreenModel
 import ddd.kc.ui.pages.creators.CreatorSearchScreenModel
+import ddd.kc.ui.pages.dm.DmScreenModel
 import ddd.kc.ui.pages.dm.DmSearchScreenModel
 import ddd.kc.ui.pages.more.FavoritesScreenModel
 import ddd.kc.ui.pages.more.MoreScreenModel
@@ -20,6 +21,7 @@ fun uiModule() = module {
   single { PopularPostsScreenModel(get()) }
   single { CreatorSearchScreenModel(get()) }
   single { PostSearchScreenModel(get()) }
+  single { DmScreenModel() }
   single { DmSearchScreenModel(get()) }
   single { WorksScreenModel() }
   single { MoreScreenModel(get(), get(), get(), get()) }

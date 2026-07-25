@@ -84,6 +84,10 @@ class RecentDMsScreenModel(
         )
   }
 
+  fun onNavigationEffectHandled(transactionId: Long) {
+    mutableState.value = reducer.consumeNavigationEffect(mutableState.value, transactionId)
+  }
+
   private suspend fun fetch(
       offset: Int,
       forceRefresh: Boolean,

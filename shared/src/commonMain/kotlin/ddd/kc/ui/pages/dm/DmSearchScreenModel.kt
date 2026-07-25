@@ -149,6 +149,10 @@ class DmSearchScreenModel(
     )
   }
 
+  fun onNavigationEffectHandled(transactionId: Long) {
+    updatePaging(reducer.consumeNavigationEffect(mutableState.value.paging, transactionId))
+  }
+
   private suspend fun loadFirstPage(query: String, forceRefresh: Boolean, requestGeneration: Long) {
     updatePaging(reducer.beginLoad(mutableState.value.paging, forceRefresh))
     fetchPage(query, 0, replace = true, requestGeneration = requestGeneration)
