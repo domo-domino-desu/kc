@@ -271,8 +271,10 @@ class PostRepository(
       creatorId: String,
       postId: String,
   ): Post =
-      observePost(service, creatorId, postId).awaitData().also {
-        log.i { "加载Post详情 -> 成功(${summarizePost(it)})" }
+      withContext(ioContext) {
+        observePost(service, creatorId, postId).awaitData().also {
+          log.i { "加载Post详情 -> 成功(${summarizePost(it)})" }
+        }
       }
 
   fun observeFavoritePosts(forceRefresh: Boolean = false): Flow<QueryState<List<Post>>> = flow {

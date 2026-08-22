@@ -5,26 +5,31 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
 import ddd.kc.data.local.dao.CacheDao
+import ddd.kc.data.local.dao.CreatorDao
 import ddd.kc.data.local.dao.HistoryDao
-import ddd.kc.data.local.entity.CacheBodyChunkEntity
 import ddd.kc.data.local.entity.CacheEntity
+import ddd.kc.data.local.entity.CreatorEntity
 import ddd.kc.data.local.entity.CreatorHistoryEntity
+import ddd.kc.data.local.entity.CreatorSyncEntity
 import ddd.kc.data.local.entity.PostHistoryEntity
 
 @Database(
     entities =
         [
             CacheEntity::class,
-            CacheBodyChunkEntity::class,
+            CreatorEntity::class,
+            CreatorSyncEntity::class,
             CreatorHistoryEntity::class,
             PostHistoryEntity::class,
         ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
   abstract fun cacheDao(): CacheDao
+
+  abstract fun creatorDao(): CreatorDao
 
   abstract fun historyDao(): HistoryDao
 }

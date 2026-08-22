@@ -1,6 +1,10 @@
 package ddd.kc.data.remote.repository
 
 import ddd.kc.data.local.AppDatabase
+import ddd.kc.data.local.entity.CreatorEntity
+import ddd.kc.data.local.entity.CreatorSyncEntity
+import ddd.kc.data.local.entity.toEntity
+import ddd.kc.data.local.entity.toModel
 import ddd.kc.data.model.Announcement
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.CreatorKey
@@ -11,19 +15,30 @@ import ddd.kc.data.model.Tag
 import ddd.kc.data.remote.cache.CacheNamespace
 import ddd.kc.data.remote.cache.typedQueryStore
 import ddd.kc.data.remote.network.PawchiveApi
+import ddd.kc.data.remote.network.toQueryError
+import ddd.kc.utils.currentTimeMs
 import ddd.kc.utils.logging.KcLog
 import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 private val log = KcLog.withTag("CreatorRepository")
-private const val CREATORS_CACHE_KEY = "pawchive:creators:v1"
+private const val CREATORS_SYNC_KEY = "all"
 
 private data class DmKey(val query: String, val offset: Int)
+
+private data class CreatorSnapshot(
+    val creators: List<Creator>,
+    val cachedAtMs: Long?,
+    val didFetch: Boolean,
+)
 
 class CreatorRepository(
     private val api: PawchiveApi,
@@ -31,6 +46,8 @@ class CreatorRepository(
     private val json: Json,
     private val ioContext: CoroutineContext,
 ) {
+  private val creatorsRefreshMutex = Mutex()
+
   private val dao
     get() = db.cacheDao()
 
@@ -93,22 +110,114 @@ class CreatorRepository(
     )
   }
 
-  private val creatorsStore by lazy {
-    typedQueryStore<Unit, List<Creator>>(
-        cacheDao = dao,
-        json = json,
-        serializer = ListSerializer(Creator.serializer()),
-        namespace = CacheNamespace.Creators,
-        cacheKey = { CREATORS_CACHE_KEY },
-        fetch = { api.parseCreators(api.fetchCreatorsBody()) },
+  fun observeCreators(forceRefresh: Boolean = false): Flow<QueryState<List<Creator>>> = flow {
+    val initial = withContext(ioContext) { readCreatorSnapshot() }
+    val stale = initial.cachedAtMs == null || isCreatorsStale(initial.cachedAtMs)
+    if (initial.creators.isNotEmpty()) {
+      emit(
+          QueryState(
+              data = initial.creators,
+              isRefreshing = forceRefresh || stale,
+              isFromCache = true,
+              isStale = stale,
+              lastUpdatedAtMillis = initial.cachedAtMs,
+          )
+      )
+    } else {
+      emit(QueryState(isLoading = true, isStale = true))
+    }
+    if (!forceRefresh && !stale) return@flow
+
+    try {
+      val fresh = withContext(ioContext) { refreshCreators(forceRefresh) }
+      emit(
+          QueryState(
+              data = fresh.creators,
+              isFromCache = !fresh.didFetch,
+              isStale = false,
+              lastUpdatedAtMillis = fresh.cachedAtMs,
+          )
+      )
+    } catch (error: CancellationException) {
+      throw error
+    } catch (error: Throwable) {
+      emit(
+          QueryState(
+              data = initial.creators.takeIf { it.isNotEmpty() },
+              isFromCache = initial.creators.isNotEmpty(),
+              isStale = true,
+              error = error.toQueryError(),
+              lastUpdatedAtMillis = initial.cachedAtMs,
+          )
+      )
+    }
+  }
+
+  suspend fun getAllCreators(forceRefresh: Boolean): List<Creator> =
+      withContext(ioContext) {
+        val sync = db.creatorDao().findSync(CREATORS_SYNC_KEY)
+        if (forceRefresh || sync == null || isCreatorsStale(sync.cachedAtMs)) {
+          refreshCreators(forceRefresh).creators
+        } else db.creatorDao().listAll().map(CreatorEntity::toModel)
+      }
+
+  suspend fun getCreator(key: CreatorKey): Creator? =
+      withContext(ioContext) {
+        db.creatorDao().find(key.service, key.id)?.toModel()
+            ?: run {
+              refreshCreators(forceRefresh = false)
+              db.creatorDao().find(key.service, key.id)?.toModel()
+            }
+      }
+
+  private suspend fun refreshCreators(forceRefresh: Boolean): CreatorSnapshot =
+      creatorsRefreshMutex.withLock {
+        val creatorDao = db.creatorDao()
+        val latestSync = creatorDao.findSync(CREATORS_SYNC_KEY)
+        if (!forceRefresh && latestSync != null && !isCreatorsStale(latestSync.cachedAtMs)) {
+          return@withLock CreatorSnapshot(
+              creators = creatorDao.listAll().map(CreatorEntity::toModel),
+              cachedAtMs = latestSync.cachedAtMs,
+              didFetch = false,
+          )
+        }
+
+        val remote = api.parseCreators(api.fetchCreatorsBody())
+        check(remote.isNotEmpty()) { "Creator snapshot is empty; refusing to replace local data" }
+        val remoteEntities = remote.map(Creator::toEntity)
+        val localEntities = creatorDao.listAll()
+        val localByKey = localEntities.associateBy { it.service to it.creatorId }
+        val remoteKeys = HashSet<Pair<String, String>>(remoteEntities.size)
+        val upserts =
+            remoteEntities.filter { entity ->
+              remoteKeys += entity.service to entity.creatorId
+              localByKey[entity.service to entity.creatorId] != entity
+            }
+        val deletes = localEntities.filter { (it.service to it.creatorId) !in remoteKeys }
+        val cachedAtMs = currentTimeMs()
+        creatorDao.applyDiff(
+            upserts = upserts,
+            deletes = deletes,
+            sync = CreatorSyncEntity(CREATORS_SYNC_KEY, cachedAtMs),
+        )
+        log.i {
+          "Creator快照同步(total=${remoteEntities.size},upsert=${upserts.size},delete=${deletes.size})"
+        }
+        CreatorSnapshot(remote, cachedAtMs, didFetch = true)
+      }
+
+  private suspend fun readCreatorSnapshot(): CreatorSnapshot {
+    val creatorDao = db.creatorDao()
+    val sync = creatorDao.findSync(CREATORS_SYNC_KEY)
+    return CreatorSnapshot(
+        creators = creatorDao.listAll().map(CreatorEntity::toModel),
+        cachedAtMs = sync?.cachedAtMs,
+        didFetch = false,
     )
   }
 
-  fun observeCreators(forceRefresh: Boolean = false): Flow<QueryState<List<Creator>>> =
-      creatorsStore.query(Unit, forceRefresh = forceRefresh)
-
-  suspend fun getAllCreators(forceRefresh: Boolean): List<Creator> =
-      observeCreators(forceRefresh).awaitData()
+  private fun isCreatorsStale(cachedAtMs: Long): Boolean =
+      currentTimeMs() - cachedAtMs > CacheNamespace.Creators.ttlMillis
 
   fun observeCreatorAnnouncements(
       service: String,

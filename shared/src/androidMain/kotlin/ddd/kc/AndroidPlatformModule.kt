@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.room.Room
 import ddd.kc.data.local.AppDatabase
 import ddd.kc.data.local.AppDatabaseBuilderFactory
+import ddd.kc.data.local.MIGRATION_1_2
 import ddd.kc.di.KOIN_QUALIFIER_SESSION_VAULT
 import eu.anifantakis.lib.ksafe.KSafe
 import java.io.File
@@ -21,10 +22,11 @@ fun androidPlatformModule(context: Context): Module = module {
     val appContext = context.applicationContext
     AppDatabaseBuilderFactory {
       Room.databaseBuilder(
-          context = appContext,
-          klass = AppDatabase::class.java,
-          name = "kc.db",
-      )
+              context = appContext,
+              klass = AppDatabase::class.java,
+              name = "kc.db",
+          )
+          .addMigrations(MIGRATION_1_2)
     }
   }
   single<DataStore<Preferences>> {

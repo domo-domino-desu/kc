@@ -7,6 +7,7 @@ import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import ddd.kc.data.local.AppDatabase
 import ddd.kc.data.local.AppDatabaseBuilderFactory
+import ddd.kc.data.local.MIGRATION_1_2
 import ddd.kc.di.KOIN_QUALIFIER_SESSION_VAULT
 import eu.anifantakis.lib.ksafe.KSafe
 import java.io.File
@@ -20,7 +21,9 @@ fun desktopPlatformModule(): Module = module {
     AppDatabaseBuilderFactory {
       val dbFile = File(applicationDataDirectory(), "kc.db")
       dbFile.parentFile?.mkdirs()
-      Room.databaseBuilder<AppDatabase>(name = dbFile.absolutePath).setDriver(BundledSQLiteDriver())
+      Room.databaseBuilder<AppDatabase>(name = dbFile.absolutePath)
+          .setDriver(BundledSQLiteDriver())
+          .addMigrations(MIGRATION_1_2)
     }
   }
   single<DataStore<Preferences>> {

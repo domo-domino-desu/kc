@@ -365,10 +365,8 @@ class PostScreenModel(
     val key = post.creatorKey
     if (mutableState.value.postCreators.containsKey(key)) return
     screenModelScope.launch {
-      resultOfSuspend { creatorRepo.getAllCreators(false) }
-          .onSuccess { creators ->
-            val creator =
-                creators.firstOrNull { it.service == post.service && it.id == post.creatorId }
+      resultOfSuspend { creatorRepo.getCreator(key) }
+          .onSuccess { creator ->
             if (creator != null) {
               mutableState.value =
                   mutableState.value.copy(

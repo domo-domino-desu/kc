@@ -1,6 +1,7 @@
 package ddd.kc.data.remote.cache
 
 import ddd.kc.data.local.dao.CacheDao
+import ddd.kc.data.local.entity.CacheEntity
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.remote.network.asException
 import ddd.kc.data.remote.network.toQueryError
@@ -17,6 +18,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 
 private val typedCacheLog = KcLog.withTag("TypedQueryStore")
+private const val MAX_DATABASE_CACHE_BODY_BYTES = 1024 * 1024
 
 enum class CacheNamespace(val ttlMillis: Long) {
   Creators(24 * 60 * 60 * 1000L),
@@ -80,7 +82,16 @@ class TypedQueryStore<Key : Any, Output : Any>(
               } else {
                 val value = fetch(key)
                 val cachedAt = currentTimeMs()
-                cacheDao.upsertBody(resolvedKey, json.encodeToString(serializer, value), cachedAt)
+                val body = json.encodeToString(serializer, value)
+                val bodyBytes = body.encodeToByteArray().size
+                if (bodyBytes <= MAX_DATABASE_CACHE_BODY_BYTES) {
+                  cacheDao.upsert(CacheEntity(resolvedKey, body, cachedAt))
+                } else {
+                  cacheDao.delete(resolvedKey)
+                  typedCacheLog.w {
+                    "typed缓存跳过超大响应(keyHash=${resolvedKey.hashCode()},bytes=$bodyBytes)"
+                  }
+                }
                 CachedResource(value, cachedAt)
               }
             }
@@ -122,7 +133,7 @@ class TypedQueryStore<Key : Any, Output : Any>(
   }
 
   private suspend fun readCached(resolvedKey: String): CachedResource<Output>? {
-    val cached = cacheDao.findBodyByKey(resolvedKey) ?: return null
+    val cached = cacheDao.findByKey(resolvedKey) ?: return null
     return try {
       CachedResource(json.decodeFromString(serializer, cached.body), cached.cachedAtMs)
     } catch (error: CancellationException) {
