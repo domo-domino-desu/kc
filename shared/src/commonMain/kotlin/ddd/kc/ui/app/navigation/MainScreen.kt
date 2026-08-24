@@ -29,13 +29,13 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.Navigator
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CommentW400Outlined
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.CommentW400Outlinedfill1
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.CommentW400OutlinedFill
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ImageW400Outlined
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.ImageW400Outlinedfill1
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.ImageW400OutlinedFill
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.MenuW400Outlined
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.MenuW400Outlinedfill1
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.MenuW400OutlinedFill
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.PersonW400Outlined
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.PersonW400Outlinedfill1
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.PersonW400OutlinedFill
 import ddd.kc.ui.pages.creators.CreatorsScreen
 import ddd.kc.ui.pages.dm.DmScreen
 import ddd.kc.ui.pages.more.MoreScreen
@@ -83,25 +83,25 @@ private fun tabs() =
             MainTab.Creators,
             stringResource(Res.string.tab_creators),
             Icons.PersonW400Outlined,
-            Icons.PersonW400Outlinedfill1,
+            Icons.PersonW400OutlinedFill,
         ),
         TabDef(
             MainTab.Works,
             stringResource(Res.string.tab_works),
             Icons.ImageW400Outlined,
-            Icons.ImageW400Outlinedfill1,
+            Icons.ImageW400OutlinedFill,
         ),
         TabDef(
             MainTab.Dm,
             stringResource(Res.string.tab_dm),
             Icons.CommentW400Outlined,
-            Icons.CommentW400Outlinedfill1,
+            Icons.CommentW400OutlinedFill,
         ),
         TabDef(
             MainTab.More,
             stringResource(Res.string.tab_more),
             Icons.MenuW400Outlined,
-            Icons.MenuW400Outlinedfill1,
+            Icons.MenuW400OutlinedFill,
         ),
     )
 

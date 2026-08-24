@@ -61,7 +61,7 @@ import ddd.kc.data.model.key
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlinedfill1
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400OutlinedFill
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.components.CreatorBannerFallback
@@ -261,7 +261,7 @@ internal fun CreatorDetailPage(
                   ) {
                     Icon(
                         imageVector =
-                            if (isFavorite) Icons.FavoriteW400Outlinedfill1
+                            if (isFavorite) Icons.FavoriteW400OutlinedFill
                             else Icons.FavoriteW400Outlined,
                         contentDescription =
                             if (isFavorite) stringResource(Res.string.remove_favorite)

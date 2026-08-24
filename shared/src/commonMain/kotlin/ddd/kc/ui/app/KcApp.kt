@@ -21,41 +21,38 @@ import ddd.kc.ui.components.AppFeedbackHost
 import ddd.kc.ui.theme.KcTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
 val LocalAppSettings = staticCompositionLocalOf<AppSettings> { error("AppSettings not provided") }
 
 @Composable
 fun KcApp(externalKcLinkEvents: Flow<String> = emptyFlow()) {
-  KoinContext {
-    val appSettings = koinInject<AppSettings>()
-    LaunchedEffect(Unit) { appSettings.init() }
-    val settingsState by appSettings.loadState.collectAsState()
-    val language by appSettings.languageFlow().collectAsState(appSettings.language())
-    val themeMode by appSettings.themeModeFlow().collectAsState(appSettings.themeMode())
-    CompositionLocalProvider(
-        LocalAppSettings provides appSettings,
-    ) {
-      ProvideAppLocale(localeTag = language.resourceLocaleTag) {
-        KcTheme(themeMode = themeMode) {
-          when (val state = settingsState) {
-            SettingsLoadState.Loading ->
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                  CircularProgressIndicator()
+  val appSettings = koinInject<AppSettings>()
+  LaunchedEffect(Unit) { appSettings.init() }
+  val settingsState by appSettings.loadState.collectAsState()
+  val language by appSettings.languageFlow().collectAsState(appSettings.language())
+  val themeMode by appSettings.themeModeFlow().collectAsState(appSettings.themeMode())
+  CompositionLocalProvider(
+      LocalAppSettings provides appSettings,
+  ) {
+    ProvideAppLocale(localeTag = language.resourceLocaleTag) {
+      KcTheme(themeMode = themeMode) {
+        when (val state = settingsState) {
+          SettingsLoadState.Loading ->
+              Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+              }
+          is SettingsLoadState.Error ->
+              Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(state.cause.message ?: "Settings initialization failed")
+              }
+          is SettingsLoadState.Ready ->
+              AppFeedbackHost {
+                Box(modifier = Modifier.fillMaxSize()) {
+                  RootNavigator(externalKcLinkEvents = externalKcLinkEvents)
+                  PawchiveChallengeOverlayHost(modifier = Modifier.fillMaxSize())
                 }
-            is SettingsLoadState.Error ->
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                  Text(state.cause.message ?: "Settings initialization failed")
-                }
-            is SettingsLoadState.Ready ->
-                AppFeedbackHost {
-                  Box(modifier = Modifier.fillMaxSize()) {
-                    RootNavigator(externalKcLinkEvents = externalKcLinkEvents)
-                    PawchiveChallengeOverlayHost(modifier = Modifier.fillMaxSize())
-                  }
-                }
-          }
+              }
         }
       }
     }

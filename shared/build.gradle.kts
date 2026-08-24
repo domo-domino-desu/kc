@@ -55,12 +55,13 @@ kotlin {
     compileSdk = androidCompileSdk
     minSdk = androidMinSdk
     androidResources { enable = true }
+    withHostTest {}
   }
 
   jvm("desktop")
 
   sourceSets {
-    val commonMain by getting {
+    named("commonMain") {
       kotlin.srcDir(generatedAboutMetadataDir)
       kotlin.srcDir(generatedSymbolCraftDir)
       dependencies {
@@ -100,7 +101,7 @@ kotlin {
       }
     }
 
-    val commonTest by getting {
+    named("commonTest") {
       dependencies {
         implementation(kotlin("test"))
         implementation(libs.kotlinx.coroutines.test)
@@ -108,7 +109,7 @@ kotlin {
       }
     }
 
-    val desktopMain by getting {
+    named("desktopMain") {
       dependencies {
         implementation(libs.ktor.client.okhttp)
         implementation(libs.slf4j.simple)
@@ -116,7 +117,7 @@ kotlin {
       }
     }
 
-    val androidMain by getting {
+    named("androidMain") {
       dependencies {
         implementation(libs.androidx.activity.compose)
         implementation(libs.coil.gif)
@@ -126,7 +127,7 @@ kotlin {
       }
     }
 
-    val desktopTest by getting {
+    named("desktopTest") {
       dependencies {
         implementation(kotlin("test"))
         implementation(libs.ktor.client.mock)
@@ -168,6 +169,12 @@ tasks
     .configureEach { mustRunAfter("exportLibraryDefinitions") }
 
 tasks.matching { it.name == "check" }.configureEach { dependsOn(verifyAboutLibrariesMetadata) }
+
+tasks
+    .matching {
+      it.name == "generateAndroidHostTestLintModel" || it.name == "lintAnalyzeAndroidHostTest"
+    }
+    .configureEach { dependsOn("kspAndroidHostTest") }
 
 symbolCraft {
   packageName.set("ddd.kc.generated.symbols")

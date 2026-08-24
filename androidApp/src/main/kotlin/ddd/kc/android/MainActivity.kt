@@ -13,7 +13,6 @@ import coil3.gif.GifDecoder
 import ddd.kc.data.remote.media.installKcCoilImageProgressSupport
 import ddd.kc.ui.app.KcApp
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import okio.Path.Companion.toPath
 
 private const val coilDiskCacheMaxBytes = 1024L * 1024L * 1024L
@@ -42,7 +41,7 @@ class MainActivity : ComponentActivity() {
             }
             .build()
       }
-      KcApp(externalKcLinkEvents = externalKcLinkEvents.asSharedFlow())
+      KcApp(externalKcLinkEvents = externalKcLinkEvents)
     }
   }
 

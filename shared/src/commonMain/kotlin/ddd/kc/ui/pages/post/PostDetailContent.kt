@@ -61,7 +61,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.CalendarAddOnW400Out
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.CommentW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.DateRangeW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlined
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400Outlinedfill1
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.FavoriteW400OutlinedFill
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.TagW400Outlined
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.components.DetailAppBar
@@ -162,7 +162,7 @@ internal fun PostDetailPage(
         FloatingActionButton(onClick = onFavoriteClick) {
           Icon(
               imageVector =
-                  if (isFavorite) Icons.FavoriteW400Outlinedfill1 else Icons.FavoriteW400Outlined,
+                  if (isFavorite) Icons.FavoriteW400OutlinedFill else Icons.FavoriteW400Outlined,
               contentDescription = null,
           )
         }

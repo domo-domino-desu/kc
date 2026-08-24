@@ -48,7 +48,7 @@ import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.DownloadW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400Outlined
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400Outlinedfill1
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400OutlinedFill
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.LinkW400Outlined
 import ddd.kc.ui.components.ImageLoadLifecycleState
 import ddd.kc.ui.components.NetworkImage
@@ -377,7 +377,7 @@ internal fun LoadFullSizeImagesIconButton(
       modifier = Modifier.size(32.dp),
   ) {
     Icon(
-        imageVector = if (isActive) Icons.HdW400Outlinedfill1 else Icons.HdW400Outlined,
+        imageVector = if (isActive) Icons.HdW400OutlinedFill else Icons.HdW400Outlined,
         contentDescription = stringResource(Res.string.load_full_size_images),
         modifier = Modifier.size(18.dp),
         tint =
