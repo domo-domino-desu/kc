@@ -1,5 +1,8 @@
 package ddd.kc.desktop
 
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
@@ -11,6 +14,7 @@ import ddd.kc.utils.logging.KcLog
 import dev.nucleusframework.application.DecoratedWindow
 import dev.nucleusframework.application.NucleusBackend
 import dev.nucleusframework.application.nucleusApplication
+import dev.nucleusframework.window.TitleBar
 import okio.Path
 import okio.Path.Companion.toPath
 
@@ -27,6 +31,12 @@ fun main() =
           },
           title = "KC",
       ) {
+        TitleBar {
+          Text(
+              text = "KC",
+              modifier = Modifier.align(Alignment.CenterHorizontally),
+          )
+        }
         setSingletonImageLoaderFactory { platformContext ->
           ImageLoader.Builder(platformContext)
               .installKcCoilImageProgressSupport()
