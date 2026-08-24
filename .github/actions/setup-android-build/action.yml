@@ -5,16 +5,16 @@ runs:
   using: composite
   steps:
     - name: Set up Java 21
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: temurin
         java-version: "21"
 
     - name: Set up Gradle
-      uses: gradle/actions/setup-gradle@v4
+      uses: gradle/actions/setup-gradle@v6
 
     - name: Set up Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
 
     - name: Install Android SDK components
       shell: bash
@@ -32,9 +32,14 @@ runs:
         build_tools="$(awk -F= '/^ANDROID_BUILD_TOOLS=/{print $2; exit}' gradle.properties)"
         test -n "${compile_sdk}" && test -n "${build_tools}"
 
+        platform_sdk="${compile_sdk}"
+        if (( compile_sdk >= 37 )); then
+          platform_sdk="${compile_sdk}.0"
+        fi
+
         sdkmanager \
           "platform-tools" \
-          "platforms;android-${compile_sdk}" \
+          "platforms;android-${platform_sdk}" \
           "build-tools;${build_tools}"
 
     - name: Make Gradle wrapper executable

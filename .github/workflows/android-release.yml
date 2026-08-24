@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -50,7 +50,7 @@ jobs:
         run: ./gradlew --stacktrace :androidApp:assembleRelease :androidApp:bundleRelease
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-release-artifacts
           path: |
@@ -97,7 +97,7 @@ jobs:
 
       - name: Publish pre-release for branch
         if: startsWith(github.ref, 'refs/heads/')
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@v1.21.0
         with:
           tag: pre-${{ github.ref_name }}
           name: Pre Release (${{ github.ref_name }})
@@ -115,7 +115,7 @@ jobs:
 
       - name: Publish versioned release for tag
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@v1.21.0
         with:
           tag: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
