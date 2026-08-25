@@ -59,6 +59,8 @@ fun PagedPostGrid(
     contentPadding: PaddingValues = PaddingValues(12.dp),
     leadingItemCount: Int = 0,
     leadingContent: LazyGridScope.() -> Unit = {},
+    initialLoadingContent: LazyGridScope.() -> Unit = { gridSkeletonItems() },
+    emptyContent: LazyGridScope.() -> Unit = {},
 ) {
   Box(modifier = modifier) {
     PagedPullRefreshBox(
@@ -86,7 +88,9 @@ fun PagedPostGrid(
             onLoadPrevious = actions.onLoadPrevious,
         )
         if (state.loading && state.posts.isEmpty()) {
-          gridSkeletonItems()
+          initialLoadingContent()
+        } else if (state.posts.isEmpty()) {
+          emptyContent()
         } else {
           items(state.posts, key = { "${it.service}:${it.artistId ?: it.user}:${it.id}" }) { post ->
             PostCard(

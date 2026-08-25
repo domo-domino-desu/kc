@@ -20,9 +20,9 @@ fun uiModule() = module {
   single { RecentDMsScreenModel(get()) }
   single { PopularPostsScreenModel(get()) }
   single { CreatorSearchScreenModel(get()) }
-  single { PostSearchScreenModel(get()) }
+  single { PostSearchScreenModel(get(), get()) }
   single { DmScreenModel() }
-  single { DmSearchScreenModel(get()) }
+  single { DmSearchScreenModel(get(), get()) }
   single { WorksScreenModel() }
   single { MoreScreenModel(get(), get(), get(), get()) }
 

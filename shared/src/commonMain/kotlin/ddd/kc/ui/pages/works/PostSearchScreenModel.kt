@@ -2,10 +2,12 @@ package ddd.kc.ui.pages.works
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import ddd.kc.data.local.ActivityHistoryRepository
 import ddd.kc.data.model.PagedResult
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.model.SearchKind
 import ddd.kc.data.model.key
 import ddd.kc.data.remote.network.asException
 import ddd.kc.data.remote.repository.PostRepository
@@ -18,17 +20,23 @@ import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val log = KcLog.withTag("PostSearchScreenModel")
 private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 data class PostSearchState(
-    val query: String = "",
+    val draftQuery: String = "",
+    val appliedQuery: String = "",
     val defaultPopularDate: String? = null,
     val paging: OffsetPagingState<Post> = OffsetPagingState(),
 ) {
+  val query
+    get() = appliedQuery
+
+  val hasPendingQuery
+    get() = draftQuery.trim() != appliedQuery
+
   val posts
     get() = paging.items
 
@@ -73,6 +81,7 @@ data class PostSearchState(
 
 class PostSearchScreenModel(
     private val postRepo: PostRepository,
+    private val historyRepo: ActivityHistoryRepository,
 ) : StateScreenModel<PostSearchState>(PostSearchState()) {
   private val reducer = OffsetPagingMachine<Post, PostKey> { it.key }
   private var searchJob: Job? = null
@@ -95,12 +104,24 @@ class PostSearchScreenModel(
 
   fun onQueryChanged(query: String) {
     searchJob?.cancel()
+    generation++
+    mutableState.value = mutableState.value.copy(draftQuery = query)
+  }
+
+  fun submitSearch() {
+    val query = mutableState.value.draftQuery.trim()
+    searchJob?.cancel()
     val requestGeneration = ++generation
-    mutableState.value = PostSearchState(query = query)
+    mutableState.value =
+        PostSearchState(
+            draftQuery = query,
+            appliedQuery = query,
+            defaultPopularDate = mutableState.value.defaultPopularDate,
+        )
     searchJob =
         screenModelScope.launch {
           try {
-            if (query.isNotBlank()) delay(300)
+            if (query.isNotBlank()) historyRepo.recordSearch(SearchKind.POSTS, query)
             if (query.isBlank()) loadDefaultPage(false, requestGeneration)
             else loadSearchPage(query, requestGeneration)
           } catch (_: CancellationException) {
@@ -161,7 +182,8 @@ class PostSearchScreenModel(
   private suspend fun loadDefaultPage(forceRefresh: Boolean, requestGeneration: Long) {
     updatePaging(reducer.beginLoad(mutableState.value.paging, forceRefresh))
     postRepo.observePopularPostsPage(null, "day", 0, forceRefresh).collect { next ->
-      if (requestGeneration != generation || mutableState.value.query.isNotBlank()) return@collect
+      if (requestGeneration != generation || mutableState.value.appliedQuery.isNotBlank())
+          return@collect
       next.data?.let { page ->
         mutableState.value =
             mutableState.value.copy(
@@ -187,7 +209,8 @@ class PostSearchScreenModel(
     updatePaging(reducer.beginLoad(mutableState.value.paging, forceRefresh = true))
     resultOfSuspend { postRepo.searchPostsPage(query, 0, null, null, true) }
         .onSuccess { page ->
-          if (requestGeneration != generation || mutableState.value.query != query) return@onSuccess
+          if (requestGeneration != generation || mutableState.value.appliedQuery != query)
+              return@onSuccess
           updatePaging(
               reducer.reduceFirstPage(
                   mutableState.value.paging,
@@ -212,7 +235,7 @@ class PostSearchScreenModel(
       rollback: OffsetPagingState<Post>? = null,
       requestGeneration: Long = generation,
   ) {
-    val requestQuery = mutableState.value.query
+    val requestQuery = mutableState.value.appliedQuery
     resultOfSuspend {
           if (requestQuery.isBlank()) {
             val page =
@@ -229,7 +252,7 @@ class PostSearchScreenModel(
           }
         }
         .onSuccess { page ->
-          if (requestGeneration != generation || mutableState.value.query != requestQuery)
+          if (requestGeneration != generation || mutableState.value.appliedQuery != requestQuery)
               return@onSuccess
           val hasMore = page.pageInfo?.hasNext ?: (page.items.size >= PAGE_SIZE)
           updatePaging(
@@ -264,7 +287,7 @@ class PostSearchScreenModel(
           }
         }
         .onFailure { error ->
-          if (requestGeneration != generation || mutableState.value.query != requestQuery)
+          if (requestGeneration != generation || mutableState.value.appliedQuery != requestQuery)
               return@onFailure
           updatePaging(
               when {

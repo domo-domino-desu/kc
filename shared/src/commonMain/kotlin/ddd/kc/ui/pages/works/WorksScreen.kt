@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DatePicker
@@ -20,6 +22,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -39,6 +42,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -47,6 +51,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.DateRangeW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowLeftW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW400Outlined
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.SearchW400Outlined
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.app.navigation.AppScreen
@@ -55,7 +60,9 @@ import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
 import ddd.kc.ui.components.PostGridPagingActions
 import ddd.kc.ui.components.PostGridPagingState
+import ddd.kc.ui.components.SearchResultStatus
 import ddd.kc.ui.components.fullWidthItem
+import ddd.kc.ui.components.gridSkeletonItems
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.paging.ScrollPosition
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
@@ -77,6 +84,8 @@ import kc.shared.generated.resources.period_day
 import kc.shared.generated.resources.period_month
 import kc.shared.generated.resources.period_week
 import kc.shared.generated.resources.save
+import kc.shared.generated.resources.search_action
+import kc.shared.generated.resources.search_pending_prompt
 import kc.shared.generated.resources.search_works_hint
 import kc.shared.generated.resources.shift_next_day
 import kc.shared.generated.resources.shift_next_month
@@ -299,17 +308,18 @@ private fun PostSearchContent(
   ErrorToastEffect(state.error?.localizedMessage())
   ErrorToastEffect(state.appendError?.localizedMessage())
   ErrorToastEffect(state.prependError?.localizedMessage())
+  val visiblePosts = if (state.hasPendingQuery) emptyList() else state.posts
   PagedPostGrid(
       state =
           PostGridPagingState(
-              posts = state.posts,
-              visiblePageInfo = state.visiblePageInfo,
-              loading = state.isLoading,
-              refreshing = state.result.isRefreshing,
-              isLoadingMore = state.isLoadingMore,
-              isLoadingPrevious = state.isLoadingPrevious,
-              hasMore = state.hasMore,
-              canLoadPrevious = state.canAutoLoadPrevious,
+              posts = visiblePosts,
+              visiblePageInfo = state.visiblePageInfo.takeUnless { state.hasPendingQuery },
+              loading = state.isLoading && !state.hasPendingQuery,
+              refreshing = state.result.isRefreshing && !state.hasPendingQuery,
+              isLoadingMore = state.isLoadingMore && !state.hasPendingQuery,
+              isLoadingPrevious = state.isLoadingPrevious && !state.hasPendingQuery,
+              hasMore = state.hasMore && state.posts.isNotEmpty() && !state.hasPendingQuery,
+              canLoadPrevious = state.canAutoLoadPrevious && !state.hasPendingQuery,
               prependErrorMessage = state.prependError?.localizedMessage(),
               appendErrorMessage = state.appendError?.localizedMessage(),
               navigationEffect = state.paging.navigationEffect,
@@ -344,16 +354,55 @@ private fun PostSearchContent(
       minCardWidth = cellWidth.dp,
       modifier = Modifier.fillMaxSize(),
       contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-      leadingItemCount = 1,
+      leadingItemCount = if (state.hasPendingQuery) 2 else 1,
       leadingContent = {
         fullWidthItem(key = "search_bar") {
           OutlinedTextField(
-              value = state.query,
+              value = state.draftQuery,
               onValueChange = screenModel::onQueryChanged,
               placeholder = { Text(stringResource(Res.string.search_works_hint)) },
               singleLine = true,
+              keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+              keyboardActions = KeyboardActions(onSearch = { screenModel.submitSearch() }),
+              trailingIcon = {
+                IconButton(onClick = screenModel::submitSearch, enabled = !state.isLoading) {
+                  Icon(
+                      imageVector = Icons.SearchW400Outlined,
+                      contentDescription = stringResource(Res.string.search_action),
+                  )
+                }
+              },
               modifier = Modifier.fillMaxWidth(),
           )
+        }
+        if (state.hasPendingQuery) {
+          fullWidthItem(key = "search_prompt") {
+            Text(
+                text = stringResource(Res.string.search_pending_prompt),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
+            )
+          }
+        }
+      },
+      initialLoadingContent = {
+        if (state.query.isBlank()) {
+          gridSkeletonItems()
+        } else {
+          fullWidthItem(key = "search_loading") {
+            SearchResultStatus(loading = true, errorMessage = null, onRetry = refresh)
+          }
+        }
+      },
+      emptyContent = {
+        if (!state.hasPendingQuery && state.query.isNotBlank()) {
+          fullWidthItem(key = if (state.error == null) "search_empty" else "search_error") {
+            SearchResultStatus(
+                loading = false,
+                errorMessage = state.error?.localizedMessage(),
+                onRetry = refresh,
+            )
+          }
         }
       },
   )

@@ -16,6 +16,16 @@
   <string name="search_dms_hint">Search DMs…</string>
   <string name="search_dms_prompt">Enter keywords to search DMs</string>
   <string name="search_action">Search</string>
+  <string name="search_pending_prompt">Click the search button to start searching</string>
+  <string name="search_no_results">No matching results</string>
+  <string name="search_failed">Search failed</string>
+  <string name="retry">Retry</string>
+  <string name="search_history">Search History</string>
+  <string name="search_history_summary">Previously submitted work and DM searches</string>
+  <string name="search_history_posts">Works</string>
+  <string name="search_history_dms">DMs</string>
+  <string name="loading_search_history">Loading search history…</string>
+  <string name="empty_search_history">No search history yet</string>
   <!-- Filters / sort -->
   <string name="filter_service">Service</string>
   <string name="filter_all">All</string>
@@ -102,7 +112,7 @@
   <string name="login_username">Username</string>
   <string name="login_password">Password</string>
   <string name="login_method_account">Account</string>
-  <string name="login_method_session">Session cookie</string>
+  <string name="login_method_session">Cookie</string>
   <string name="back">Back</string>
   <string name="home">Home</string>
   <string name="translate_action">Translate</string>
@@ -118,6 +128,10 @@
   <string name="creator_tab_posts">Posts</string>
   <string name="creator_tab_announcements">Announcements</string>
   <string name="creator_tab_tags">Tags</string>
+  <string name="creator_tab_community">Community</string>
+  <string name="community_directory">Community directory</string>
+  <string name="no_community_messages">No community messages</string>
+  <string name="community_creator_badge">Creator</string>
   <string name="creator_tab_discord_channels">Channels</string>
   <string name="no_discord_channels">No channels</string>
   <string name="no_announcements">(No Announcements)</string>

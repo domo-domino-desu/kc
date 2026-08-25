@@ -28,6 +28,7 @@ kotlin {
         implementation(libs.kermit)
         implementation(libs.nucleus.application)
         implementation(libs.nucleus.core.runtime)
+        implementation(libs.nucleus.decorated.window.material3)
         implementation(libs.nucleus.decorated.window.tao)
         implementation(libs.room.runtime)
         implementation(libs.sqlite.bundled)

@@ -3,6 +3,7 @@ package ddd.kc.ui.pages.creator
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.model.Announcement
+import ddd.kc.data.model.CommunityMessage
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.Post
@@ -51,6 +52,7 @@ class CreatorScreenModel(
     POSTS,
     TAGS,
     LINKS,
+    COMMUNITY,
   }
 
   private val requestTokens = mutableMapOf<Pair<RequestKind, CreatorKey>, Long>()
@@ -68,6 +70,7 @@ class CreatorScreenModel(
   private val updatingFavoriteCreators = mutableSetOf<CreatorKey>()
   private val favoriteRequestTokens = mutableMapOf<CreatorKey, Long>()
   private val postReducer = OffsetPagingMachine<Post, PostKey> { it.key }
+  private val communityReducer = OffsetPagingMachine<CommunityMessage, String> { it.key }
 
   private fun beginFavoriteRequest(key: CreatorKey): Long {
     val next = (favoriteRequestTokens[key] ?: 0L) + 1L
@@ -125,6 +128,255 @@ class CreatorScreenModel(
 
   fun getCreatorPostSnapshot(creator: Creator): OffsetPagingState<Post> =
       mutableState.value.creatorPostSnapshots[creator.key] ?: OffsetPagingState()
+
+  fun getCreatorCommunity(creator: Creator): CreatorCommunityUiState =
+      mutableState.value.creatorCommunities[creator.key] ?: CreatorCommunityUiState()
+
+  fun loadCreatorCommunity(creator: Creator, forceRefresh: Boolean = false) {
+    if (!creator.service.equals("patreon", ignoreCase = true)) {
+      updateCommunity(creator, CreatorCommunityUiState(available = false))
+      return
+    }
+    val existing = getCreatorCommunity(creator)
+    if (!forceRefresh && (existing.available != null || existing.loading)) return
+    val token = beginRequest(RequestKind.COMMUNITY, creator.key)
+    updateCommunity(creator, existing.copy(loading = true, error = null))
+    screenModelScope.launch {
+      resultOfSuspend {
+            creatorRepo.getCreatorCommunityPage(
+                creator.service,
+                creator.id,
+                forceRefresh = forceRefresh,
+            )
+          }
+          .onSuccess { page ->
+            if (!isCurrentRequest(RequestKind.COMMUNITY, creator.key, token)) return@onSuccess
+            if (page == null) {
+              updateCommunity(creator, CreatorCommunityUiState(available = false))
+              return@onSuccess
+            }
+            val snapshot =
+                communityReducer.reduceFirstPage(
+                    OffsetPagingState(pageSize = COMMUNITY_PAGE_SIZE, loading = true),
+                    page.messages,
+                    page.pageInfo?.hasNext ?: (page.messages.size >= COMMUNITY_PAGE_SIZE),
+                    COMMUNITY_PAGE_SIZE,
+                    page.pageInfo,
+                )
+            updateCommunity(
+                creator,
+                CreatorCommunityUiState(
+                    available = true,
+                    lounges = page.lounges,
+                    selectedLoungeId = page.selectedLoungeId,
+                    loungeSnapshots = mapOf(page.selectedLoungeId to snapshot),
+                ),
+            )
+          }
+          .onFailure { error ->
+            if (!isCurrentRequest(RequestKind.COMMUNITY, creator.key, token)) return@onFailure
+            updateCommunity(creator, existing.copy(loading = false, error = error.toQueryError()))
+          }
+    }
+  }
+
+  fun selectCommunityLounge(creator: Creator, loungeId: String) {
+    val current = getCreatorCommunity(creator)
+    if (current.selectedLoungeId == loungeId) return
+    updateCommunity(creator, current.copy(selectedLoungeId = loungeId, error = null))
+    if (loungeId !in current.loungeSnapshots) {
+      loadCommunityWindow(creator, loungeId, offset = 0)
+    }
+  }
+
+  fun refreshCreatorCommunity(creator: Creator) {
+    val state = getCreatorCommunity(creator)
+    val loungeId = state.selectedLoungeId ?: return loadCreatorCommunity(creator, true)
+    loadCommunityWindow(
+        creator,
+        loungeId,
+        offset = state.selectedSnapshot.startOffset,
+        forceRefresh = true,
+    )
+  }
+
+  fun loadMoreCommunity(
+      creator: Creator,
+      loungeId: String? = getCreatorCommunity(creator).selectedLoungeId,
+      retry: Boolean = false,
+  ) {
+    val state = getCreatorCommunity(creator)
+    loungeId ?: return
+    val snapshot =
+        state.selectedSnapshot.takeIf { state.selectedLoungeId == loungeId }
+            ?: state.loungeSnapshots[loungeId]
+            ?: return
+    if (!communityReducer.canLoadMore(snapshot, force = retry)) return
+    updateCommunitySnapshot(creator, loungeId, communityReducer.beginAppend(snapshot))
+    loadCommunityWindow(creator, loungeId, snapshot.offset, append = true)
+  }
+
+  fun loadPreviousCommunity(
+      creator: Creator,
+      loungeId: String? = getCreatorCommunity(creator).selectedLoungeId,
+  ) {
+    val state = getCreatorCommunity(creator)
+    loungeId ?: return
+    val snapshot =
+        state.selectedSnapshot.takeIf { state.selectedLoungeId == loungeId }
+            ?: state.loungeSnapshots[loungeId]
+            ?: return
+    if (!communityReducer.canLoadPrevious(snapshot)) return
+    val offset = (snapshot.startOffset - COMMUNITY_PAGE_SIZE).coerceAtLeast(0)
+    updateCommunitySnapshot(creator, loungeId, communityReducer.beginPrepend(snapshot))
+    loadCommunityWindow(creator, loungeId, offset, prepend = true)
+  }
+
+  fun jumpCommunityToPage(creator: Creator, page: Int) {
+    val state = getCreatorCommunity(creator)
+    val loungeId = state.selectedLoungeId ?: return
+    val snapshot = state.selectedSnapshot
+    val target = page.coerceIn(1, snapshot.pageInfo?.lastPage ?: page.coerceAtLeast(1))
+    val offset = (target - 1) * COMMUNITY_PAGE_SIZE
+    updateCommunitySnapshot(creator, loungeId, communityReducer.beginJump(snapshot, offset))
+    loadCommunityWindow(creator, loungeId, offset, replace = true, rollback = snapshot)
+  }
+
+  fun onCommunityViewportChanged(creator: Creator, anchor: PagingAnchor) {
+    val state = getCreatorCommunity(creator)
+    val loungeId = state.selectedLoungeId ?: return
+    updateCommunitySnapshot(
+        creator,
+        loungeId,
+        communityReducer.updateViewport(
+            state.selectedSnapshot,
+            anchor.index,
+            anchor.offset,
+            anchor.itemKey,
+            COMMUNITY_PAGE_SIZE,
+        ),
+    )
+  }
+
+  fun onCommunityNavigationEffectHandled(creator: Creator, transactionId: Long) {
+    val state = getCreatorCommunity(creator)
+    val loungeId = state.selectedLoungeId ?: return
+    updateCommunitySnapshot(
+        creator,
+        loungeId,
+        communityReducer.consumeNavigationEffect(state.selectedSnapshot, transactionId),
+    )
+  }
+
+  private fun loadCommunityWindow(
+      creator: Creator,
+      loungeId: String,
+      offset: Int,
+      forceRefresh: Boolean = false,
+      append: Boolean = false,
+      prepend: Boolean = false,
+      replace: Boolean = false,
+      rollback: OffsetPagingState<CommunityMessage>? = null,
+  ) {
+    val token = beginRequest(RequestKind.COMMUNITY, creator.key)
+    screenModelScope.launch {
+      resultOfSuspend {
+            requireNotNull(
+                creatorRepo.getCreatorCommunityPage(
+                    creator.service,
+                    creator.id,
+                    loungeId,
+                    offset,
+                    forceRefresh,
+                )
+            )
+          }
+          .onSuccess { page ->
+            if (!isCurrentRequest(RequestKind.COMMUNITY, creator.key, token)) return@onSuccess
+            val current =
+                getCreatorCommunity(creator).loungeSnapshots[loungeId]
+                    ?: OffsetPagingState(pageSize = COMMUNITY_PAGE_SIZE)
+            val hasMore = page.pageInfo?.hasNext ?: (page.messages.size >= COMMUNITY_PAGE_SIZE)
+            val next =
+                when {
+                  append ->
+                      communityReducer.reduceAppend(
+                          current,
+                          page.messages,
+                          hasMore,
+                          offset + COMMUNITY_PAGE_SIZE,
+                      )
+                  prepend ->
+                      communityReducer.reducePrepend(
+                          current,
+                          page.messages,
+                          current.hasMore,
+                          offset,
+                      )
+                  else ->
+                      communityReducer.reduceFirstPage(
+                          current,
+                          page.messages,
+                          hasMore,
+                          offset + COMMUNITY_PAGE_SIZE,
+                          page.pageInfo,
+                          offset,
+                      )
+                }
+            val community = getCreatorCommunity(creator)
+            updateCommunity(
+                creator,
+                community.copy(
+                    available = true,
+                    lounges = page.lounges.ifEmpty { community.lounges },
+                    loungeSnapshots = community.loungeSnapshots + (loungeId to next),
+                    loading = false,
+                    error = null,
+                ),
+            )
+          }
+          .onFailure { error ->
+            if (!isCurrentRequest(RequestKind.COMMUNITY, creator.key, token)) return@onFailure
+            val state = getCreatorCommunity(creator)
+            val current =
+                state.loungeSnapshots[loungeId] ?: OffsetPagingState(pageSize = COMMUNITY_PAGE_SIZE)
+            val failed =
+                when {
+                  append -> communityReducer.reduceAppendError(current, error)
+                  prepend -> communityReducer.reducePrependError(current, error)
+                  replace && rollback != null -> communityReducer.reduceJumpError(rollback, error)
+                  else -> communityReducer.reduceFirstPageError(current, error)
+                }
+            updateCommunity(
+                creator,
+                state.copy(
+                    loungeSnapshots = state.loungeSnapshots + (loungeId to failed),
+                    loading = false,
+                    error = error.toQueryError(),
+                ),
+            )
+          }
+    }
+  }
+
+  private fun updateCommunitySnapshot(
+      creator: Creator,
+      loungeId: String,
+      snapshot: OffsetPagingState<CommunityMessage>,
+  ) {
+    val state = getCreatorCommunity(creator)
+    updateCommunity(
+        creator,
+        state.copy(loungeSnapshots = state.loungeSnapshots + (loungeId to snapshot)),
+    )
+  }
+
+  private fun updateCommunity(creator: Creator, state: CreatorCommunityUiState) {
+    mutableState.value =
+        mutableState.value.copy(
+            creatorCommunities = mutableState.value.creatorCommunities + (creator.key to state)
+        )
+  }
 
   fun loadCreatorAnnouncements(creator: Creator, forceRefresh: Boolean = false) {
     if (!forceRefresh && mutableState.value.creatorAnnouncements.containsKey(creator.key)) return

@@ -4,6 +4,7 @@ import com.fleeksoft.ksoup.Ksoup
 import com.fleeksoft.ksoup.nodes.Element
 import ddd.kc.data.model.Announcement
 import ddd.kc.data.model.Comment
+import ddd.kc.data.model.CommunityPage
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.PagedResult
@@ -275,6 +276,24 @@ class PawchiveApi(
       )
 
   fun parseCreatorTags(body: String): List<Tag> = parseTags(body)
+
+  suspend fun fetchCreatorCommunityBody(
+      service: String,
+      creatorId: String,
+      loungeId: String? = null,
+      offset: Int = 0,
+  ): String {
+    val suffix = loungeId?.let { "/${it.encodeURLPathPart()}" }.orEmpty()
+    return gateway.getText(
+        "/${service.encodeURLPathPart()}/user/${creatorId.encodeURLPathPart()}/community$suffix",
+        "请求Creator Community(service=$service,creator=$creatorId,offset=$offset)",
+    ) {
+      offset.takeIf { it > 0 }?.let { parameter("o", it) }
+    }
+  }
+
+  fun parseCreatorCommunity(body: String, offset: Int = 0): CommunityPage =
+      parseCommunityPage(body, offset)
 
   suspend fun getCreatorLinks(
       service: String,

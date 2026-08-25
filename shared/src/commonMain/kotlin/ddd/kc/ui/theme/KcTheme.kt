@@ -10,6 +10,19 @@ import ddd.kc.data.local.settings.ThemeMode
 
 @Composable
 fun KcTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
+  ProvideKcTheme(themeMode = themeMode) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+        content = content,
+    )
+  }
+}
+
+/** 只提供应用主题，不绘制界面节点；供桌面窗口装饰与应用内容共享配色。 */
+@Composable
+fun ProvideKcTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
   val forceDarkMode =
       when (themeMode) {
         ThemeMode.SYSTEM -> null
@@ -19,15 +32,7 @@ fun KcTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
 
   MaterialTheme(
       colorScheme = rememberPlatformColorScheme(forceDarkMode),
-      content = {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-        ) {
-          content()
-        }
-      },
+      content = content,
   )
 }
 

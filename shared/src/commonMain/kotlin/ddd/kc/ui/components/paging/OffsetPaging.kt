@@ -7,6 +7,7 @@ import ddd.kc.data.remote.network.toQueryError
 const val DEFAULT_PAGE_SIZE = 50
 
 data class OffsetPagingState<Item>(
+    val pageSize: Int = DEFAULT_PAGE_SIZE,
     val items: List<Item> = emptyList(),
     val startOffset: Int = 0,
     val offset: Int = 0,
@@ -38,7 +39,7 @@ data class OffsetPagingState<Item>(
       val page = currentPage.coerceIn(1, lastPage ?: info.lastPage)
       return info.copy(
           currentPage = page,
-          currentOffset = ((page - 1) * DEFAULT_PAGE_SIZE).coerceIn(0, info.lastOffset),
+          currentOffset = ((page - 1) * pageSize).coerceIn(0, info.lastOffset),
       )
     }
 
@@ -106,7 +107,7 @@ class OffsetPagingMachine<Item, Key>(private val keyOf: (Item) -> Key) {
       targetOffset: Int,
   ): OffsetPagingState<Item> {
     val transactionId = snapshot.transactionId + 1
-    val targetPage = targetOffset.coerceAtLeast(0) / DEFAULT_PAGE_SIZE + 1
+    val targetPage = targetOffset.coerceAtLeast(0) / snapshot.pageSize + 1
     return snapshot.copy(
         items = emptyList(),
         startOffset = targetOffset.coerceAtLeast(0),

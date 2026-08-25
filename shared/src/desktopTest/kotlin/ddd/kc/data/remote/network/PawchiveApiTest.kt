@@ -110,6 +110,8 @@ class PawchiveApiTest {
                 "/api/v1/patreon/user/artist/announcements" -> announcementsJson
                 "/patreon/user/artist/tags" ->
                     TestFixtures.read("pawchive.st__patreon__user__3295915__tags.html")
+                "/patreon/user/artist/community/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ->
+                    TestFixtures.read("pawchive.pw__patreon__user__70000001__community.html")
                 "/api/v1/account/favorites" ->
                     if (request.url.parameters["type"] == "post") favoritePostsJson
                     else favoriteCreatorsJson
@@ -157,6 +159,21 @@ class PawchiveApiTest {
           it.tag == "Animation"
         },
     )
+    val community =
+        api.parseCreatorCommunity(
+            api.fetchCreatorCommunityBody(
+                "patreon",
+                "artist",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+        )
+    assertEquals(2, community.lounges.size)
+    assertEquals("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", community.selectedLoungeId)
+    assertEquals(7, community.pageInfo?.lastPage)
+    assertTrue(community.messages.isNotEmpty())
+    assertTrue(community.messages.any { it.reply != null })
+    assertTrue(community.messages.any { it.imageUrl != null })
+    assertTrue(community.messages.any { it.isDeleted })
     assertEquals(listOf("artist"), api.getFavorites(type = "artist").map { it.id })
     assertEquals(listOf("post1"), api.getFavoritePosts().map { it.id })
     api.addFavoriteCreator(service = "patreon", creatorId = "artist")

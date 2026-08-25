@@ -227,6 +227,7 @@ symbolCraft {
       "keyboard_arrow_left",
       "keyboard_arrow_right",
       "link",
+      "list_alt",
       "lock_open",
       "logout",
       "menu",

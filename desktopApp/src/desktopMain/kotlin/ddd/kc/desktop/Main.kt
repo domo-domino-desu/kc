@@ -9,12 +9,13 @@ import coil3.disk.DiskCache
 import ddd.kc.data.remote.media.installKcCoilImageProgressSupport
 import ddd.kc.di.startAppKoin
 import ddd.kc.di.stopAppKoin
-import ddd.kc.ui.app.KcApp
+import ddd.kc.ui.app.KcAppContent
+import ddd.kc.ui.app.KcAppEnvironment
 import ddd.kc.utils.logging.KcLog
-import dev.nucleusframework.application.DecoratedWindow
 import dev.nucleusframework.application.NucleusBackend
 import dev.nucleusframework.application.nucleusApplication
-import dev.nucleusframework.window.TitleBar
+import dev.nucleusframework.window.material.MaterialDecoratedWindow
+import dev.nucleusframework.window.material.MaterialTitleBar
 import okio.Path
 import okio.Path.Companion.toPath
 
@@ -24,31 +25,33 @@ fun main() =
     nucleusApplication(backend = NucleusBackend.Tao) {
       KcLog.init(KcLog.parseDesktopSeverity(System.getProperty("kc.log.level")))
       startAppKoin(desktopPlatformModule())
-      DecoratedWindow(
-          onCloseRequest = {
-            stopAppKoin()
-            exitApplication()
-          },
-          title = "KC",
-      ) {
-        TitleBar {
-          Text(
-              text = "KC",
-              modifier = Modifier.align(Alignment.CenterHorizontally),
-          )
+      KcAppEnvironment { settingsState ->
+        MaterialDecoratedWindow(
+            onCloseRequest = {
+              stopAppKoin()
+              exitApplication()
+            },
+            title = "KC",
+        ) {
+          MaterialTitleBar {
+            Text(
+                text = "KC",
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+          }
+          setSingletonImageLoaderFactory { platformContext ->
+            ImageLoader.Builder(platformContext)
+                .installKcCoilImageProgressSupport()
+                .diskCache {
+                  DiskCache.Builder()
+                      .directory(coilCachePath())
+                      .maxSizeBytes(coilDiskCacheMaxBytes)
+                      .build()
+                }
+                .build()
+          }
+          KcAppContent(settingsState = settingsState)
         }
-        setSingletonImageLoaderFactory { platformContext ->
-          ImageLoader.Builder(platformContext)
-              .installKcCoilImageProgressSupport()
-              .diskCache {
-                DiskCache.Builder()
-                    .directory(coilCachePath())
-                    .maxSizeBytes(coilDiskCacheMaxBytes)
-                    .build()
-              }
-              .build()
-        }
-        KcApp()
       }
     }
 

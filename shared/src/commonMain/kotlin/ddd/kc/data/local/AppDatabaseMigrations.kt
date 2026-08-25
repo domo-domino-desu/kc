@@ -28,6 +28,17 @@ val MIGRATION_1_2 =
       }
     }
 
+val MIGRATION_2_3 =
+    object : Migration(2, 3) {
+      override fun migrate(connection: SQLiteConnection) {
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS kc_search_history " +
+                "(kind TEXT NOT NULL, queryKey TEXT NOT NULL, query TEXT NOT NULL, " +
+                "visitedAtMs INTEGER NOT NULL, PRIMARY KEY(kind, queryKey))"
+        )
+      }
+    }
+
 private fun SQLiteConnection.execute(sql: String) {
   prepare(sql).use { it.step() }
 }

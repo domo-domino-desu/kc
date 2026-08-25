@@ -45,6 +45,7 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.LogoutW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.MenuW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.PersonW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.ReceiptLongW400Outlined
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.SearchW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.SettingsW400Outlined
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.app.navigation.AppScreen
@@ -53,6 +54,7 @@ import ddd.kc.ui.components.LocalShowToast
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.pages.about.AboutRouteScreen
 import ddd.kc.ui.pages.history.HistoryRouteScreen
+import ddd.kc.ui.pages.history.SearchHistoryRouteScreen
 import ddd.kc.ui.pages.settings.SettingsRouteScreen
 import ddd.kc.ui.pages.settings.components.SettingsGroup
 import ddd.kc.ui.pages.settings.components.SettingsListItem
@@ -77,6 +79,8 @@ import kc.shared.generated.resources.more
 import kc.shared.generated.resources.platform_logged_in
 import kc.shared.generated.resources.platform_login
 import kc.shared.generated.resources.save
+import kc.shared.generated.resources.search_history
+import kc.shared.generated.resources.search_history_summary
 import kc.shared.generated.resources.session_cookie_hint
 import kc.shared.generated.resources.settings
 import kc.shared.generated.resources.settings_summary
@@ -330,6 +334,12 @@ class MoreScreen : AppScreen {
               title = stringResource(Res.string.history),
               subtitle = stringResource(Res.string.history_summary),
               onClick = { navigator.push(HistoryRouteScreen()) },
+          )
+          SettingsListItem(
+              icon = Icons.SearchW400Outlined,
+              title = stringResource(Res.string.search_history),
+              subtitle = stringResource(Res.string.search_history_summary),
+              onClick = { navigator.push(SearchHistoryRouteScreen()) },
           )
           SettingsListItem(
               icon = Icons.FavoriteW400Outlined,

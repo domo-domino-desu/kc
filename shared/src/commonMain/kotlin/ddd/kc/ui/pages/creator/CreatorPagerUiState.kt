@@ -1,6 +1,8 @@
 package ddd.kc.ui.pages.creator
 
 import ddd.kc.data.model.Announcement
+import ddd.kc.data.model.CommunityLounge
+import ddd.kc.data.model.CommunityMessage
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.Post
@@ -26,6 +28,7 @@ data class CreatorPagerUiState(
     val creatorAnnouncements: Map<CreatorKey, List<Announcement>> = emptyMap(),
     val creatorTags: Map<CreatorKey, List<Tag>> = emptyMap(),
     val creatorLinks: Map<CreatorKey, List<Creator>> = emptyMap(),
+    val creatorCommunities: Map<CreatorKey, CreatorCommunityUiState> = emptyMap(),
     /** creatorId → (announcementKey → translated content state) */
     val announcementTranslations: Map<CreatorKey, Map<String, ContentTranslationState>> =
         emptyMap(),
@@ -39,3 +42,19 @@ data class CreatorPagerUiState(
   val currentCreator: Creator?
     get() = creators.getOrNull(currentIndex)
 }
+
+data class CreatorCommunityUiState(
+    val available: Boolean? = null,
+    val lounges: List<CommunityLounge> = emptyList(),
+    val selectedLoungeId: String? = null,
+    val loungeSnapshots: Map<String, OffsetPagingState<CommunityMessage>> = emptyMap(),
+    val loading: Boolean = false,
+    val error: QueryError? = null,
+) {
+  val selectedSnapshot: OffsetPagingState<CommunityMessage>
+    get() =
+        selectedLoungeId?.let(loungeSnapshots::get)
+            ?: OffsetPagingState(pageSize = COMMUNITY_PAGE_SIZE)
+}
+
+internal const val COMMUNITY_PAGE_SIZE = 25

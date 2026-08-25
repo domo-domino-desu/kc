@@ -49,6 +49,7 @@ materialyou = { module = "dev.zwander:materialyou", version.ref = "materialyou" 
 composemediaplayer = { module = "io.github.kdroidfilter:composemediaplayer", version.ref = "composemediaplayer" }
 nucleus-application = { module = "dev.nucleusframework:nucleus.nucleus-application", version.ref = "nucleus" }
 nucleus-core-runtime = { module = "dev.nucleusframework:nucleus.core-runtime", version.ref = "nucleus" }
+nucleus-decorated-window-material3 = { module = "dev.nucleusframework:nucleus.decorated-window-material3", version.ref = "nucleus" }
 nucleus-decorated-window-tao = { module = "dev.nucleusframework:nucleus.decorated-window-tao", version.ref = "nucleus" }
 htmlconverter-compose = { module = "be.digitalia.compose.htmlconverter:htmlconverter", version.ref = "htmlconverter-compose" }
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }

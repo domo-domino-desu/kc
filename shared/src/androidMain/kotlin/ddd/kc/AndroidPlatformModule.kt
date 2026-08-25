@@ -8,6 +8,7 @@ import androidx.room.Room
 import ddd.kc.data.local.AppDatabase
 import ddd.kc.data.local.AppDatabaseBuilderFactory
 import ddd.kc.data.local.MIGRATION_1_2
+import ddd.kc.data.local.MIGRATION_2_3
 import ddd.kc.di.KOIN_QUALIFIER_SESSION_VAULT
 import eu.anifantakis.lib.ksafe.KSafe
 import java.io.File
@@ -26,7 +27,7 @@ fun androidPlatformModule(context: Context): Module = module {
               klass = AppDatabase::class.java,
               name = "kc.db",
           )
-          .addMigrations(MIGRATION_1_2)
+          .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
     }
   }
   single<DataStore<Preferences>> {

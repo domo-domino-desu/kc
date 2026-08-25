@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -36,6 +42,8 @@ import ddd.kc.data.model.key
 import ddd.kc.data.remote.translation.TranslationBlock
 import ddd.kc.data.remote.translation.TranslationBlockResult
 import ddd.kc.data.remote.translation.TranslationEngine
+import ddd.kc.generated.symbols.icons.materialsymbols.Icons
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.SearchW400Outlined
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
@@ -45,6 +53,7 @@ import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.ListLoadingSkeleton
 import ddd.kc.ui.components.PageJumpFabMenu
 import ddd.kc.ui.components.PagedPullRefreshBox
+import ddd.kc.ui.components.SearchResultStatus
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.loadingFooter
 import ddd.kc.ui.components.paging.ContentTranslationState
@@ -58,7 +67,9 @@ import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.recent.RecentDMsScreenModel
 import ddd.kc.utils.coroutines.resultOfSuspend
 import kc.shared.generated.resources.Res
+import kc.shared.generated.resources.search_action
 import kc.shared.generated.resources.search_dms_hint
+import kc.shared.generated.resources.search_pending_prompt
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -271,13 +282,16 @@ class DmScreen : AppScreen {
     }
 
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { paddingValues ->
-      val isSearchMode = searchState.query.isNotBlank()
+      val hasPendingSearch = searchState.hasPendingQuery
+      val isSearchMode = searchState.query.isNotBlank() && !hasPendingSearch
       Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         PagedPullRefreshBox(
             currentPage =
                 if (isSearchMode) searchState.visiblePageInfo?.currentPage ?: 1
                 else recentState.visiblePageInfo?.currentPage ?: 1,
-            enabled = if (isSearchMode) !searchState.isLoading else !recentState.loading,
+            enabled =
+                !hasPendingSearch &&
+                    if (isSearchMode) !searchState.isLoading else !recentState.loading,
             refreshing =
                 if (isSearchMode) searchState.result.isRefreshing else recentState.refreshing,
             loadingPrevious =
@@ -296,35 +310,95 @@ class DmScreen : AppScreen {
           ) {
             item(key = "search_bar") {
               OutlinedTextField(
-                  value = searchState.query,
+                  value = searchState.draftQuery,
                   onValueChange = searchModel::onQueryChanged,
                   placeholder = { Text(stringResource(Res.string.search_dms_hint)) },
                   singleLine = true,
+                  keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                  keyboardActions = KeyboardActions(onSearch = { searchModel.submitSearch() }),
+                  trailingIcon = {
+                    IconButton(
+                        onClick = searchModel::submitSearch,
+                        enabled = !searchState.isLoading,
+                    ) {
+                      Icon(
+                          imageVector = Icons.SearchW400Outlined,
+                          contentDescription = stringResource(Res.string.search_action),
+                      )
+                    }
+                  },
                   modifier = Modifier.fillMaxWidth(),
               )
             }
 
-            val canLoadPrevious =
-                if (isSearchMode) searchState.canAutoLoadPrevious
-                else recentState.canAutoLoadPrevious
-            val loadingPrevious =
-                if (isSearchMode) searchState.isLoadingPrevious else recentState.isLoadingPrevious
-            previousPageHeader(
-                canLoadPrevious = canLoadPrevious,
-                loadingPrevious = loadingPrevious,
-                errorMessage =
-                    if (isSearchMode) searchPrependErrorMessage else recentPrependErrorMessage,
-                onLoadPrevious = {
-                  if (isSearchMode) searchModel.loadPrevious() else recentModel.loadPrevious()
-                },
-            )
+            if (hasPendingSearch) {
+              item(key = "search_prompt") {
+                Text(
+                    text = stringResource(Res.string.search_pending_prompt),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
+                )
+              }
+            } else {
+              val canLoadPrevious =
+                  if (isSearchMode) searchState.canAutoLoadPrevious
+                  else recentState.canAutoLoadPrevious
+              val loadingPrevious =
+                  if (isSearchMode) searchState.isLoadingPrevious else recentState.isLoadingPrevious
+              previousPageHeader(
+                  canLoadPrevious = canLoadPrevious,
+                  loadingPrevious = loadingPrevious,
+                  errorMessage =
+                      if (isSearchMode) searchPrependErrorMessage else recentPrependErrorMessage,
+                  onLoadPrevious = {
+                    if (isSearchMode) searchModel.loadPrevious() else recentModel.loadPrevious()
+                  },
+              )
 
-            if (searchState.query.isBlank()) {
-              if (recentState.loading && recentState.items.isEmpty()) {
-                item(key = "recent-dms-skeleton") { ListLoadingSkeleton(itemHeightDp = 96) }
+              if (searchState.query.isBlank()) {
+                if (recentState.loading && recentState.items.isEmpty()) {
+                  item(key = "recent-dms-skeleton") { ListLoadingSkeleton(itemHeightDp = 96) }
+                } else {
+                  items(
+                      recentState.items,
+                      key = { "${it.service}:${it.user}:${it.hash}:${it.id}:${it.added}" },
+                  ) { dm ->
+                    DmCard(
+                        dm = dm,
+                        translationState = dmTranslations[dm.translationKey()],
+                        onTranslate = { translateDm(dm) },
+                        onCreatorClick =
+                            if (!dm.service.isNullOrBlank() && !dm.user.isNullOrBlank()) {
+                              { openCreator(dm) }
+                            } else null,
+                    )
+                  }
+                  loadingFooter(
+                      recentState.isLoadingMore,
+                      recentAppendErrorMessage,
+                  )
+                }
+              } else if (searchState.isLoading && searchState.dms.isEmpty()) {
+                item(key = "search-dms-loading") {
+                  SearchResultStatus(
+                      loading = true,
+                      errorMessage = null,
+                      onRetry = searchModel::refresh,
+                  )
+                }
+              } else if (searchState.dms.isEmpty()) {
+                item(
+                    key = if (searchState.error == null) "search-dms-empty" else "search-dms-error"
+                ) {
+                  SearchResultStatus(
+                      loading = false,
+                      errorMessage = searchState.error?.localizedMessage(),
+                      onRetry = searchModel::refresh,
+                  )
+                }
               } else {
                 items(
-                    recentState.items,
+                    searchState.dms,
                     key = { "${it.service}:${it.user}:${it.hash}:${it.id}:${it.added}" },
                 ) { dm ->
                   DmCard(
@@ -338,36 +412,16 @@ class DmScreen : AppScreen {
                   )
                 }
                 loadingFooter(
-                    recentState.isLoadingMore,
-                    recentAppendErrorMessage,
+                    searchState.isLoadingMore,
+                    searchAppendErrorMessage,
                 )
               }
-            } else if (searchState.isLoading && searchState.dms.isEmpty()) {
-              item(key = "search-dms-skeleton") { ListLoadingSkeleton(itemHeightDp = 96) }
-            } else {
-              items(
-                  searchState.dms,
-                  key = { "${it.service}:${it.user}:${it.hash}:${it.id}:${it.added}" },
-              ) { dm ->
-                DmCard(
-                    dm = dm,
-                    translationState = dmTranslations[dm.translationKey()],
-                    onTranslate = { translateDm(dm) },
-                    onCreatorClick =
-                        if (!dm.service.isNullOrBlank() && !dm.user.isNullOrBlank()) {
-                          { openCreator(dm) }
-                        } else null,
-                )
-              }
-              loadingFooter(
-                  searchState.isLoadingMore,
-                  searchAppendErrorMessage,
-              )
             }
           }
         }
         val pageInfo =
-            if (isSearchMode) searchState.visiblePageInfo else recentState.visiblePageInfo
+            if (hasPendingSearch) null
+            else if (isSearchMode) searchState.visiblePageInfo else recentState.visiblePageInfo
         PageJumpFabMenu(
             pageInfo = pageInfo,
             loading =
@@ -388,7 +442,7 @@ class DmScreen : AppScreen {
 
     ErrorToastEffect(recentState.error?.localizedMessage())
     ErrorToastEffect(recentState.appendError?.localizedMessage())
-    if (searchState.query.isBlank()) {
+    if (!searchState.hasPendingQuery && searchState.query.isBlank()) {
       AutoLoadEffect(
           listState = listState,
           totalItems = recentState.items.size,
@@ -396,11 +450,11 @@ class DmScreen : AppScreen {
           isLoadingMore = recentState.isLoadingMore,
           onLoadMore = recentModel::loadMore,
       )
-    } else {
+    } else if (!searchState.hasPendingQuery) {
       AutoLoadEffect(
           listState = listState,
           totalItems = searchState.dms.size,
-          hasMore = searchState.hasMore,
+          hasMore = searchState.hasMore && searchState.dms.isNotEmpty(),
           isLoadingMore = searchState.isLoadingMore,
           onLoadMore = searchModel::loadMore,
       )

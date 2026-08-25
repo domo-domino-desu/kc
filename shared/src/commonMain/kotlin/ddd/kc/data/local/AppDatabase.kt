@@ -12,6 +12,7 @@ import ddd.kc.data.local.entity.CreatorEntity
 import ddd.kc.data.local.entity.CreatorHistoryEntity
 import ddd.kc.data.local.entity.CreatorSyncEntity
 import ddd.kc.data.local.entity.PostHistoryEntity
+import ddd.kc.data.local.entity.SearchHistoryEntity
 
 @Database(
     entities =
@@ -21,8 +22,9 @@ import ddd.kc.data.local.entity.PostHistoryEntity
             CreatorSyncEntity::class,
             CreatorHistoryEntity::class,
             PostHistoryEntity::class,
+            SearchHistoryEntity::class,
         ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @ConstructedBy(AppDatabaseConstructor::class)

@@ -1,5 +1,6 @@
 package ddd.kc.ui.components.paging
 
+import ddd.kc.data.model.PageInfo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -10,7 +11,7 @@ class OffsetPagingMachineTest {
   @Test
   fun consumesOnlyMatchingNavigationEffect() {
     val state =
-        OffsetPagingState(
+        OffsetPagingState<Int>(
             items = listOf(1),
             navigationEffect = PagingEffect.ScrollToTop(transactionId = 7),
         )
@@ -20,5 +21,18 @@ class OffsetPagingMachineTest {
         machine.consumeNavigationEffect(state, transactionId = 6),
     )
     assertNull(machine.consumeNavigationEffect(state, transactionId = 7).navigationEffect)
+  }
+
+  @Test
+  fun usesConfiguredPageSizeForCommunityPageNavigation() {
+    val state =
+        OffsetPagingState<Int>(
+            pageSize = 25,
+            pageInfo = PageInfo(currentPage = 1, lastPage = 7, lastOffset = 150),
+            currentPage = 3,
+        )
+
+    assertEquals(50, state.visiblePageInfo?.currentOffset)
+    assertEquals(4, machine.beginJump(state, targetOffset = 75).currentPage)
   }
 }

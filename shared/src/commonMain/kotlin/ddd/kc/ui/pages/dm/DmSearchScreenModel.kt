@@ -2,9 +2,11 @@ package ddd.kc.ui.pages.dm
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import ddd.kc.data.local.ActivityHistoryRepository
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.DmKey
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.model.SearchKind
 import ddd.kc.data.model.key
 import ddd.kc.data.remote.repository.CreatorRepository
 import ddd.kc.ui.components.paging.DEFAULT_PAGE_SIZE
@@ -15,16 +17,22 @@ import ddd.kc.utils.coroutines.resultOfSuspend
 import ddd.kc.utils.logging.KcLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val log = KcLog.withTag("DmSearchScreenModel")
 private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 data class DmSearchState(
-    val query: String = "",
+    val draftQuery: String = "",
+    val appliedQuery: String = "",
     val paging: OffsetPagingState<DM> = OffsetPagingState(),
 ) {
+  val query
+    get() = appliedQuery
+
+  val hasPendingQuery
+    get() = draftQuery.trim() != appliedQuery
+
   val dms
     get() = paging.items
 
@@ -66,6 +74,7 @@ data class DmSearchState(
 
 class DmSearchScreenModel(
     private val creatorRepo: CreatorRepository,
+    private val historyRepo: ActivityHistoryRepository,
 ) : StateScreenModel<DmSearchState>(DmSearchState()) {
   private val reducer = OffsetPagingMachine<DM, DmKey> { it.key }
   private var searchJob: Job? = null
@@ -76,13 +85,19 @@ class DmSearchScreenModel(
   fun onQueryChanged(query: String) {
     searchJob?.cancel()
     generation++
-    mutableState.value = DmSearchState(query = query)
+    mutableState.value = mutableState.value.copy(draftQuery = query)
+  }
+
+  fun submitSearch() {
+    val query = mutableState.value.draftQuery.trim()
+    searchJob?.cancel()
+    val requestGeneration = ++generation
+    mutableState.value = DmSearchState(draftQuery = query, appliedQuery = query)
     if (query.isBlank()) return
-    val requestGeneration = generation
     searchJob =
         screenModelScope.launch {
           try {
-            delay(300)
+            historyRepo.recordSearch(SearchKind.DMS, query)
             loadFirstPage(query, forceRefresh = true, requestGeneration)
           } catch (_: CancellationException) {
             return@launch
@@ -91,7 +106,7 @@ class DmSearchScreenModel(
   }
 
   fun refresh() {
-    val query = mutableState.value.query
+    val query = mutableState.value.appliedQuery
     if (query.isBlank()) return
     searchJob?.cancel()
     val requestGeneration = ++generation
@@ -100,26 +115,26 @@ class DmSearchScreenModel(
 
   fun loadMore() {
     val state = mutableState.value
-    if (state.query.isBlank() || !reducer.canLoadMore(state.paging)) return
+    if (state.appliedQuery.isBlank() || !reducer.canLoadMore(state.paging)) return
     screenModelScope.launch {
       updatePaging(reducer.beginAppend(mutableState.value.paging))
-      fetchPage(state.query, mutableState.value.paging.offset)
+      fetchPage(state.appliedQuery, mutableState.value.paging.offset)
     }
   }
 
   fun loadPrevious() {
     val state = mutableState.value
-    if (state.query.isBlank() || !reducer.canLoadPrevious(state.paging)) return
+    if (state.appliedQuery.isBlank() || !reducer.canLoadPrevious(state.paging)) return
     val offset = (state.paging.startOffset - PAGE_SIZE).coerceAtLeast(0)
     screenModelScope.launch {
       updatePaging(reducer.beginPrepend(mutableState.value.paging))
-      fetchPage(state.query, offset, prepend = true)
+      fetchPage(state.appliedQuery, offset, prepend = true)
     }
   }
 
   fun jumpToPage(page: Int) {
     val state = mutableState.value
-    if (state.query.isBlank()) return
+    if (state.appliedQuery.isBlank()) return
     val targetPage = page.coerceIn(1, state.paging.pageInfo?.lastPage ?: page.coerceAtLeast(1))
     val offset = (targetPage - 1) * PAGE_SIZE
     searchJob?.cancel()
@@ -128,7 +143,7 @@ class DmSearchScreenModel(
     updatePaging(reducer.beginJump(previous, offset))
     screenModelScope.launch {
       fetchPage(
-          state.query,
+          state.appliedQuery,
           offset,
           replace = true,
           rollback = previous,
@@ -168,7 +183,8 @@ class DmSearchScreenModel(
   ) {
     resultOfSuspend { creatorRepo.searchDMsPage(query, offset, forceRefresh = true) }
         .onSuccess { page ->
-          if (requestGeneration != generation || mutableState.value.query != query) return@onSuccess
+          if (requestGeneration != generation || mutableState.value.appliedQuery != query)
+              return@onSuccess
           val hasMore = page.pageInfo?.hasNext ?: (page.items.size >= PAGE_SIZE)
           val next =
               when {
@@ -202,7 +218,8 @@ class DmSearchScreenModel(
           updatePaging(next)
         }
         .onFailure { error ->
-          if (requestGeneration != generation || mutableState.value.query != query) return@onFailure
+          if (requestGeneration != generation || mutableState.value.appliedQuery != query)
+              return@onFailure
           updatePaging(
               when {
                 replace && rollback != null -> reducer.reduceJumpError(rollback, error)

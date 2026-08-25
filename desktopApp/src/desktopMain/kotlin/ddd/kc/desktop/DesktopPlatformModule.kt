@@ -8,6 +8,7 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import ddd.kc.data.local.AppDatabase
 import ddd.kc.data.local.AppDatabaseBuilderFactory
 import ddd.kc.data.local.MIGRATION_1_2
+import ddd.kc.data.local.MIGRATION_2_3
 import ddd.kc.di.KOIN_QUALIFIER_SESSION_VAULT
 import eu.anifantakis.lib.ksafe.KSafe
 import java.io.File
@@ -23,7 +24,7 @@ fun desktopPlatformModule(): Module = module {
       dbFile.parentFile?.mkdirs()
       Room.databaseBuilder<AppDatabase>(name = dbFile.absolutePath)
           .setDriver(BundledSQLiteDriver())
-          .addMigrations(MIGRATION_1_2)
+          .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
     }
   }
   single<DataStore<Preferences>> {

@@ -16,6 +16,16 @@
   <string name="search_dms_hint">搜索 DMs…</string>
   <string name="search_dms_prompt">输入关键词搜索 DMs</string>
   <string name="search_action">搜索</string>
+  <string name="search_pending_prompt">点击搜索按钮开始搜索</string>
+  <string name="search_no_results">没有找到匹配结果</string>
+  <string name="search_failed">搜索失败</string>
+  <string name="retry">重试</string>
+  <string name="search_history">搜索记录</string>
+  <string name="search_history_summary">已提交的作品与 DM 搜索</string>
+  <string name="search_history_posts">作品</string>
+  <string name="search_history_dms">DM</string>
+  <string name="loading_search_history">正在加载搜索记录…</string>
+  <string name="empty_search_history">暂无搜索记录</string>
   <!-- Filters / sort -->
   <string name="filter_service">平台</string>
   <string name="filter_all">全部</string>
@@ -102,7 +112,7 @@
   <string name="login_username">用户名</string>
   <string name="login_password">密码</string>
   <string name="login_method_account">账号密码</string>
-  <string name="login_method_session">Session Cookie</string>
+  <string name="login_method_session">Cookie</string>
   <string name="back">返回</string>
   <string name="home">主页</string>
   <string name="translate_action">翻译</string>
@@ -118,6 +128,10 @@
   <string name="creator_tab_posts">Posts</string>
   <string name="creator_tab_announcements">Announcements</string>
   <string name="creator_tab_tags">Tags</string>
+  <string name="creator_tab_community">Community</string>
+  <string name="community_directory">Community 目录</string>
+  <string name="no_community_messages">暂无 Community 消息</string>
+  <string name="community_creator_badge">Creator</string>
   <string name="creator_tab_discord_channels">频道</string>
   <string name="no_discord_channels">暂无频道</string>
   <string name="no_announcements">（无 Announcements）</string>

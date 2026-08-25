@@ -1,55 +1,37 @@
 package ddd.kc.ui.pages.imageviewer
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import coil3.compose.AsyncImage
-import com.github.panpf.zoomimage.CoilZoomAsyncImage
-import com.github.panpf.zoomimage.rememberCoilZoomState
-import ddd.kc.generated.symbols.icons.materialsymbols.Icons
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.CloseW400Outlined
+import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.app.navigation.AppScreen
+import ddd.kc.ui.app.navigation.ImageViewerItem
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
-import ddd.kc.ui.components.CenterCircularWavyImageLoadingProgress
-import ddd.kc.ui.components.ImageLoadLifecycleState
-import ddd.kc.ui.components.NetworkImage
-import ddd.kc.ui.components.rememberImageLoadProgressState
 import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
-import kc.shared.generated.resources.close
 import kc.shared.generated.resources.navigation_content_expired
+import kc.shared.generated.resources.retry
 import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.stringResource
 
@@ -63,7 +45,6 @@ class ImageViewerScreen(
 ) : AppScreen {
   override val key: String = routeKey
 
-  @OptIn(ExperimentalFoundationApi::class)
   @Composable
   override fun Content() {
     val navigator = LocalNavigator.currentOrThrow
@@ -78,165 +59,88 @@ class ImageViewerScreen(
       }
       return
     }
-    val imageUrls = imageWindow.imageUrls
-    val thumbnailUrls = imageWindow.thumbnailUrls
-    val pagerState = rememberPagerState(initialPage = startIndex, pageCount = { imageUrls.size })
-    val focusRequester = remember { FocusRequester() }
+
+    val snapshot by imageWindow.snapshots.collectAsState(initial = imageWindow.initialSnapshot)
+    var currentImage by remember { mutableStateOf<ImageViewerItem?>(null) }
+    val currentIndex = snapshot.images.indexOfFirst { it.key == currentImage?.key }
 
     LaunchedEffect(Unit) {
-      log.i { "图片查看器 -> 打开(count=${imageUrls.size},startIndex=$startIndex)" }
-      focusRequester.requestFocus()
+      log.i { "图片查看器 -> 打开(count=${snapshot.images.size},startIndex=$startIndex)" }
     }
-    LaunchedEffect(pagerState.currentPage) {
-      imageUrls.getOrNull(pagerState.currentPage)?.let { imageWindow.onImageViewed?.invoke(it) }
-    }
-
-    Box(
-        modifier =
-            Modifier.fillMaxSize()
-                .background(Color.Black)
-                .focusRequester(focusRequester)
-                .focusable()
-                .onPreviewKeyEvent { event ->
-                  if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                  when (event.key) {
-                    Key.DirectionLeft -> {
-                      val prev = (pagerState.currentPage - 1).coerceAtLeast(0)
-                      if (prev != pagerState.currentPage) {
-                        pagerState.requestScrollToPage(prev)
-                        true
-                      } else false
-                    }
-                    Key.DirectionRight -> {
-                      val next = (pagerState.currentPage + 1).coerceAtMost(imageUrls.lastIndex)
-                      if (next != pagerState.currentPage) {
-                        pagerState.requestScrollToPage(next)
-                        true
-                      } else false
-                    }
-                    Key.Escape -> {
-                      navigator.pop()
-                      true
-                    }
-                    else -> false
-                  }
-                }
+    LaunchedEffect(
+        currentImage?.key,
+        currentIndex,
+        snapshot.hasPrevious,
+        snapshot.hasNext,
+        snapshot.isLoadingPrevious,
+        snapshot.isLoadingNext,
+        snapshot.previousError,
+        snapshot.nextError,
+        snapshot.images.size,
     ) {
-      HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-        val fullUrl = imageUrls.getOrNull(page)
-        val thumbUrl = thumbnailUrls.getOrNull(page)
-        ZoomImagePage(fullUrl = fullUrl, thumbnailUrl = thumbUrl, onClick = { navigator.pop() })
-      }
-
-      Box(
-          modifier =
-              Modifier.align(Alignment.TopCenter)
-                  .safeDrawingPadding()
-                  .padding(top = 48.dp, start = 16.dp, end = 16.dp)
-                  .background(
-                      color = Color.Black.copy(alpha = 0.4f),
-                      shape = MaterialTheme.shapes.small,
-                  )
-                  .padding(horizontal = 12.dp, vertical = 4.dp),
+      if (
+          currentIndex == 0 &&
+              snapshot.hasPrevious &&
+              !snapshot.isLoadingPrevious &&
+              snapshot.previousError == null
       ) {
-        Text(
-            text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge,
-        )
+        imageWindow.onLoadPrevious?.invoke()
       }
-
-      IconButton(
-          onClick = { navigator.pop() },
-          modifier = Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(16.dp),
+      if (
+          currentIndex == snapshot.images.lastIndex &&
+              snapshot.hasNext &&
+              !snapshot.isLoadingNext &&
+              snapshot.nextError == null
       ) {
-        Icon(
-            imageVector = Icons.CloseW400Outlined,
-            contentDescription = stringResource(Res.string.close),
-            tint = Color.White,
-        )
+        imageWindow.onLoadNext?.invoke()
       }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+      ZoomImageViewer(
+          images = snapshot.images,
+          startIndex = startIndex,
+          hasUnloadedImages = snapshot.hasPrevious || snapshot.hasNext,
+          onClose = { navigator.pop() },
+          onImageChanged = { item ->
+            currentImage = item
+            imageWindow.onImageViewed?.invoke(item.imageUrl)
+          },
+      )
+
+      ImagePagingStatus(
+          loading = snapshot.isLoadingPrevious,
+          errorMessage = snapshot.previousError?.localizedMessage(),
+          onRetry = { imageWindow.onLoadPrevious?.invoke() },
+          modifier = Modifier.align(Alignment.CenterStart),
+      )
+      ImagePagingStatus(
+          loading = snapshot.isLoadingNext,
+          errorMessage = snapshot.nextError?.localizedMessage(),
+          onRetry = { imageWindow.onLoadNext?.invoke() },
+          modifier = Modifier.align(Alignment.CenterEnd),
+      )
     }
   }
 }
 
 @Composable
-private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -> Unit) {
-  val isGif = remember(fullUrl) { fullUrl?.let(::isGifUrl) == true }
-  var isLoading by remember(fullUrl) { mutableStateOf(true) }
-  var loadFailed by remember(fullUrl) { mutableStateOf(false) }
-  var loadLifecycleState by remember(fullUrl) { mutableStateOf(ImageLoadLifecycleState.Idle) }
-  val progressState =
-      rememberImageLoadProgressState(progressKey = fullUrl, lifecycleState = loadLifecycleState)
-  val zoomState = rememberCoilZoomState()
-
-  LaunchedEffect(zoomState) { zoomState.zoomable.setThreeStepScale(false) }
-
-  Box(modifier = Modifier.fillMaxSize()) {
-    if (isGif) {
-      NetworkImage(
-          url = fullUrl,
-          thumbnailUrl = thumbnailUrl,
-          contentDescription = null,
-          contentScale = ContentScale.Fit,
-          modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
-      )
-      if (isLoading) {
-        CenterCircularWavyImageLoadingProgress(
-            progressState = progressState,
-            modifier = Modifier.align(Alignment.Center),
-        )
-      }
-      return@Box
-    }
-
-    // Thumbnail shown as placeholder while full image loads
-    if ((isLoading || loadFailed) && !thumbnailUrl.isNullOrBlank()) {
-      AsyncImage(
-          model = thumbnailUrl,
-          contentDescription = null,
-          contentScale = ContentScale.Fit,
-          modifier = Modifier.fillMaxSize(),
-      )
-    }
-
-    CoilZoomAsyncImage(
-        model = fullUrl,
-        contentDescription = null,
-        modifier = Modifier.fillMaxSize(),
-        onLoading = {
-          isLoading = true
-          loadFailed = false
-          loadLifecycleState = ImageLoadLifecycleState.Loading
-        },
-        onSuccess = {
-          isLoading = false
-          loadFailed = false
-          loadLifecycleState = ImageLoadLifecycleState.Success
-        },
-        onError = { error ->
-          isLoading = false
-          loadFailed = true
-          loadLifecycleState = ImageLoadLifecycleState.Error
-          log.w(error.result.throwable) {
-            "图片查看器 -> 大图加载失败(fullUrlLength=${fullUrl.orEmpty().length},thumbnailUrlLength=${thumbnailUrl.orEmpty().length})"
-          }
-        },
-        zoomState = zoomState,
-        onTap = { onClick() },
-    )
-
-    if (isLoading) {
-      CenterCircularWavyImageLoadingProgress(
-          progressState = progressState,
-          modifier = Modifier.align(Alignment.Center),
-      )
+private fun ImagePagingStatus(
+    loading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+  if (!loading && errorMessage == null) return
+  Row(
+      modifier = modifier.safeDrawingPadding().padding(12.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    if (loading) {
+      CircularProgressIndicator(strokeWidth = 2.dp)
+    } else {
+      TextButton(onClick = onRetry) { Text("${stringResource(Res.string.retry)} · $errorMessage") }
     }
   }
-}
-
-private fun isGifUrl(url: String): Boolean {
-  val pathSegment =
-      url.trim().substringBefore('#').substringBefore('?').substringAfterLast('/').lowercase()
-  return pathSegment.endsWith(".gif")
 }

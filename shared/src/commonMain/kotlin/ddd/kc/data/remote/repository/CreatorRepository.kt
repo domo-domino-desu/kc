@@ -6,6 +6,7 @@ import ddd.kc.data.local.entity.CreatorSyncEntity
 import ddd.kc.data.local.entity.toEntity
 import ddd.kc.data.local.entity.toModel
 import ddd.kc.data.model.Announcement
+import ddd.kc.data.model.CommunityPage
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.DM
@@ -15,6 +16,7 @@ import ddd.kc.data.model.Tag
 import ddd.kc.data.remote.cache.CacheNamespace
 import ddd.kc.data.remote.cache.typedQueryStore
 import ddd.kc.data.remote.network.PawchiveApi
+import ddd.kc.data.remote.network.PawchiveApiException
 import ddd.kc.data.remote.network.toQueryError
 import ddd.kc.utils.currentTimeMs
 import ddd.kc.utils.logging.KcLog
@@ -33,6 +35,12 @@ private val log = KcLog.withTag("CreatorRepository")
 private const val CREATORS_SYNC_KEY = "all"
 
 private data class DmKey(val query: String, val offset: Int)
+
+private data class CommunityPageKey(
+    val creator: CreatorKey,
+    val loungeId: String?,
+    val offset: Int,
+)
 
 private data class CreatorSnapshot(
     val creators: List<Creator>,
@@ -83,6 +91,30 @@ class CreatorRepository(
         namespace = CacheNamespace.Detail,
         cacheKey = { key -> "pawchive:${key.service}:${key.id}:links" },
         fetch = { key -> api.getCreatorLinks(service = key.service, creatorId = key.id) },
+    )
+  }
+
+  private val communityStore by lazy {
+    typedQueryStore<CommunityPageKey, CommunityPage>(
+        cacheDao = dao,
+        json = json,
+        serializer = CommunityPage.serializer(),
+        namespace = CacheNamespace.Detail,
+        cacheKey = { key ->
+          "pawchive:${key.creator.service}:${key.creator.id}:community:" +
+              "${key.loungeId.orEmpty()}:${key.offset}"
+        },
+        fetch = { key ->
+          api.parseCreatorCommunity(
+              api.fetchCreatorCommunityBody(
+                  service = key.creator.service,
+                  creatorId = key.creator.id,
+                  loungeId = key.loungeId,
+                  offset = key.offset,
+              ),
+              key.offset,
+          )
+        },
     )
   }
 
@@ -263,6 +295,23 @@ class CreatorRepository(
       creatorId: String,
       forceRefresh: Boolean = false,
   ): List<Creator> = observeCreatorLinks(service, creatorId, forceRefresh).awaitData()
+
+  suspend fun getCreatorCommunityPage(
+      service: String,
+      creatorId: String,
+      loungeId: String? = null,
+      offset: Int = 0,
+      forceRefresh: Boolean = false,
+  ): CommunityPage? =
+      try {
+        if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:community:")
+        communityStore.queryOnce(
+            CommunityPageKey(CreatorKey(service, creatorId), loungeId, offset),
+            forceRefresh = forceRefresh,
+        )
+      } catch (error: PawchiveApiException) {
+        if (error.statusCode == 404 && loungeId == null) null else throw error
+      }
 
   fun observeDmsPage(
       query: String = "",

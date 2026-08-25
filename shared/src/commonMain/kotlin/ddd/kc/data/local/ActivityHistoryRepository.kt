@@ -2,9 +2,12 @@ package ddd.kc.data.local
 
 import ddd.kc.data.local.entity.CreatorHistoryEntity
 import ddd.kc.data.local.entity.PostHistoryEntity
+import ddd.kc.data.local.entity.SearchHistoryEntity
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.model.SearchHistoryRecord
+import ddd.kc.data.model.SearchKind
 import ddd.kc.data.model.creatorId
 import ddd.kc.utils.currentTimeMs
 import ddd.kc.utils.logging.KcLog
@@ -92,6 +95,28 @@ class ActivityHistoryRepository(
         posts
       }
 
+  suspend fun recordSearch(kind: SearchKind, query: String) =
+      withContext(ioContext) {
+        val normalized = query.trim()
+        if (normalized.isBlank()) return@withContext
+        dao.upsertSearch(
+            SearchHistoryEntity(
+                kind = kind.name,
+                queryKey = normalized.lowercase(),
+                query = normalized,
+                visitedAtMs = currentTimeMs(),
+            )
+        )
+        dao.trimSearches(kind.name, MAX_SEARCH_HISTORY_COUNT)
+      }
+
+  suspend fun loadSearchHistory(kind: SearchKind): List<SearchHistoryRecord> =
+      withContext(ioContext) {
+        dao.listSearchesByLatest(kind.name, MAX_SEARCH_HISTORY_COUNT).map {
+          SearchHistoryRecord(kind = kind, query = it.query)
+        }
+      }
+
   private fun creatorHistoryKey(service: String, creatorId: String): String =
       listOf(service, creatorId).joinToString(":")
 
@@ -121,5 +146,6 @@ class ActivityHistoryRepository(
 
   companion object {
     const val MAX_HISTORY_COUNT = 300
+    const val MAX_SEARCH_HISTORY_COUNT = 200
   }
 }
