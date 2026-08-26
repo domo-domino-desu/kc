@@ -132,6 +132,13 @@ class CreatorScreenModel(
   fun getCreatorCommunity(creator: Creator): CreatorCommunityUiState =
       mutableState.value.creatorCommunities[creator.key] ?: CreatorCommunityUiState()
 
+  fun selectContentTab(creator: Creator, tab: CreatorContentTab) {
+    val state = mutableState.value
+    if (state.selectedContentTabs[creator.key] == tab) return
+    mutableState.value =
+        state.copy(selectedContentTabs = state.selectedContentTabs + (creator.key to tab))
+  }
+
   fun loadCreatorCommunity(creator: Creator, forceRefresh: Boolean = false) {
     if (!creator.service.equals("patreon", ignoreCase = true)) {
       updateCommunity(creator, CreatorCommunityUiState(available = false))

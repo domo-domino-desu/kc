@@ -124,13 +124,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
-private enum class CreatorContentTab {
-  POSTS,
-  ANNOUNCEMENTS,
-  TAGS,
-  COMMUNITY,
-}
-
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalFoundationApi::class,
@@ -152,7 +145,7 @@ internal fun CreatorDetailPage(
   val cdnUrl = appSettings.cdnUrl()
   val baseUrl = appSettings.baseUrl()
   val cellWidth = appSettings.cellMinWidthDp()
-  var selectedTab by remember(creator.key) { mutableStateOf(CreatorContentTab.POSTS) }
+  val selectedTab = state.selectedContentTabs[creator.key] ?: CreatorContentTab.POSTS
   val gridState = rememberLazyGridState()
   val coroutineScope = rememberCoroutineScope()
   val postSnapshot = screenModel.getCreatorPostSnapshot(creator)
@@ -376,7 +369,9 @@ internal fun CreatorDetailPage(
               ScrollableButtonGroup(
                   labels = tabs.map { it.second },
                   selectedIndex = tabs.indexOfFirst { it.first == selectedTab }.coerceAtLeast(0),
-                  onSelected = { index -> selectedTab = tabs[index].first },
+                  onSelected = { index ->
+                    screenModel.selectContentTab(creator, tabs[index].first)
+                  },
               )
               if (selectedTab == CreatorContentTab.COMMUNITY) {
                 CommunityLoungeSelector(

@@ -29,6 +29,7 @@ data class CreatorPagerUiState(
     val creatorTags: Map<CreatorKey, List<Tag>> = emptyMap(),
     val creatorLinks: Map<CreatorKey, List<Creator>> = emptyMap(),
     val creatorCommunities: Map<CreatorKey, CreatorCommunityUiState> = emptyMap(),
+    val selectedContentTabs: Map<CreatorKey, CreatorContentTab> = emptyMap(),
     /** creatorId → (announcementKey → translated content state) */
     val announcementTranslations: Map<CreatorKey, Map<String, ContentTranslationState>> =
         emptyMap(),
@@ -41,6 +42,13 @@ data class CreatorPagerUiState(
 
   val currentCreator: Creator?
     get() = creators.getOrNull(currentIndex)
+}
+
+enum class CreatorContentTab {
+  POSTS,
+  ANNOUNCEMENTS,
+  TAGS,
+  COMMUNITY,
 }
 
 data class CreatorCommunityUiState(
