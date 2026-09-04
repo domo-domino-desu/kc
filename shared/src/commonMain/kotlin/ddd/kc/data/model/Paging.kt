@@ -24,6 +24,13 @@ data class PagedResult<T>(
 )
 
 @Serializable
+data class CreatorPostsPage(
+    val items: List<Post> = emptyList(),
+    val pageInfo: PageInfo? = null,
+    val communityAvailable: Boolean = false,
+)
+
+@Serializable
 data class PopularPage(
     val props: PopularProps = PopularProps(),
     val info: PopularInfo = PopularInfo(),

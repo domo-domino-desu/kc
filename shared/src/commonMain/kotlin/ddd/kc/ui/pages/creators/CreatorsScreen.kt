@@ -2,6 +2,7 @@ package ddd.kc.ui.pages.creators
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -53,12 +54,15 @@ import ddd.kc.generated.symbols.icons.materialsymbols.icons.SortW400Outlined
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
+import ddd.kc.ui.components.AiFilterField
 import ddd.kc.ui.components.AutoLoadEffect
+import ddd.kc.ui.components.CollapsibleFilterPanel
 import ddd.kc.ui.components.CreatorSearchCard
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PageJumpFabMenu
 import ddd.kc.ui.components.PagedPullRefreshBox
 import ddd.kc.ui.components.SkeletonBlock
+import ddd.kc.ui.components.aiFilterLabel
 import ddd.kc.ui.components.icons.pawchiveServices
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.loadingFooter
@@ -170,76 +174,89 @@ class CreatorsScreen : AppScreen {
             }
 
             item(key = "artist_filters", span = { GridItemSpan(maxLineSpan) }) {
-              Row(
-                  modifier = Modifier.fillMaxWidth(),
-                  verticalAlignment = Alignment.CenterVertically,
-              ) {
-                CreatorFilterChipDropdown(
-                    label = stringResource(Res.string.filter_service),
-                    selectedLabel =
-                        state.selectedService?.replaceFirstChar { it.uppercase() }
-                            ?: stringResource(Res.string.filter_all),
-                    expanded = serviceDropdownExpanded,
-                    onExpandedChange = { serviceDropdownExpanded = it },
-                    modifier = Modifier.weight(1f),
-                ) {
-                  DropdownMenuItem(
-                      text = { Text(stringResource(Res.string.filter_all)) },
-                      onClick = {
-                        screenModel.onServiceChanged(null)
-                        serviceDropdownExpanded = false
-                      },
-                  )
-                  pawchiveServices().forEach { service ->
-                    DropdownMenuItem(
-                        text = { Text(service.replaceFirstChar { it.uppercase() }) },
-                        onClick = {
-                          screenModel.onServiceChanged(service)
-                          serviceDropdownExpanded = false
-                        },
-                    )
-                  }
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                CreatorFilterChipDropdown(
-                    label = stringResource(Res.string.filter_sort),
-                    selectedLabel = creatorSortLabel(state.sortBy),
-                    expanded = sortDropdownExpanded,
-                    onExpandedChange = { sortDropdownExpanded = it },
-                    modifier = Modifier.weight(1f),
-                ) {
-                  CreatorSort.entries.forEach { sort ->
-                    DropdownMenuItem(
-                        text = { Text(creatorSortLabel(sort)) },
-                        onClick = {
-                          screenModel.onSortChanged(sort)
-                          sortDropdownExpanded = false
-                        },
-                    )
-                  }
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                FilledTonalIconButton(
-                    onClick = {
-                      screenModel.onSortOrderChanged(
-                          if (state.sortOrder == SortOrder.DESC) SortOrder.ASC else SortOrder.DESC
+              CollapsibleFilterPanel(
+                  chips =
+                      listOfNotNull(
+                          aiFilterLabel(state.aiFilter),
+                          state.selectedService,
+                          creatorSortLabel(state.sortBy),
                       )
-                    },
-                    shape = CircleShape,
-                    modifier = Modifier.size(40.dp),
-                ) {
-                  Icon(
-                      imageVector = Icons.SortW400Outlined,
-                      contentDescription = sortOrderLabel(state.sortOrder),
-                      modifier =
-                          Modifier.graphicsLayer {
-                            scaleY = if (state.sortOrder == SortOrder.DESC) 1f else -1f
+              ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                  AiFilterField(state.aiFilter, screenModel::onAiFilterChanged)
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      verticalAlignment = Alignment.CenterVertically,
+                  ) {
+                    CreatorFilterChipDropdown(
+                        label = stringResource(Res.string.filter_service),
+                        selectedLabel =
+                            state.selectedService?.replaceFirstChar { it.uppercase() }
+                                ?: stringResource(Res.string.filter_all),
+                        expanded = serviceDropdownExpanded,
+                        onExpandedChange = { serviceDropdownExpanded = it },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                      DropdownMenuItem(
+                          text = { Text(stringResource(Res.string.filter_all)) },
+                          onClick = {
+                            screenModel.onServiceChanged(null)
+                            serviceDropdownExpanded = false
                           },
-                  )
+                      )
+                      pawchiveServices().forEach { service ->
+                        DropdownMenuItem(
+                            text = { Text(service.replaceFirstChar { it.uppercase() }) },
+                            onClick = {
+                              screenModel.onServiceChanged(service)
+                              serviceDropdownExpanded = false
+                            },
+                        )
+                      }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    CreatorFilterChipDropdown(
+                        label = stringResource(Res.string.filter_sort),
+                        selectedLabel = creatorSortLabel(state.sortBy),
+                        expanded = sortDropdownExpanded,
+                        onExpandedChange = { sortDropdownExpanded = it },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                      CreatorSort.entries.forEach { sort ->
+                        DropdownMenuItem(
+                            text = { Text(creatorSortLabel(sort)) },
+                            onClick = {
+                              screenModel.onSortChanged(sort)
+                              sortDropdownExpanded = false
+                            },
+                        )
+                      }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    FilledTonalIconButton(
+                        onClick = {
+                          screenModel.onSortOrderChanged(
+                              if (state.sortOrder == SortOrder.DESC) SortOrder.ASC
+                              else SortOrder.DESC
+                          )
+                        },
+                        shape = CircleShape,
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                      Icon(
+                          imageVector = Icons.SortW400Outlined,
+                          contentDescription = sortOrderLabel(state.sortOrder),
+                          modifier =
+                              Modifier.graphicsLayer {
+                                scaleY = if (state.sortOrder == SortOrder.DESC) 1f else -1f
+                              },
+                      )
+                    }
+                  }
                 }
               }
             }
@@ -265,9 +282,9 @@ class CreatorsScreen : AppScreen {
                     onClick = {
                       navigator.push(
                           CreatorRouteScreen(
-                              navigationWindows.putCreators(state.creators),
+                              navigationWindows.putCreators(state.filteredCreators),
                               creator.key,
-                              state.creators.indexOf(creator),
+                              state.filteredCreators.indexOf(creator),
                           )
                       )
                     },

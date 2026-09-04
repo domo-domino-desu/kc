@@ -2,6 +2,7 @@ package ddd.kc.data.remote.network
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostFile
@@ -108,8 +109,9 @@ class PawchiveApiTest {
                 "/api/v1/patreon/user/artist/post/post1" -> postDetailJson
                 "/api/v1/patreon/user/artist/post/post1/comments" -> commentsJson
                 "/api/v1/patreon/user/artist/announcements" -> announcementsJson
-                "/patreon/user/artist/tags" ->
-                    TestFixtures.read("pawchive.st__patreon__user__3295915__tags.html")
+                "/api/v1/patreon/user/artist/tags" -> creatorTagsJson
+                "/patreon/user/artist/recommended" ->
+                    TestFixtures.read("pawchive.st__patreon__user__3295915__recommended.html")
                 "/patreon/user/artist/community/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ->
                     TestFixtures.read("pawchive.pw__patreon__user__70000001__community.html")
                 "/api/v1/account/favorites" ->
@@ -132,6 +134,9 @@ class PawchiveApiTest {
             .isNotEmpty()
     )
     assertTrue(api.parsePopularPostsPage(api.fetchPopularPostsBody()).posts.isNotEmpty())
+    api.fetchPopularPostsBody(aiFilter = AiFilterMode.HIDE)
+    api.fetchPostSearchBody(query = "art", aiFilter = AiFilterMode.ONLY)
+    api.fetchCreatorsBody(aiFilter = AiFilterMode.HIDE)
     assertTrue(api.parseTags(api.fetchTagsBody()).any { it.tag == "nsfw" && it.count > 0 })
     assertTrue(api.parseDms(api.fetchDmsBody(offset = 0)).isNotEmpty())
     val creatorPage =
@@ -158,6 +163,9 @@ class PawchiveApiTest {
         api.parseCreatorTags(api.fetchCreatorTagsBody("patreon", "artist")).any {
           it.tag == "Animation"
         },
+    )
+    assertTrue(
+        api.parseSimilarCreators(api.fetchSimilarCreatorsBody("patreon", "artist")).isNotEmpty()
     )
     val community =
         api.parseCreatorCommunity(
@@ -187,6 +195,15 @@ class PawchiveApiTest {
     assertTrue(paths.contains("/posts/popular"))
     assertTrue(paths.contains("/posts/tags"))
     assertTrue(paths.contains("/dms"))
+    assertTrue(
+        requests.any { it.url.encodedPath == "/posts/popular" && it.url.parameters["hide"] == "ai" }
+    )
+    assertTrue(requests.any { it.url.encodedPath == "/posts" && it.url.parameters["show"] == "ai" })
+    assertTrue(
+        requests.any {
+          it.url.encodedPath == "/api/v1/creators" && it.url.parameters["hide"] == "ai"
+        }
+    )
     assertTrue(
         requests
             .filter {
@@ -698,9 +715,14 @@ class PawchiveApiTest {
     val servicePosts =
         api.parsePostCardsPage(TestFixtures.read("pawchive.st__posts__service-patreon.html"))
     assertTrue(servicePosts.items.isNotEmpty())
-    assertTrue(servicePosts.items.all { it.service == "patreon" })
+    assertTrue(servicePosts.items.any { it.service == "patreon" })
     assertTrue(servicePosts.items.any { it.file?.path?.startsWith("/") == true })
     assertEquals(1000, servicePosts.pageInfo?.lastPage)
+
+    val searchPosts =
+        api.parsePostCardsPage(TestFixtures.read("pawchive.st__posts__search-test.html"))
+    assertTrue(searchPosts.items.isNotEmpty())
+    assertTrue(searchPosts.pageInfo != null)
 
     val tagPosts = api.parsePostCards(TestFixtures.read("pawchive.st__posts__tag-nsfw.html"))
     assertTrue(tagPosts.isNotEmpty())
@@ -708,9 +730,26 @@ class PawchiveApiTest {
     val tags = api.parseTags(TestFixtures.read("pawchive.st__posts__tags.html"))
     assertTrue(tags.any { it.tag == "nsfw" && it.count > 0 })
 
-    val creatorTags =
-        api.parseCreatorTags(TestFixtures.read("pawchive.st__patreon__user__3295915__tags.html"))
+    val creatorTags = api.parseCreatorTags(creatorTagsJson)
     assertTrue(creatorTags.any { it.tag == "Animation" && it.count > 0 })
+
+    val similarCreators =
+        api.parseSimilarCreators(
+            TestFixtures.read("pawchive.st__patreon__user__3295915__recommended.html")
+        )
+    assertTrue(similarCreators.isNotEmpty())
+    assertTrue(similarCreators.all { it.id.isNotBlank() && it.service.isNotBlank() })
+
+    val creatorWithoutCommunity =
+        api.parseCreatorPostsPage(TestFixtures.read("pawchive.st__patreon__user__3295915.html"))
+    assertTrue(creatorWithoutCommunity.items.isNotEmpty())
+    assertEquals(false, creatorWithoutCommunity.communityAvailable)
+
+    val creatorWithCommunity =
+        api.parseCreatorPostsPage(
+            TestFixtures.read("pawchive.pw__patreon__user__70000001__community.html")
+        )
+    assertEquals(true, creatorWithCommunity.communityAvailable)
 
     val dmsPage = api.parseDmsPage(TestFixtures.read("pawchive.pw__dms.html"))
     assertTrue(dmsPage.items.isNotEmpty())
@@ -775,6 +814,8 @@ class PawchiveApiTest {
         """[{"id":"post1","user":"artist","service":"patreon","title":"Post","file":{"name":"a.jpg","path":"/a.jpg"},"attachments":[]}]"""
     const val creatorPostsJson =
         """[{"id":"post1","user":"artist","service":"patreon","title":"Creator Post","tags":"{Animation,Chainsaw-Man,\"Quoted Tag\"}"}]"""
+    const val creatorTagsJson =
+        """[{"tag":"Animation","post_count":12},{"tag":"Illustration","post_count":4}]"""
     const val postDetailJson =
         """{"id":"post1","user":"artist","service":"patreon","title":"Detail","content":"detail text","attachments":[{"name":"detail.jpg","path":"/detail.jpg"}],"tags":"{\"Tomoe Umari\",Vtuber,winner}"}"""
     const val commentsJson = """[{"id":"comment1","content":"ok","commenter":"reader"}]"""

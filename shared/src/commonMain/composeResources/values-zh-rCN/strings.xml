@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="filter_title">筛选</string>
+  <string name="ai_filter_label">AI 生成</string>
+  <string name="filter_hide">隐藏</string>
+  <string name="filter_show">显示</string>
+  <string name="filter_only">仅显示</string>
+  <string name="similar_users">相似用户</string>
   <!-- Navigation tabs -->
   <string name="tab_creators">创作者</string>
   <string name="tab_works">作品</string>

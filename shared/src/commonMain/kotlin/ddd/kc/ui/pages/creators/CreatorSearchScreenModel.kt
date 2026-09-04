@@ -3,6 +3,8 @@ package ddd.kc.ui.pages.creators
 import androidx.compose.runtime.Composable
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.PageInfo
@@ -62,11 +64,13 @@ private val log = KcLog.withTag("CreatorSearchScreenModel")
 private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 data class CreatorSearchState(
+    val aiFilter: AiFilterMode = AiFilterMode.SHOW,
     val query: String = "",
     val selectedService: String? = null,
     val sortBy: CreatorSort = CreatorSort.FAVORITED,
     val sortOrder: SortOrder = SortOrder.DESC,
     val allCreators: List<Creator> = emptyList(),
+    val filteredCreators: List<Creator> = emptyList(),
     val filteredCount: Int = 0,
     val paging: OffsetPagingState<Creator> = OffsetPagingState(loading = true),
 ) {
@@ -105,7 +109,11 @@ data class CreatorSearchState(
 
 class CreatorSearchScreenModel(
     private val creatorRepo: CreatorRepository,
-) : StateScreenModel<CreatorSearchState>(CreatorSearchState()) {
+    private val settings: AppSettings,
+) :
+    StateScreenModel<CreatorSearchState>(
+        CreatorSearchState(aiFilter = settings.creatorsAiFilter())
+    ) {
   private val reducer = OffsetPagingMachine<Creator, CreatorKey> { it.key }
   private var searchJob: Job? = null
 
@@ -131,6 +139,13 @@ class CreatorSearchScreenModel(
   fun onSortOrderChanged(order: SortOrder) {
     mutableState.value = mutableState.value.copy(sortOrder = order)
     reload(delayMs = 100)
+  }
+
+  fun onAiFilterChanged(value: AiFilterMode) {
+    if (mutableState.value.aiFilter == value) return
+    mutableState.value = mutableState.value.copy(aiFilter = value, allCreators = emptyList())
+    screenModelScope.launch { settings.setCreatorsAiFilter(value) }
+    reload(delayMs = 0)
   }
 
   fun refresh() {
@@ -200,7 +215,7 @@ class CreatorSearchScreenModel(
             if (delayMs > 0) delay(delayMs)
             val state = mutableState.value
             updatePaging(reducer.beginLoad(state.paging, forceRefresh))
-            creatorRepo.observeCreators(forceRefresh).collect { next ->
+            creatorRepo.observeCreators(forceRefresh, state.aiFilter).collect { next ->
               val allCreators = next.data ?: mutableState.value.allCreators
               val rows =
                   filterCreators(
@@ -258,6 +273,7 @@ class CreatorSearchScreenModel(
     val pageItems = filtered.drop(safeOffset).take(PAGE_SIZE)
     return state.copy(
         filteredCount = filtered.size,
+        filteredCreators = filtered,
         paging =
             reducer.reduceFirstPage(
                 state.paging,

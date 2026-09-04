@@ -1,8 +1,10 @@
 package ddd.kc.data.remote.repository
 
 import ddd.kc.data.local.AppDatabase
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.Comment
 import ddd.kc.data.model.CreatorKey
+import ddd.kc.data.model.CreatorPostsPage
 import ddd.kc.data.model.PagedResult
 import ddd.kc.data.model.PopularPage
 import ddd.kc.data.model.Post
@@ -31,13 +33,19 @@ private val log = KcLog.withTag("PostRepository")
 
 private data class OffsetKey(val offset: Int)
 
-private data class PopularKey(val date: String?, val period: String, val offset: Int)
+private data class PopularKey(
+    val date: String?,
+    val period: String,
+    val offset: Int,
+    val aiFilter: AiFilterMode,
+)
 
 private data class SearchKey(
     val query: String,
     val offset: Int,
     val tag: String?,
     val service: String?,
+    val aiFilter: AiFilterMode,
 )
 
 private data class CreatorPostsKey(val creator: CreatorKey, val offset: Int)
@@ -70,11 +78,16 @@ class PostRepository(
         serializer = PopularPage.serializer(),
         namespace = CacheNamespace.PostList,
         cacheKey = { key ->
-          "pawchive:posts:popular:${key.period}:${key.date.orEmpty()}:${key.offset}"
+          "pawchive:posts:popular:${key.period}:${key.date.orEmpty()}:${key.offset}:${key.aiFilter.persistedValue}"
         },
         fetch = { key ->
           api.parsePopularPostsPage(
-              api.fetchPopularPostsBody(date = key.date, period = key.period, offset = key.offset),
+              api.fetchPopularPostsBody(
+                  date = key.date,
+                  period = key.period,
+                  offset = key.offset,
+                  aiFilter = key.aiFilter,
+              ),
               key.date,
               key.period,
               key.offset,
@@ -90,7 +103,7 @@ class PostRepository(
         serializer = PagedResult.serializer(Post.serializer()),
         namespace = CacheNamespace.PostList,
         cacheKey = { key ->
-          "pawchive:posts:search:${key.offset}:${key.service.orEmpty()}:${key.tag.orEmpty()}:${key.query}"
+          "pawchive:posts:search:${key.offset}:${key.service.orEmpty()}:${key.tag.orEmpty()}:${key.aiFilter.persistedValue}:${key.query}"
         },
         fetch = { key ->
           api.parsePostCardsPage(
@@ -99,6 +112,7 @@ class PostRepository(
                   offset = key.offset,
                   tag = key.tag,
                   service = key.service,
+                  aiFilter = key.aiFilter,
               ),
               key.offset,
           )
@@ -107,16 +121,16 @@ class PostRepository(
   }
 
   private val creatorPostsStore by lazy {
-    typedQueryStore<CreatorPostsKey, PagedResult<Post>>(
+    typedQueryStore<CreatorPostsKey, CreatorPostsPage>(
         cacheDao = dao,
         json = json,
-        serializer = PagedResult.serializer(Post.serializer()),
+        serializer = CreatorPostsPage.serializer(),
         namespace = CacheNamespace.PostList,
         cacheKey = { key ->
-          "pawchive:${key.creator.service}:${key.creator.id}:posts:${key.offset}"
+          "pawchive:${key.creator.service}:${key.creator.id}:posts:v2:${key.offset}"
         },
         fetch = { key ->
-          api.parsePostCardsPage(
+          api.parseCreatorPostsPage(
               api.fetchCreatorPostsPageBody(
                   service = key.creator.service,
                   creatorId = key.creator.id,
@@ -173,11 +187,12 @@ class PostRepository(
       period: String,
       offset: Int,
       forceRefresh: Boolean = false,
+      aiFilter: AiFilterMode = AiFilterMode.SHOW,
   ): Flow<QueryState<PopularPage>> = flow {
     if (forceRefresh) {
       deleteCacheGroup("pawchive:posts:popular:$period:")
     }
-    emitAll(popularStore.query(PopularKey(date, period, offset)))
+    emitAll(popularStore.query(PopularKey(date, period, offset, aiFilter)))
   }
 
   suspend fun getPopularPostsPage(
@@ -185,17 +200,19 @@ class PostRepository(
       period: String,
       offset: Int,
       forceRefresh: Boolean,
-  ): PopularPage = observePopularPostsPage(date, period, offset, forceRefresh).awaitData()
+      aiFilter: AiFilterMode = AiFilterMode.SHOW,
+  ): PopularPage = observePopularPostsPage(date, period, offset, forceRefresh, aiFilter).awaitData()
 
   fun observePostSearchPage(
       query: String,
       offset: Int,
       tag: String?,
       service: String?,
+      aiFilter: AiFilterMode = AiFilterMode.SHOW,
       forceRefresh: Boolean = false,
   ): Flow<QueryState<PagedResult<Post>>> = flow {
     if (forceRefresh) deleteCacheGroup("pawchive:posts:search:")
-    emitAll(searchStore.query(SearchKey(query.trim(), offset, tag, service)))
+    emitAll(searchStore.query(SearchKey(query.trim(), offset, tag, service, aiFilter)))
   }
 
   suspend fun searchPosts(
@@ -212,8 +229,9 @@ class PostRepository(
       tag: String?,
       service: String?,
       forceRefresh: Boolean,
+      aiFilter: AiFilterMode = AiFilterMode.SHOW,
   ): PagedResult<Post> =
-      observePostSearchPage(query, offset, tag, service, forceRefresh = forceRefresh).awaitData()
+      observePostSearchPage(query, offset, tag, service, aiFilter, forceRefresh).awaitData()
 
   suspend fun getPostsByTag(
       tag: String,
@@ -249,7 +267,7 @@ class PostRepository(
       creatorId: String,
       offset: Int,
       forceRefresh: Boolean,
-  ): PagedResult<Post> {
+  ): CreatorPostsPage {
     if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:posts:")
     return creatorPostsStore
         .query(CreatorPostsKey(CreatorKey(service, creatorId), offset))

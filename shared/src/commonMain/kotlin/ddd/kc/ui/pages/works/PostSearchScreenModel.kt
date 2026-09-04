@@ -3,6 +3,8 @@ package ddd.kc.ui.pages.works
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import ddd.kc.data.local.ActivityHistoryRepository
+import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.PagedResult
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
@@ -26,6 +28,7 @@ private val log = KcLog.withTag("PostSearchScreenModel")
 private const val PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 data class PostSearchState(
+    val aiFilter: AiFilterMode = AiFilterMode.SHOW,
     val draftQuery: String = "",
     val appliedQuery: String = "",
     val defaultPopularDate: String? = null,
@@ -82,7 +85,8 @@ data class PostSearchState(
 class PostSearchScreenModel(
     private val postRepo: PostRepository,
     private val historyRepo: ActivityHistoryRepository,
-) : StateScreenModel<PostSearchState>(PostSearchState()) {
+    private val settings: AppSettings,
+) : StateScreenModel<PostSearchState>(PostSearchState(aiFilter = settings.searchAiFilter())) {
   private val reducer = OffsetPagingMachine<Post, PostKey> { it.key }
   private var searchJob: Job? = null
   private var generation = 0L
@@ -108,12 +112,28 @@ class PostSearchScreenModel(
     mutableState.value = mutableState.value.copy(draftQuery = query)
   }
 
+  fun onAiFilterChanged(value: AiFilterMode) {
+    if (mutableState.value.aiFilter == value) return
+    searchJob?.cancel()
+    val requestGeneration = ++generation
+    mutableState.value =
+        mutableState.value.copy(aiFilter = value, paging = OffsetPagingState(loading = true))
+    searchJob =
+        screenModelScope.launch {
+          settings.setSearchAiFilter(value)
+          val query = mutableState.value.appliedQuery
+          if (query.isBlank()) loadDefaultPage(false, requestGeneration)
+          else loadSearchPage(query, requestGeneration)
+        }
+  }
+
   fun submitSearch() {
     val query = mutableState.value.draftQuery.trim()
     searchJob?.cancel()
     val requestGeneration = ++generation
     mutableState.value =
         PostSearchState(
+            aiFilter = mutableState.value.aiFilter,
             draftQuery = query,
             appliedQuery = query,
             defaultPopularDate = mutableState.value.defaultPopularDate,
@@ -181,33 +201,41 @@ class PostSearchScreenModel(
 
   private suspend fun loadDefaultPage(forceRefresh: Boolean, requestGeneration: Long) {
     updatePaging(reducer.beginLoad(mutableState.value.paging, forceRefresh))
-    postRepo.observePopularPostsPage(null, "day", 0, forceRefresh).collect { next ->
-      if (requestGeneration != generation || mutableState.value.appliedQuery.isNotBlank())
-          return@collect
-      next.data?.let { page ->
-        mutableState.value =
-            mutableState.value.copy(
-                defaultPopularDate =
-                    page.info.minDate ?: page.info.date ?: mutableState.value.defaultPopularDate,
-                paging =
-                    reducer.reduceFirstPage(
-                        mutableState.value.paging,
-                        page.posts,
-                        page.pageInfo?.hasNext ?: (page.posts.size >= PAGE_SIZE),
-                        page.posts.size,
-                        page.pageInfo,
-                    ),
-            )
-      }
-      next.error?.let {
-        updatePaging(reducer.reduceFirstPageError(mutableState.value.paging, it.asException()))
-      }
-    }
+    postRepo
+        .observePopularPostsPage(null, "day", 0, forceRefresh, mutableState.value.aiFilter)
+        .collect { next ->
+          if (requestGeneration != generation || mutableState.value.appliedQuery.isNotBlank())
+              return@collect
+          next.data?.let { page ->
+            mutableState.value =
+                mutableState.value.copy(
+                    defaultPopularDate =
+                        page.info.minDate
+                            ?: page.info.date
+                            ?: mutableState.value.defaultPopularDate,
+                    paging =
+                        reducer.reduceFirstPage(
+                            mutableState.value.paging,
+                            page.posts,
+                            page.pageInfo?.hasNext ?: (page.posts.size >= PAGE_SIZE),
+                            page.posts.size,
+                            page.pageInfo,
+                        ),
+                )
+          }
+          next.error?.let {
+            updatePaging(reducer.reduceFirstPageError(mutableState.value.paging, it.asException()))
+          }
+        }
   }
 
   private suspend fun loadSearchPage(query: String, requestGeneration: Long) {
     updatePaging(reducer.beginLoad(mutableState.value.paging, forceRefresh = true))
-    resultOfSuspend { postRepo.searchPostsPage(query, 0, null, null, true) }
+    resultOfSuspend {
+          postRepo
+              .observePostSearchPage(query, 0, null, null, mutableState.value.aiFilter, true)
+              .awaitData()
+        }
         .onSuccess { page ->
           if (requestGeneration != generation || mutableState.value.appliedQuery != query)
               return@onSuccess
@@ -244,11 +272,21 @@ class PostSearchScreenModel(
                         mutableState.value.defaultPopularDate,
                         "day",
                         offset,
+                        aiFilter = mutableState.value.aiFilter,
                     )
                     .awaitData()
             PagedResult(page.posts, page.pageInfo)
           } else {
-            postRepo.searchPostsPage(requestQuery, offset, null, null, true)
+            postRepo
+                .observePostSearchPage(
+                    requestQuery,
+                    offset,
+                    null,
+                    null,
+                    mutableState.value.aiFilter,
+                    true,
+                )
+                .awaitData()
           }
         }
         .onSuccess { page ->

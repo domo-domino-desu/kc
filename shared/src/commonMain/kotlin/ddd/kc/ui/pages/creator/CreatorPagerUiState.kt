@@ -21,6 +21,7 @@ data class CreatorPagerUiState(
     val announcementErrors: Map<CreatorKey, QueryError> = emptyMap(),
     val tagErrors: Map<CreatorKey, QueryError> = emptyMap(),
     val linkErrors: Map<CreatorKey, QueryError> = emptyMap(),
+    val similarErrors: Map<CreatorKey, QueryError> = emptyMap(),
     val loadingCreatorPostIds: Set<CreatorKey> = emptySet(),
     val loadingCreatorAnnouncementIds: Set<CreatorKey> = emptySet(),
     val loadingCreatorTagIds: Set<CreatorKey> = emptySet(),
@@ -28,6 +29,7 @@ data class CreatorPagerUiState(
     val creatorAnnouncements: Map<CreatorKey, List<Announcement>> = emptyMap(),
     val creatorTags: Map<CreatorKey, List<Tag>> = emptyMap(),
     val creatorLinks: Map<CreatorKey, List<Creator>> = emptyMap(),
+    val similarCreators: Map<CreatorKey, List<Creator>> = emptyMap(),
     val creatorCommunities: Map<CreatorKey, CreatorCommunityUiState> = emptyMap(),
     val selectedContentTabs: Map<CreatorKey, CreatorContentTab> = emptyMap(),
     /** creatorId → (announcementKey → translated content state) */

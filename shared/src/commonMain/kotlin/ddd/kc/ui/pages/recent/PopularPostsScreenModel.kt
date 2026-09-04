@@ -2,6 +2,8 @@ package ddd.kc.ui.pages.recent
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import ddd.kc.data.local.settings.AppSettings
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.PopularInfo
 import ddd.kc.data.model.PopularProps
 import ddd.kc.data.model.Post
@@ -38,6 +40,7 @@ enum class PopularPeriod(val apiValue: String) {
 }
 
 data class PopularPostsState(
+    val aiFilter: AiFilterMode = AiFilterMode.SHOW,
     val period: PopularPeriod = PopularPeriod.DAY,
     val date: String? = defaultPopularDate(PopularPeriod.DAY),
     val info: PopularInfo? = null,
@@ -97,7 +100,8 @@ data class PopularPostsState(
 
 class PopularPostsScreenModel(
     private val postRepo: PostRepository,
-) : StateScreenModel<PopularPostsState>(PopularPostsState()) {
+    private val settings: AppSettings,
+) : StateScreenModel<PopularPostsState>(PopularPostsState(aiFilter = settings.popularAiFilter())) {
   private val reducer = OffsetPagingMachine<Post, PostKey> { it.key }
   private var generation: Long = 0
 
@@ -107,6 +111,17 @@ class PopularPostsScreenModel(
     generation++
     updatePaging(reducer.beginLoad(state.paging, forceRefresh))
     screenModelScope.launch { loadPage(offset = 0, forceRefresh = forceRefresh, replace = true) }
+  }
+
+  fun onAiFilterChanged(value: AiFilterMode) {
+    if (mutableState.value.aiFilter == value) return
+    generation++
+    mutableState.value =
+        mutableState.value.copy(aiFilter = value, paging = OffsetPagingState(loading = true))
+    screenModelScope.launch {
+      settings.setPopularAiFilter(value)
+      loadPage(offset = 0, forceRefresh = false, replace = true)
+    }
   }
 
   fun loadMore() {
@@ -213,6 +228,7 @@ class PopularPostsScreenModel(
                   period = requestPeriod.apiValue,
                   offset = offset,
                   forceRefresh = forceRefresh,
+                  aiFilter = state.aiFilter,
               )
               .awaitData()
         }

@@ -44,7 +44,7 @@ class CreatorScreenModel(
         CreatorPagerUiState(
             creators = initialCreators,
             currentIndex = startIndex,
-            hasMore = initialCreators.size >= PAGE_SIZE,
+            hasMore = false,
         )
     ) {
   private enum class RequestKind {
@@ -52,6 +52,7 @@ class CreatorScreenModel(
     POSTS,
     TAGS,
     LINKS,
+    SIMILAR,
     COMMUNITY,
   }
 
@@ -107,6 +108,7 @@ class CreatorScreenModel(
     loadCreatorAnnouncements(creator)
     loadCreatorTags(creator)
     loadCreatorLinks(creator)
+    loadSimilarCreators(creator)
   }
 
   fun previous() {
@@ -137,6 +139,7 @@ class CreatorScreenModel(
     if (state.selectedContentTabs[creator.key] == tab) return
     mutableState.value =
         state.copy(selectedContentTabs = state.selectedContentTabs + (creator.key to tab))
+    if (tab == CreatorContentTab.COMMUNITY) loadCreatorCommunity(creator)
   }
 
   fun loadCreatorCommunity(creator: Creator, forceRefresh: Boolean = false) {
@@ -145,7 +148,12 @@ class CreatorScreenModel(
       return
     }
     val existing = getCreatorCommunity(creator)
-    if (!forceRefresh && (existing.available != null || existing.loading)) return
+    if (
+        !forceRefresh &&
+            (existing.available == false || existing.loading || existing.selectedLoungeId != null)
+    ) {
+      return
+    }
     val token = beginRequest(RequestKind.COMMUNITY, creator.key)
     updateCommunity(creator, existing.copy(loading = true, error = null))
     screenModelScope.launch {
@@ -650,6 +658,14 @@ class CreatorScreenModel(
                     loadingCreatorPostIds = mutableState.value.loadingCreatorPostIds - creator.key,
                     creatorPostSnapshots =
                         mutableState.value.creatorPostSnapshots + (creator.key to snapshot),
+                    creatorCommunities =
+                        mutableState.value.creatorCommunities +
+                            (creator.key to
+                                getCreatorCommunity(creator)
+                                    .copy(
+                                        available = page.communityAvailable,
+                                        error = null,
+                                    )),
                 )
             log.i {
               "加载Creator Posts -> 成功(service=${creator.service},creator=${creator.id},offset=$offset,count=${posts.size})"
@@ -891,6 +907,37 @@ class CreatorScreenModel(
 
   fun getCreatorLinks(creator: Creator): List<Creator> =
       mutableState.value.creatorLinks[creator.key] ?: emptyList()
+
+  fun loadSimilarCreators(creator: Creator, forceRefresh: Boolean = false) {
+    if (!forceRefresh && mutableState.value.similarCreators.containsKey(creator.key)) return
+    val requestToken = beginRequest(RequestKind.SIMILAR, creator.key)
+    mutableState.value =
+        mutableState.value.copy(similarErrors = mutableState.value.similarErrors - creator.key)
+    screenModelScope.launch {
+      resultOfSuspend { creatorRepo.getSimilarCreators(creator.service, creator.id, forceRefresh) }
+          .onSuccess { creators ->
+            if (!isCurrentRequest(RequestKind.SIMILAR, creator.key, requestToken)) return@onSuccess
+            mutableState.value =
+                mutableState.value.copy(
+                    similarCreators =
+                        mutableState.value.similarCreators + (creator.key to creators),
+                    similarErrors = mutableState.value.similarErrors - creator.key,
+                )
+          }
+          .onFailure {
+            if (!isCurrentRequest(RequestKind.SIMILAR, creator.key, requestToken)) return@onFailure
+            mutableState.value =
+                mutableState.value.copy(
+                    similarErrors =
+                        mutableState.value.similarErrors + (creator.key to it.toQueryError())
+                )
+            log.w(it) { "加载相似Creator -> 失败(service=${creator.service},creator=${creator.id})" }
+          }
+    }
+  }
+
+  fun getSimilarCreators(creator: Creator): List<Creator> =
+      mutableState.value.similarCreators[creator.key] ?: emptyList()
 
   fun loadFavoriteStatus(creator: Creator) {
     if (!creatorRepo.hasSession()) {

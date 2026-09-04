@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import ddd.kc.data.local.security.SecretStore
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.OpenAiTranslationConfig
 import ddd.kc.data.model.TranslationProvider
 import ddd.kc.data.model.TranslationSettings
@@ -29,6 +30,9 @@ class AppSettings(
   private val preferences = MutableStateFlow(defaultPreferences())
   private val _loadState = MutableStateFlow<SettingsLoadState>(SettingsLoadState.Loading)
   private val mutationMutex = Mutex()
+  private val popularAiFilter = MutableStateFlow(AiFilterMode.SHOW)
+  private val searchAiFilter = MutableStateFlow(AiFilterMode.SHOW)
+  private val creatorsAiFilter = MutableStateFlow(AiFilterMode.SHOW)
   val loadState: StateFlow<SettingsLoadState> = _loadState
 
   suspend fun init() {
@@ -36,6 +40,9 @@ class AppSettings(
     try {
       val persisted = dataStore.data.first()
       val loaded = decode(persisted)
+      popularAiFilter.value = AiFilterMode.fromPersistedValue(persisted[POPULAR_AI_FILTER])
+      searchAiFilter.value = AiFilterMode.fromPersistedValue(persisted[SEARCH_AI_FILTER])
+      creatorsAiFilter.value = AiFilterMode.fromPersistedValue(persisted[CREATORS_AI_FILTER])
       val legacyApiKey = persisted[OPENAI_TRANSLATION_API_KEY]?.trim().orEmpty()
       if (legacyApiKey.isNotBlank()) {
         secretStore.put(OPENAI_API_KEY_SECRET, legacyApiKey)
@@ -96,6 +103,37 @@ class AppSettings(
   fun translationSettings(): TranslationSettings = preferences.value.translationSettings
 
   fun translationSettingsFlow() = preferences.map { it.translationSettings }.distinctUntilChanged()
+
+  fun popularAiFilter(): AiFilterMode = popularAiFilter.value
+
+  fun popularAiFilterFlow(): StateFlow<AiFilterMode> = popularAiFilter
+
+  fun searchAiFilter(): AiFilterMode = searchAiFilter.value
+
+  fun searchAiFilterFlow(): StateFlow<AiFilterMode> = searchAiFilter
+
+  fun creatorsAiFilter(): AiFilterMode = creatorsAiFilter.value
+
+  fun creatorsAiFilterFlow(): StateFlow<AiFilterMode> = creatorsAiFilter
+
+  suspend fun setPopularAiFilter(value: AiFilterMode) =
+      setAiFilter(POPULAR_AI_FILTER, popularAiFilter, value)
+
+  suspend fun setSearchAiFilter(value: AiFilterMode) =
+      setAiFilter(SEARCH_AI_FILTER, searchAiFilter, value)
+
+  suspend fun setCreatorsAiFilter(value: AiFilterMode) =
+      setAiFilter(CREATORS_AI_FILTER, creatorsAiFilter, value)
+
+  private suspend fun setAiFilter(
+      key: Preferences.Key<String>,
+      state: MutableStateFlow<AiFilterMode>,
+      value: AiFilterMode,
+  ) =
+      mutationMutex.withLock {
+        dataStore.edit { it[key] = value.persistedValue }
+        state.value = value
+      }
 
   /** Commits the complete non-secret snapshot in one DataStore transaction. */
   suspend fun save(value: AppPreferences) =
@@ -265,6 +303,9 @@ class AppSettings(
     private val OPENAI_TRANSLATION_API_KEY = stringPreferencesKey("openai_translation_api_key")
     private val OPENAI_TRANSLATION_MODEL = stringPreferencesKey("openai_translation_model")
     private val OPENAI_TRANSLATION_PROMPT = stringPreferencesKey("openai_translation_prompt")
+    private val POPULAR_AI_FILTER = stringPreferencesKey("popular_ai_filter")
+    private val SEARCH_AI_FILTER = stringPreferencesKey("search_ai_filter")
+    private val CREATORS_AI_FILTER = stringPreferencesKey("creators_ai_filter")
     private const val OPENAI_API_KEY_SECRET = "openai_translation_api_key"
 
     const val CELL_MIN_WIDTH_DEFAULT = 220

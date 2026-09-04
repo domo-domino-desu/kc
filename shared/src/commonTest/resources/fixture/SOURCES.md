@@ -12,6 +12,8 @@
 | `pawchive.st__posts__popular.html` | `https://pawchive.st/posts/popular` |
 | `pawchive.st__posts__service-patreon.html` | `https://pawchive.st/posts?service=patreon` |
 | `pawchive.st__posts__tag-nsfw.html` | `https://pawchive.st/posts?tag=nsfw` |
+| `pawchive.st__posts__search-test.html` | `https://pawchive.st/posts?q=test` |
 | `pawchive.st__posts__tags.html` | `https://pawchive.st/posts/tags` |
+| `pawchive.st__patreon__user__3295915__recommended.html` | `https://pawchive.st/patreon/user/3295915/recommended` |
 
 更新快照时应重新下载对应 URL，不得手工修改 HTML 来迎合解析器。

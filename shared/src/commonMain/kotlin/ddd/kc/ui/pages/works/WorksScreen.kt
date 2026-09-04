@@ -56,11 +56,14 @@ import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
+import ddd.kc.ui.components.AiFilterField
+import ddd.kc.ui.components.CollapsibleFilterPanel
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
 import ddd.kc.ui.components.PostGridPagingActions
 import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.components.SearchResultStatus
+import ddd.kc.ui.components.aiFilterLabel
 import ddd.kc.ui.components.fullWidthItem
 import ddd.kc.ui.components.gridSkeletonItems
 import ddd.kc.ui.components.isAtTop
@@ -244,6 +247,7 @@ private fun PopularWorksContent(
                             PostPagingContext.Popular(
                                 date = state.date,
                                 period = state.period.apiValue,
+                                aiFilter = state.aiFilter,
                             ),
                     )
                 )
@@ -256,12 +260,17 @@ private fun PopularWorksContent(
       leadingItemCount = 1,
       leadingContent = {
         fullWidthItem(key = "popular-controls") {
-          PopularControls(
-              state = state,
-              onSelectPeriod = popularModel::selectPeriod,
-              onSelectBoundaryDate = popularModel::selectBoundaryDate,
-              onShiftManual = popularModel::shiftManual,
-          )
+          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            CollapsibleFilterPanel(chips = listOf(aiFilterLabel(state.aiFilter))) {
+              AiFilterField(state.aiFilter, popularModel::onAiFilterChanged)
+            }
+            PopularControls(
+                state = state,
+                onSelectPeriod = popularModel::selectPeriod,
+                onSelectBoundaryDate = popularModel::selectBoundaryDate,
+                onShiftManual = popularModel::shiftManual,
+            )
+          }
         }
       },
   )
@@ -345,6 +354,7 @@ private fun PostSearchContent(
                             PostPagingContext.Search(
                                 query = state.query,
                                 defaultPopularDate = state.defaultPopularDate,
+                                aiFilter = state.aiFilter,
                             ),
                     )
                 )
@@ -354,7 +364,7 @@ private fun PostSearchContent(
       minCardWidth = cellWidth.dp,
       modifier = Modifier.fillMaxSize(),
       contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-      leadingItemCount = if (state.hasPendingQuery) 2 else 1,
+      leadingItemCount = if (state.hasPendingQuery) 3 else 2,
       leadingContent = {
         fullWidthItem(key = "search_bar") {
           OutlinedTextField(
@@ -374,6 +384,11 @@ private fun PostSearchContent(
               },
               modifier = Modifier.fillMaxWidth(),
           )
+        }
+        fullWidthItem(key = "search_filter") {
+          CollapsibleFilterPanel(chips = listOf(aiFilterLabel(state.aiFilter))) {
+            AiFilterField(state.aiFilter, screenModel::onAiFilterChanged)
+          }
         }
         if (state.hasPendingQuery) {
           fullWidthItem(key = "search_prompt") {

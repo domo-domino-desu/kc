@@ -2,10 +2,12 @@ package ddd.kc.data.remote.network
 
 import com.fleeksoft.ksoup.Ksoup
 import com.fleeksoft.ksoup.nodes.Element
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.Announcement
 import ddd.kc.data.model.Comment
 import ddd.kc.data.model.CommunityPage
 import ddd.kc.data.model.Creator
+import ddd.kc.data.model.CreatorPostsPage
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.PagedResult
 import ddd.kc.data.model.PopularInfo
@@ -14,6 +16,7 @@ import ddd.kc.data.model.PopularPage
 import ddd.kc.data.model.PopularProps
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.Tag
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.parameter
 import io.ktor.http.encodeURLPathPart
 import kotlinx.serialization.json.Json
@@ -22,13 +25,24 @@ class PawchiveApi(
     private val gateway: PawchiveHttpGateway,
     private val json: Json,
 ) {
+  private fun HttpRequestBuilder.applyAiFilter(mode: AiFilterMode) {
+    when (mode) {
+      AiFilterMode.SHOW -> Unit
+      AiFilterMode.HIDE -> parameter("hide", "ai")
+      AiFilterMode.ONLY -> parameter("show", "ai")
+    }
+  }
+
   fun hasSession(): Boolean = gateway.hasSession()
 
   suspend fun login(username: String, password: String) = gateway.login(username, password)
 
   private inline fun <reified T> decode(body: String): T = json.decodeFromString(body)
 
-  suspend fun fetchCreatorsBody(): String = gateway.getText("/api/v1/creators", "请求Creators")
+  suspend fun fetchCreatorsBody(aiFilter: AiFilterMode = AiFilterMode.SHOW): String =
+      gateway.getText("/api/v1/creators", "请求Creators(aiFilter=$aiFilter)") {
+        applyAiFilter(aiFilter)
+      }
 
   fun parseCreators(body: String): List<Creator> = json.decodeFromString(body)
 
@@ -48,6 +62,7 @@ class PawchiveApi(
       date: String? = null,
       period: String? = null,
       offset: Int? = null,
+      aiFilter: AiFilterMode = AiFilterMode.SHOW,
   ): String =
       gateway.getText(
           "/posts/popular",
@@ -56,6 +71,7 @@ class PawchiveApi(
         date?.let { parameter("date", it) }
         period?.let { parameter("period", it) }
         offset?.takeIf { it > 0 }?.let { parameter("o", it) }
+        applyAiFilter(aiFilter)
       }
 
   fun parsePopularPostsPage(
@@ -115,6 +131,7 @@ class PawchiveApi(
       offset: Int = 0,
       tag: String? = null,
       service: String? = null,
+      aiFilter: AiFilterMode = AiFilterMode.SHOW,
   ): String =
       gateway.getText(
           "/posts",
@@ -124,6 +141,7 @@ class PawchiveApi(
         offset.takeIf { it > 0 }?.let { parameter("o", it) }
         tag?.let { parameter("tag", it) }
         service?.let { parameter("service", it) }
+        applyAiFilter(aiFilter)
       }
 
   fun parsePostCards(body: String): List<Post> {
@@ -133,6 +151,18 @@ class PawchiveApi(
 
   fun parsePostCardsPage(body: String, offset: Int = 0): PagedResult<Post> =
       PagedResult(items = parsePostCards(body), pageInfo = parsePageInfo(body, offset))
+
+  fun parseCreatorPostsPage(body: String, offset: Int = 0): CreatorPostsPage {
+    val doc = Ksoup.parse(body)
+    return CreatorPostsPage(
+        items = doc.select(".post-card").mapNotNull { it.toPostCard() },
+        pageInfo = parsePageInfo(body, offset),
+        communityAvailable =
+            doc.select(".tabs .tab a[href]").any { link ->
+              link.attr("href").substringBefore('?').trimEnd('/').endsWith("/community")
+            },
+    )
+  }
 
   suspend fun searchPostsPage(
       query: String,
@@ -271,11 +301,34 @@ class PawchiveApi(
       creatorId: String,
   ): String =
       gateway.getText(
-          "/${service.encodeURLPathPart()}/user/${creatorId.encodeURLPathPart()}/tags",
+          "/api/v1/${service.encodeURLPathPart()}/user/${creatorId.encodeURLPathPart()}/tags",
           "请求Creator Tags(service=$service,creator=$creatorId)",
       )
 
-  fun parseCreatorTags(body: String): List<Tag> = parseTags(body)
+  fun parseCreatorTags(body: String): List<Tag> = decode(body)
+
+  suspend fun fetchSimilarCreatorsBody(service: String, creatorId: String): String =
+      gateway.getText(
+          "/${service.encodeURLPathPart()}/user/${creatorId.encodeURLPathPart()}/recommended",
+          "请求相似Creator(service=$service,creator=$creatorId)",
+      )
+
+  fun parseSimilarCreators(body: String): List<Creator> =
+      Ksoup.parse(body).select("a.user-card[data-service][data-id]").mapNotNull { card ->
+        val service = card.attr("data-service").ifBlankOrNull() ?: return@mapNotNull null
+        val id = card.attr("data-id").ifBlankOrNull() ?: return@mapNotNull null
+        Creator(
+            id = id,
+            service = service,
+            name = card.selectFirst(".user-card__name")?.text()?.trim().orEmpty().ifBlank { id },
+            favorited =
+                card
+                    .selectFirst(".user-card__fav-count")
+                    ?.text()
+                    ?.filter(Char::isDigit)
+                    ?.toIntOrNull() ?: 0,
+        )
+      }
 
   suspend fun fetchCreatorCommunityBody(
       service: String,

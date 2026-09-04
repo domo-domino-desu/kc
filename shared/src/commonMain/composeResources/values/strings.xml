@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="filter_title">Filters</string>
+  <string name="ai_filter_label">AI-generated</string>
+  <string name="filter_hide">Hide</string>
+  <string name="filter_show">Show</string>
+  <string name="filter_only">Only</string>
+  <string name="similar_users">Similar users</string>
   <!-- Navigation tabs -->
   <string name="tab_creators">Creators</string>
   <string name="tab_works">Works</string>

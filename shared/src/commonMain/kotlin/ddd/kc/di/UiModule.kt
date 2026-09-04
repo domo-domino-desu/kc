@@ -18,9 +18,9 @@ import org.koin.dsl.module
 fun uiModule() = module {
   // Tab-level models: singletons so state survives tab switches and detail screen pushes
   single { RecentDMsScreenModel(get()) }
-  single { PopularPostsScreenModel(get()) }
-  single { CreatorSearchScreenModel(get()) }
-  single { PostSearchScreenModel(get(), get()) }
+  single { PopularPostsScreenModel(get(), get()) }
+  single { CreatorSearchScreenModel(get(), get()) }
+  single { PostSearchScreenModel(get(), get(), get()) }
   single { DmScreenModel() }
   single { DmSearchScreenModel(get(), get()) }
   single { WorksScreenModel() }

@@ -119,6 +119,7 @@ import kc.shared.generated.resources.no_announcements
 import kc.shared.generated.resources.no_community_messages
 import kc.shared.generated.resources.no_tags
 import kc.shared.generated.resources.remove_favorite
+import kc.shared.generated.resources.similar_users
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -159,6 +160,7 @@ internal fun CreatorDetailPage(
   val isLoadingAnnouncements = creator.key in state.loadingCreatorAnnouncementIds
   val isLoadingTags = creator.key in state.loadingCreatorTagIds
   val linkedCreators = screenModel.getCreatorLinks(creator)
+  val similarCreators = screenModel.getSimilarCreators(creator)
   val announcementTranslations = state.announcementTranslations[creator.key] ?: emptyMap()
   val refresh = {
     when (selectedTab) {
@@ -187,6 +189,7 @@ internal fun CreatorDetailPage(
   ErrorToastEffect(state.announcementErrors[creator.key]?.localizedMessage())
   ErrorToastEffect(state.tagErrors[creator.key]?.localizedMessage())
   ErrorToastEffect(state.linkErrors[creator.key]?.localizedMessage())
+  ErrorToastEffect(state.similarErrors[creator.key]?.localizedMessage())
   ErrorToastEffect(community.error?.localizedMessage())
   ErrorToastEffect(postSnapshot.appendError?.localizedMessage())
   ErrorToastEffect(postSnapshot.prependError?.localizedMessage())
@@ -202,7 +205,7 @@ internal fun CreatorDetailPage(
     screenModel.loadCreatorTags(creator)
     screenModel.loadFavoriteStatus(creator)
     screenModel.loadCreatorLinks(creator)
-    screenModel.loadCreatorCommunity(creator)
+    screenModel.loadSimilarCreators(creator)
   }
   LaunchedEffect(gridState, selectedTab, communitySnapshot.items) {
     if (selectedTab != CreatorContentTab.COMMUNITY) return@LaunchedEffect
@@ -323,6 +326,12 @@ internal fun CreatorDetailPage(
                             stringResource(Res.string.linked_accounts, linkedCreators.size)
                         CreatorPill(text = linkedLabel) {
                           onCreatorListOpen(linkedLabel, linkedCreators, false)
+                        }
+                      }
+                      if (similarCreators.isNotEmpty()) {
+                        val similarLabel = stringResource(Res.string.similar_users)
+                        CreatorPill(text = similarLabel) {
+                          onCreatorListOpen(similarLabel, similarCreators, true)
                         }
                       }
                     }

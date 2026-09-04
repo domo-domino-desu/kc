@@ -2,6 +2,7 @@ package ddd.kc.data.local.settings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.stringPreferencesKey
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.TranslationProvider
 import ddd.kc.data.model.TranslationSettings
 import ddd.kc.fake.TestSecretStore
@@ -15,6 +16,24 @@ import kotlinx.coroutines.runBlocking
 import okio.Path.Companion.toPath
 
 class AppSettingsTest {
+  @Test
+  fun aiFiltersPersistIndependently() = runBlocking {
+    val file = File.createTempFile("kc-filter-settings-test", ".preferences_pb").also(File::delete)
+    val dataStore =
+        PreferenceDataStoreFactory.createWithPath(produceFile = { file.absolutePath.toPath() })
+    val settings = AppSettings(dataStore, TestSecretStore())
+    settings.init()
+
+    settings.setPopularAiFilter(AiFilterMode.HIDE)
+    settings.setSearchAiFilter(AiFilterMode.ONLY)
+
+    val reloaded = AppSettings(dataStore, TestSecretStore())
+    reloaded.init()
+    assertEquals(AiFilterMode.HIDE, reloaded.popularAiFilter())
+    assertEquals(AiFilterMode.ONLY, reloaded.searchAiFilter())
+    assertEquals(AiFilterMode.SHOW, reloaded.creatorsAiFilter())
+  }
+
   @Test
   fun persistsNewSettingsAndClampsRanges() = runBlocking {
     val settings = tempSettings()

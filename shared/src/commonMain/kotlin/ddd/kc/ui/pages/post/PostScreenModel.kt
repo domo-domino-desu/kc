@@ -208,6 +208,7 @@ class PostScreenModel(
                   period = context.period,
                   offset = offset,
                   forceRefresh = forceRefresh,
+                  aiFilter = context.aiFilter,
               )
           DetailPagingPage(page.posts, page.pageInfo)
         }
@@ -219,6 +220,7 @@ class PostScreenModel(
                     period = "day",
                     offset = offset,
                     forceRefresh = forceRefresh,
+                    aiFilter = context.aiFilter,
                 )
             DetailPagingPage(page.posts, page.pageInfo)
           } else {
@@ -229,6 +231,7 @@ class PostScreenModel(
                     tag = null,
                     service = null,
                     forceRefresh = forceRefresh,
+                    aiFilter = context.aiFilter,
                 )
             DetailPagingPage(page.items, page.pageInfo)
           }

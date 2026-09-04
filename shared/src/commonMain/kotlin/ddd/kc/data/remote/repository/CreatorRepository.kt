@@ -5,18 +5,21 @@ import ddd.kc.data.local.entity.CreatorEntity
 import ddd.kc.data.local.entity.CreatorSyncEntity
 import ddd.kc.data.local.entity.toEntity
 import ddd.kc.data.local.entity.toModel
+import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.Announcement
 import ddd.kc.data.model.CommunityPage
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.CreatorKey
 import ddd.kc.data.model.DM
 import ddd.kc.data.model.PagedResult
+import ddd.kc.data.model.QueryError
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.Tag
 import ddd.kc.data.remote.cache.CacheNamespace
 import ddd.kc.data.remote.cache.typedQueryStore
 import ddd.kc.data.remote.network.PawchiveApi
 import ddd.kc.data.remote.network.PawchiveApiException
+import ddd.kc.data.remote.network.QueryException
 import ddd.kc.data.remote.network.toQueryError
 import ddd.kc.utils.currentTimeMs
 import ddd.kc.utils.logging.KcLog
@@ -76,10 +79,34 @@ class CreatorRepository(
         json = json,
         serializer = ListSerializer(Tag.serializer()),
         namespace = CacheNamespace.Detail,
-        cacheKey = { key -> "pawchive:${key.service}:${key.id}:tags" },
+        cacheKey = { key -> "pawchive:${key.service}:${key.id}:tags:v2" },
         fetch = { key ->
           api.parseCreatorTags(api.fetchCreatorTagsBody(service = key.service, creatorId = key.id))
         },
+    )
+  }
+
+  private val similarCreatorsStore by lazy {
+    typedQueryStore<CreatorKey, List<Creator>>(
+        cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Creator.serializer()),
+        namespace = CacheNamespace.Detail,
+        cacheKey = { key -> "pawchive:${key.service}:${key.id}:similar" },
+        fetch = { key ->
+          api.parseSimilarCreators(api.fetchSimilarCreatorsBody(key.service, key.id))
+        },
+    )
+  }
+
+  private val filteredCreatorsStore by lazy {
+    typedQueryStore<AiFilterMode, List<Creator>>(
+        cacheDao = dao,
+        json = json,
+        serializer = ListSerializer(Creator.serializer()),
+        namespace = CacheNamespace.Creators,
+        cacheKey = { "pawchive:creators:filter:${it.persistedValue}" },
+        fetch = { api.parseCreators(api.fetchCreatorsBody(it)) },
     )
   }
 
@@ -142,7 +169,15 @@ class CreatorRepository(
     )
   }
 
-  fun observeCreators(forceRefresh: Boolean = false): Flow<QueryState<List<Creator>>> = flow {
+  fun observeCreators(
+      forceRefresh: Boolean = false,
+      aiFilter: AiFilterMode = AiFilterMode.SHOW,
+  ): Flow<QueryState<List<Creator>>> = flow {
+    if (aiFilter != AiFilterMode.SHOW) {
+      if (forceRefresh) deleteCacheGroup("pawchive:creators:filter:${aiFilter.persistedValue}")
+      emitAll(filteredCreatorsStore.query(aiFilter))
+      return@flow
+    }
     val initial = withContext(ioContext) { readCreatorSnapshot() }
     val stale = initial.cachedAtMs == null || isCreatorsStale(initial.cachedAtMs)
     if (initial.creators.isNotEmpty()) {
@@ -296,6 +331,21 @@ class CreatorRepository(
       forceRefresh: Boolean = false,
   ): List<Creator> = observeCreatorLinks(service, creatorId, forceRefresh).awaitData()
 
+  fun observeSimilarCreators(
+      service: String,
+      creatorId: String,
+      forceRefresh: Boolean = false,
+  ): Flow<QueryState<List<Creator>>> = flow {
+    if (forceRefresh) deleteCacheGroup("pawchive:$service:$creatorId:similar")
+    emitAll(similarCreatorsStore.query(CreatorKey(service, creatorId)))
+  }
+
+  suspend fun getSimilarCreators(
+      service: String,
+      creatorId: String,
+      forceRefresh: Boolean = false,
+  ): List<Creator> = observeSimilarCreators(service, creatorId, forceRefresh).awaitData()
+
   suspend fun getCreatorCommunityPage(
       service: String,
       creatorId: String,
@@ -311,6 +361,9 @@ class CreatorRepository(
         )
       } catch (error: PawchiveApiException) {
         if (error.statusCode == 404 && loungeId == null) null else throw error
+      } catch (error: QueryException) {
+        if ((error.error as? QueryError.Http)?.code == 404 && loungeId == null) null
+        else throw error
       }
 
   fun observeDmsPage(
