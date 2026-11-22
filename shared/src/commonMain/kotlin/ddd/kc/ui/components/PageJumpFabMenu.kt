@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -71,13 +72,18 @@ fun PageJumpFabMenu(
       }
 
   Column(
-      modifier = modifier,
+      modifier =
+          modifier.testTag("page-menu").semantics {
+            uiTestState =
+                "page=${info.currentPage};last=${info.lastPage};loading=$loading;expanded=$expanded"
+          },
       verticalArrangement = Arrangement.spacedBy(8.dp),
       horizontalAlignment = Alignment.End,
   ) {
     PageFabAction(
         visible = expanded,
         icon = Icons.VerticalAlignTopW400Outlined,
+        testTag = "page-first",
         contentDescription = stringResource(Res.string.page_first),
         enabled = info.hasPrevious && !loading,
         onClick = {
@@ -88,6 +94,7 @@ fun PageJumpFabMenu(
     PageFabAction(
         visible = expanded,
         icon = Icons.KeyboardArrowLeftW400Outlined,
+        testTag = "page-previous",
         contentDescription = stringResource(Res.string.page_previous),
         enabled = info.hasPrevious && !loading,
         onClick = {
@@ -97,6 +104,7 @@ fun PageJumpFabMenu(
     )
     PageFabAction(
         visible = expanded,
+        testTag = "page-current",
         label = stringResource(Res.string.page_number, info.currentPage),
         contentDescription =
             stringResource(Res.string.page_number_with_total, info.currentPage, info.lastPage),
@@ -109,6 +117,7 @@ fun PageJumpFabMenu(
     PageFabAction(
         visible = expanded,
         icon = Icons.KeyboardArrowRightW400Outlined,
+        testTag = "page-next",
         contentDescription = stringResource(Res.string.page_next),
         enabled = info.hasNext && !loading,
         onClick = {
@@ -120,6 +129,7 @@ fun PageJumpFabMenu(
         visible = expanded,
         icon = Icons.VerticalAlignTopW400Outlined,
         iconModifier = Modifier.rotate(180f),
+        testTag = "page-last",
         contentDescription = stringResource(Res.string.page_last),
         enabled = info.hasNext && !loading,
         onClick = {
@@ -127,7 +137,10 @@ fun PageJumpFabMenu(
           onJumpToPage(info.lastPage)
         },
     )
-    FloatingActionButton(onClick = { expanded = !expanded }) {
+    FloatingActionButton(
+        modifier = Modifier.testTag("page-toggle"),
+        onClick = { expanded = !expanded },
+    ) {
       Icon(
           imageVector = if (expanded) Icons.CloseW400Outlined else Icons.MenuW400Outlined,
           contentDescription = stringResource(Res.string.page_navigation),
@@ -148,11 +161,12 @@ fun PageJumpFabMenu(
                 Text(stringResource(Res.string.target_page_number_with_range, info.lastPage))
               },
               singleLine = true,
-              modifier = Modifier.fillMaxWidth(),
+              modifier = Modifier.fillMaxWidth().testTag("page-input"),
           )
         },
         confirmButton = {
           TextButton(
+              modifier = Modifier.testTag("page-confirm"),
               onClick = {
                 parsedPage?.let(onJumpToPage)
                 dialogVisible = false
@@ -175,6 +189,7 @@ fun PageJumpFabMenu(
 @Composable
 private fun PageFabAction(
     visible: Boolean,
+    testTag: String,
     contentDescription: String,
     enabled: Boolean,
     onClick: () -> Unit,
@@ -200,9 +215,9 @@ private fun PageFabAction(
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
         modifier =
-            Modifier.then(if (label == null) Modifier.size(40.dp) else Modifier).semantics {
-              this.contentDescription = contentDescription
-            },
+            Modifier.testTag(testTag)
+                .then(if (label == null) Modifier.size(40.dp) else Modifier)
+                .semantics { this.contentDescription = contentDescription },
     ) {
       Box(
           modifier =

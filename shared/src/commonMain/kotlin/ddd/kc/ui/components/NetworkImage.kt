@@ -30,6 +30,7 @@ fun NetworkImage(
     progressTrackingKey: String? = null,
     fallbackContent: (@Composable () -> Unit)? = null,
     logFailureAsWarning: Boolean = true,
+    onLoadStateChanged: ((ImageLoadLifecycleState) -> Unit)? = null,
 ) {
   val fallbackUrl = thumbnailUrl?.takeIf { it.isNotBlank() && it != url }
   if (url.isNullOrBlank()) {
@@ -51,6 +52,7 @@ fun NetworkImage(
     return
   }
   var loadLifecycleState by remember(url) { mutableStateOf(ImageLoadLifecycleState.Idle) }
+  LaunchedEffect(loadLifecycleState) { onLoadStateChanged?.invoke(loadLifecycleState) }
   val progressState =
       if (showTopLinearLoadingProgress) {
         rememberImageLoadProgressState(

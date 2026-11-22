@@ -41,6 +41,9 @@ fun desktopPlatformModule(): Module = module {
 }
 
 private fun applicationDataDirectory(): File {
+  System.getenv("KC_E2E_HOME")?.let {
+    return File(it, ".local/share/kc")
+  }
   val home = System.getProperty("user.home")
   val os = System.getProperty("os.name").lowercase()
   return when {

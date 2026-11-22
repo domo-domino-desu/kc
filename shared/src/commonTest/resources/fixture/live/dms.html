@@ -1,0 +1,2281 @@
+
+
+<!DOCTYPE html>
+<html lang="en" prefix="og: https://ogp.me/ns#">
+  <head>
+    <script>try{var li=localStorage.getItem('logged_in')==='yes'||location.search.indexOf('logged_in=yes')>-1;document.documentElement.classList.add(li?'is-logged-in':'is-logged-out')}catch(e){document.documentElement.classList.add('is-logged-out')}</script>
+    <script>try{
+      if(['/posts','/artists','/artists/updated'].indexOf(location.pathname)>-1){
+        var fu=new URL(location.href),fc=false;
+        [['hide','hide_tags'],['only','only_tags']].forEach(function(p){
+          var v=localStorage.getItem(p[1]);
+          if(v&&!fu.searchParams.has(p[0])){fu.searchParams.set(p[0],v);fc=true}
+        });
+        if(fc)location.replace(fu.toString());
+      }}catch(e){}</script>
+    <script>var page_data = {}</script>
+
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DMs | Pawchive</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="apple-touch-icon" href="/static/logo.png">
+
+        <meta name="count" content="35144">
+
+      <link rel="canonical" href="https://pawchive.pw/dms">
+      <meta name="description" content="Pawchive is a public archive of Patreon, Pixiv Fanbox and Discord posts. Browse archived creators and search their posts, comments and files.">
+
+      <meta property="og:title" content="Pawchive">
+      <meta property="og:type" content="website">
+      <meta property="og:site_name" content="Pawchive">
+      <meta property="og:image" content="https://pawchive.pw/static/logo.png">
+      <meta property="og:image:width" content="512" />
+      <meta property="og:image:height" content="512" />
+      <meta property="og:url" content="https://pawchive.pw/dms">
+
+      <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "logo": "https://pawchive.pw/static/logo.png", "name": "Pawchive", "url": "https://pawchive.pw"}</script>
+      <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "Pawchive", "url": "https://pawchive.pw"}</script>
+
+
+      
+      <style>
+        .dm-card__content ul, .dm-card__content ol { list-style: none; padding-left: 0; margin: 0.25em 0; }
+        .dm-card__content li { margin: 0; }
+        .dm-card__content { overflow-wrap: anywhere; }
+        [class^="__cld-"], [class*=" __cld-"] { display: none !important; }
+      </style>
+
+      <script src="/static/js/lazy-styles.js"></script>         <script data-cfasync="false">!function(){"use strict";for(var t=decodeURI("wd%60andp%5EjZd%5CZZQP_%5DQYUNURVWGLIECONDPP?MCIL:BI;%3C65?%3C/6:3+7%3C6313$&&$%20%20%7Bz)z&%7Czv)t&v%25X#ryro%7DQ%7BkrvhopvdGqahnmdi%5Be%60TUV4%5E%5BNUY_%5BTKXFPOKOSS?K?@@T??GEEICF27I44/:..,3)13&+%25#+%20%7D%25~%7C%25!'~xru%7Dopplppl~ofznqha%60rbj%5C%5B%5C%5C%5D%5Dled_%5ESRQYXWRPaQIHYMUZFIWVCDSBMAC@@?JME@@77AAA037=j3j7624c,u~/*$(%20'x%20yv'w&%7Dq%22uzx87FIZYHE_((=,+d)::::::::::::::::::::::::::@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@TTTTTTTTTT(z1k&+w%7Bb!y%7D#!I1smED.ah.+%3E(Z_*v+'2&$S%20%7Cx1M%7DvQ%5CYgSWpCtq8RWDH$TBJOIGLFK8%3CFF2BC-=/,65w&%255%256c6&%25#/!(#-+'v,%22qdu%7Bs%7Bu!whQKKdVheprcco%5BZ%60gkZhZYab%5DQcT%5C%5EX%60NVKUWGRNPR#CMPCIKA%3CDI5G;@@%3EV%256:%5D%5BQDN%3E%5CYK%3EHl%20!e*/~%25@@W&%25%20wp%25t%22%22kjmuiijkvvvsimeik%5E%5BeKkegUZWYdc%5E%60&yxLNHY%5ERFIFT3GJAUIG=&%3C;G8F51C/Y'(jiuykDO86'LV$%7D(.~").replace(/((\x40){2})/g,"$2").split("").map(((t,n)=>{const r=t.charCodeAt(0)-32;return r>=0&&r<95?String.fromCharCode(32+(r+n)%95):t})).join(""),n=[0,9,16,23,29,35,41,47,53,59,65,69,73,77,84,91,101,104,117,120,122,125,133,136,141,144,151,153,159,165,171,184,188,190,191,197,198,200,202,204,207,210,214,218,223,229,236,244,246,253,262,268,276,278,279,284,286,290,291,291,292,354,368,369,370,373,379,395,407,408,418,430,432,437,440,442,448,452,457,479,480,483,489,497,503,513,524,548,553,560,567,573,585,593,600,617,622,623,624,630,631,636,641],r=0;r<n.length-1;r++)n[r]=t.substring(n[r],n[r+1]);var o=[n[0],n[1],n[2],n[3],n[4],n[5],n[6],n[7],n[8],n[9]];o.push(o[1]+n[10]);var e=window,s=e.Math,c=e.Error,i=e.RegExp,u=e.Promise,l=e.document,h=e.navigator,a=e.Uint8Array;r=[n[11],n[12],o[7],n[13],n[14],n[15],n[16],n[17],n[18],n[19],n[20],n[21]];const f=n[22]+o[9],d={2:f+n[23],15:f+n[23],9:f+o[4],16:f+o[4],10:f+o[3],17:f+o[3],19:f+n[24],20:f+n[24],21:f+n[24]},v=n[25]+o[9],w={2:o[2],15:o[2],9:o[4],16:o[4],10:o[3],17:o[3],5:n[26],7:n[26],19:n[24],20:n[24],21:n[24]},C={15:n[27],16:n[28],17:n[29],19:o[6],20:o[6],21:o[6]},E=n[30],p=E+n[31],D=E+o[7],B=n[32]+o[1]+n[33],T=n[34],g=T+(o[1]+n[35]),I=T+o[10],y=T+(o[10]+n[36]),S=[n[37],n[38],n[39],n[40],n[41],n[42],n[43],n[44],n[45],n[46]],x=n[47],Y={0:n[48],1:n[49]};class F extends c{constructor(t,n=0,o){super(t),this[r[0]]=Y[n],this[r[1]]=o,e.Object.setPrototypeOf(this,F.prototype)}}function K(t,r,o){try{return n[50],t()}catch(t){if(r)return r(t)}}function P(t,r,o){return K(t,typeof handleException===n[51]?t=>{null===handleException||void 0===handleException||handleException(t)}:r)}const Z=t=>{const[o]=t.split(n[52]);let[e,s,c]=((t,n)=>{let[r,o,...e]=t.split(n);return o=[o,...e].join(n),[r,o,!!e.length]})(t,n[53]);c&&P((()=>{throw new F(n[54])}));const u=new i(n[55]+o+n[56],n[57]),[l,...h]=e.replace(u,n[58]).split(n[59]);return{protocol:o,origin:e,[r[2]]:l,path:h.join(n[59]),search:s}},m=n[60],G=[[97,122],[65,90],[48,57]],M=n[61],Q=(t,n)=>s.floor(s.random()*(n-t+1))+t;function U(t){let r=n[58];for(let n=0;n<t;n++)r+=m.charAt(s.floor(s.random()*m.length));return r}const k=()=>{const t=S[Q(0,S.length-1)],r=Q(0,1)?Q(1,999999):(t=>{let r=n[58];for(let n=0;n<t;n++)r+=e.String.fromCharCode(Q(97,122));return r})(Q(2,6));return t+n[62]+r},N=(t,r)=>(null==t?void 0:t.length)?t.split(n[63]).map((t=>{const o=t.indexOf(n[62])+1,e=t.slice(0,o),s=t.slice(o);return e+r(s)})).join(n[63]):n[58],R=(t,r)=>{const{search:o,origin:c}=Z(t),i=o?o.split(n[63]):[],[u,l]=((t,n)=>{const r=[],o=[];return t.forEach((t=>{t.indexOf(n)>-1?o.push(t):r.push(t)})),[r,o]})(i,E);if(!u.length)return t;const h=((t,n)=>{const r=[],o=Q(t,n);for(let t=0;t<o;t++)r.push(k());return r})(...i.length>4?[0,2]:[5,9]),a=n[64]+r;u.indexOf(a)<0&&u.push(a);const f=(t=>{const n=[...t];let r=n.length;for(;0!==r;){const t=s.floor(s.random()*r);r--,[n[r],n[t]]=[n[t],n[r]]}return n})([...u,...h]);let d=((t,r)=>{const o=(t=>{let n=t%71387;return()=>n=(23251*n+12345)%71387})((t=>t.split(n[58]).reduce(((t,n)=>31*t+n.charCodeAt(0)&33554431),19))(t)),s=(c=r,N(c,e.decodeURIComponent)).split(n[58]).map((t=>((t,n)=>{const r=t.charCodeAt(0);for(const t of G){const[o,s]=t;if(r>=o&&r<=s){const t=s-o+1,c=o+(r-o+n())%t;return e.String.fromCharCode(c)}}return t})(t,o))).join(n[58]);var c;return t+n[63]+(t=>N(t,e.encodeURIComponent))(s)})(U(Q(2,6))+n[62]+U(Q(2,6)),f.join(n[63]));return l.length>0&&(d+=n[63]+l.join(n[63])),c+n[53]+d},V=()=>{const t=new i(p+n[65]).exec(e.location.href),r=t?+t[1]:null;return null!=r?r:e.Date.now()},W=new i(n[67]);function j(t){const r=function(){const t=new i(D+n[66]).exec(e.location.href);return t&&t[1]?t[1]:null}();return r?t.replace(W,n[68]+r+n[59]):t}function z(){if(h){const t=/Mac/.test(h.userAgent)&&h[M]>2,n=/iPhone|iPad|iPod/.test(h.userAgent);return t||n}return!1}function $(){return h&&/android/i.test(h.userAgent)}const A=o[0];function q(){return n[71]+o[8]in e||n[72]+o[8]in e||n[73]+o[8]+n[74]in e||K((()=>!!(e[A]||h[A]||l.documentElement.getAttribute(A))),(()=>!1))||n[75]in e||n[76]in e||n[77]in e||n[78]in e||n[32]+o[0]+n[79]+o[5]+n[80]in l||(z()||$())&&h&&/Mobi/i.test(h.userAgent)&&!function(){try{return l.createEvent(n[69]),n[70]in l.documentElement}catch(t){return!1}}()||function(){var t;const r=n[81],o=n[82],s=n[83],c=n[84],u=n[85];let l=!1;var a,f;return h&&e[r]&&($()||z())&&(l=h[M]<2&&new i(n[86]).test(h[o]),z()&&(l=l&&(a=null!==(t=h[s])&&void 0!==t?t:n[58],f=n[87],!(a.indexOf(f)>-1))&&e[r][c]<32&&!!e[r][u])),l}()}const H=n[89];function L(){if((t=>{const[o]=(t=>{let o;try{if(o=e[t],!o)return[!1,o];const s=n[32]+t+n[88];return o[r[3]](s,s),o[r[4]](s)!==s?[!1,o]:(o[r[5]](s),[!0])}catch(t){return[!1,o,t]}})(t);return o})(n[91]))try{const t=localStorage[r[4]](H);return[t?e.JSON.parse(t):null,!1]}catch(t){return[null,!0]}return[null,!0]}function O(t,r,o){let e=(/https?:\/\//.test(t)?n[58]:n[92])+t;return r&&(e+=n[59]+r),o&&(e+=n[53]+o),e}const _=(()=>{var t;const[o,s]=L();if(!s){const s=null!==(t=function(t){if(!t)return null;const r={};return e.Object.keys(t).forEach((o=>{const s=t[o];(function(t){const r=null==t?void 0:t[0],o=null==t?void 0:t[1];return typeof r===n[90]&&e.isFinite(+o)&&o>e.Date.now()})(s)&&(r[o]=s)})),r}(o))&&void 0!==t?t:{};localStorage[r[3]](H,e.JSON.stringify(s))}return{get:t=>{const[n]=L();return null==n?void 0:n[t]},set:(t,n,o)=>{const[s,c]=L();if(c)return;const i=[n,e.Date.now()+1e3*o],u=null!=s?s:{};u[t]=i,P((()=>localStorage[r[3]](H,e.JSON.stringify(u))))},t:t=>{const[n,o]=L();if(o)return;const c=null!=n?n:{},i=e.Date.now();let u=!1;e.Object.keys(t).forEach((n=>{const{[r[2]]:o,[r[6]]:e}=t[n];c[n]=[o,i+1e3*e],u=!0})),u&&!s&&P((()=>localStorage[r[3]](H,e.JSON.stringify(c))))}}})(),b=(X=_,(t,n,o)=>{const{[r[2]]:s,path:c,search:i}=Z(t);if(o){const t={};e.Object.keys(o).forEach((n=>{const e=o[n];if((null==e?void 0:e[r[7]])&&e[r[6]]){const{[r[2]]:o}=Z(n),{[r[2]]:s}=Z(e[r[7]]);o!==s&&(t[o]={[r[2]]:e[r[7]],[r[6]]:e[r[6]]})}})),e.Object.keys(t).length>0&&X.t(t)}const u=X.get(s);if(u)return[O(u[0],c,i),!1];if((null==n?void 0:n[r[7]])&&n[r[6]]){const{[r[2]]:t}=Z(n[r[7]]);if(t!==s)return X.set(s,n[r[7]],n[r[6]]),[O(n[r[7]],c,i),!0]}return[t,!1]});var X;const J=[1,3,6,5,8,9,10,11,12,13,14,18,22],tt=n[93],nt=n[94];class rt{constructor(t,n,o){this.o=t,this.i=n,this.u=o,this.l=l.currentScript,this.h=t=>this.v.then((n=>n&&n[r[8]](this.C(t)))),this.p=t=>a.from(e.atob(t),(t=>t.charCodeAt(0))),this.D=t=>0!=+t,this.v=this.B(),this[r[9]]=this.T(),e[B]=this[r[9]],e[y]=R}in(t){!this.D(t)||e[v+w[t]]||e[d[t]]||this.I(t)}I(t){this.h(t).then((r=>{e[I+w[t]]=this.i;const s=this.S(),i=C[t],u=b(j(r))[0];if(i){const r=n[95]+i,u=l.querySelector(o[5]+n[96]+r+n[97]);if(!u)throw new c(n[98]+t);const h=u.getAttribute(r).trim();e.Object.keys(u.dataset).forEach((t=>{const r=u.dataset[t],o=n[95]+t;t.slice(-2)===x&&(u.removeAttribute(o),s.setAttribute(o,r))})),u.removeAttribute(r),s.setAttribute(r,h)}s.src=u,l.head.appendChild(s)}))}T(){return e[g]={},u[r[10]](J.map((t=>this.h(t).then((n=>{e[g][t]=n?j(n):void 0}))))).then((()=>!0))}C(t){const r=h?h.userAgent:n[58],o=e.location.hostname||n[58],s=e.innerHeight,c=e.innerWidth,i=sessionStorage?1:0,u=l.cookie?l.cookie.length:0,a=this.Y(),f=q()?1:0;return[s,c,i,V(),0,t,o.slice(0,100),u,a,r.slice(0,15),f].join(n[99])}Y(){const t=(new e.Date)[nt]();return!t||t>720||t<-720?0:720+t}B(){const t=e.WebAssembly&&e.WebAssembly.instantiate;return t?u.resolve().then((()=>t(this.p(this.o),{}))).then((({[r[11]]:t})=>{const{memory:o,[r[8]]:s}=t.exports,c=new e.TextEncoder,i=new e.TextDecoder(n[100]);return{[r[8]]:t=>{const n=c.encode(t),r=new a(o.buffer,0,n.length);r.set(n);const e=r.byteOffset+n.length,u=s(r,n.length,e),l=new a(o.buffer,e,u);return i.decode(l)}}})).catch((()=>null)):u.resolve(null)}S(){const t=l.createElement(o[5]);return e.Object.assign(t.dataset,{[tt]:n[101]},this.l?this.l.dataset:{}),t.async=!0,t}}const ot=(t,n,r,o)=>{const s=new rt(t,n,r);e[o]=t=>s.in(t)};ot("AGFzbQEAAAABHAVgAAF/YAN/f38Bf2ADf39/AX5gAX8AYAF/AX8DCQgAAQIBAAMEAAQFAXABAQEFBgEBgAKAAgYJAX8BQZCJwAILB2cHBm1lbW9yeQIAA3VybAADGV9faW5kaXJlY3RfZnVuY3Rpb25fdGFibGUBABBfX2Vycm5vX2xvY2F0aW9uAAcJc3RhY2tTYXZlAAQMc3RhY2tSZXN0b3JlAAUKc3RhY2tBbGxvYwAGCpcJCCEBAX9BgAlBgAkoAgBBE2xBoRxqQYfC1y9wIgA2AgAgAAuTAQEFfxAAIAEgAGtBAWpwIABqIgQEQEEAIQBBAyEBA0AgAUEDIABBA3AiBhshARAAIgVBFHBBkAhqLQAAIQMCfyAHQQAgBhtFBEBBACAFIAFwDQEaIAVBBnBBgwhqLQAAIQMLQQELIQcgACACaiADQfQILQAAazoAACABQQFrIQEgAEEBaiIAIARJDQALCyACIARqC3ECA38CfgJAIAFBAEwNAANAIARBAWohAyACIAUgACAEai0AAEEsRmoiBUYEQCABIANMDQIDQCAAIANqMAAAIgdCLFENAyAGQgp+IAd8QjB9IQYgA0EBaiIDIAFHDQALDAILIAMhBCABIANKDQALCyAGC8gGAgR+B38gACABQQMQAiEDIAAgAUEFEAIhBUHwCCgCACIHQQZsIQogB0EBdCILQQRqIQggACABQQgQAiEEIAdBMmoiCSAJbEHoB2whCSAAIAFBChACQgFRBEAgAyAHQQJqIAdBCGtuIAlsrX0hAwsgCCAKbCEIIAdBBGshDEGAgIACIQEgA0KAwOLCxzNaBEAgAyAJrYAgDK2AIQZBgICAAiEAQQAhAQNAQQAgACAGIAFBAnRBsAhqNQIAURshACABQQFqIgFBEEcNAAsgA0KAkMrm9zN9QoDwm797VCENIABBgICAEEGAgIAIIAQgCK2CpyALIAdB+f///wdqbG4iAUEJRkEYdCABQQNGGyABQRFGG3IhAQsgA0KAkIjarzN9Qv/3wL8XWARAIAQgCK2CpyIIIAogB0EHa2wiCm4iC0F9cUEBRyEAIAtBBUYEfyAIIApBA25uIABqBSAAC0EXdCABciEBC0GACSADQfgIKQMAIgQgAyAEVBsgCa2AIgQgB0EOaiIIIAwgA0KAgPHtxzBUIgwbrYCnQQAgASADQoCQzKf2MVQiCxtyNgIAEAAaEAAaIAJC6OjRg7fOzpcvNwAAQQdBCkEIIANCgNDFl4MyVBsgA0KAlqKd5TBUIgcbQQtBDCAHGyACQQhqEAEhASMAQRBrIgAkACABQS46AAAgAEHj3rUDNgIEIABBgggtAAA6AAIgAEGACC8AADsBACAAIAA2AgwgACAAQQRqNgIIIAFBAWohCUEAIQEgAEEIaiANQQJ0aigCACINLQAAIgoEQANAIAEgCWogCjoAACANIAFBAWoiAWotAAAiCg0ACwsgAEEQaiQAIAEgCWohARAAGkGACSAEIAitgCAFQhuGQgBCgICAIEKAgIAwQoCAgAhCgICAGCAFQghRG0KAgIASQoCAwA1CgIDAByADQoCAz5LuM1QbIANCgIiX2qwyVBsgCxsgA0KAmMauzzFUGyAHGyAMG4SEPgIAEAAaQQJBBEEFIANCgJDqgNMyVCIAGxAAQQNwIgcbIQlBBUEIIAAbIQpBACEAA0AgAUEvOgAAIAAgB0YhCCAJIAogAUEBahABIQEgAEEBaiEAIAhFDQALIAEgAmsLBAAjAAsGACAAJAALEAAjACAAa0FwcSIAJAAgAAsFAEGECQsLigECAEGACAtvaW4AnqKmrLK2AAAAAAAAAJ+goaOkpaeoqaqrra6vsLGztLW3bW5wb3JxdHN2dQAAY0EBALNBAQDnQgEAB0MBAIlDAQCpQwEA3EMBAPBDAQBMRAEAUUQBAKZEAQCyRAEAykQBAOlEAQD9RAEADkUBAEHwCAsOCgAAAD0AAAD/J5mLogE=","15","1.1.84-st","bauvhwon")}();</script>
+<script>(function(){function mk(){var l=document.head.querySelectorAll('script,style');for(var i=0;i<l.length;i++)l[i].setAttribute('data-keep','')}function sw(){var l=document.head.querySelectorAll('script:not([data-keep]),style:not([data-keep])');for(var i=0;i<l.length;i++)if(l[i].parentNode)l[i].parentNode.removeChild(l[i])}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mk);else mk();document.addEventListener('htmx:beforeSwap',sw);var d=document,l=d.currentScript||d.scripts[d.scripts.length-1];function inj(){var sc=d.createElement('script');sc.async=true;sc.setAttribute('data-cfasync','false');sc.setAttribute('data-clocid','2151144');sc.src='//excavatenearbywand.com/on.js';sc.onload=sc.onerror=function(){bauvhwon(15)};(l&&l.parentNode?l.parentNode:d.head).insertBefore(sc,l&&l.parentNode?l:null)}function home(){return location.pathname==='/'}function later(){if(home())return;document.removeEventListener('htmx:afterSwap',later);document.removeEventListener('htmx:historyRestore',later);inj()}if(!home())inj();else{document.addEventListener('htmx:afterSwap',later);document.addEventListener('htmx:historyRestore',later)}})();</script>
+
+      
+      <link rel="stylesheet" href="/static/bundle/assets/global-Cz4jp90g.css">
+<script type="module" src="/static/bundle/assets/global-DFzShfO5.js"></script>
+
+  </head>
+  <body class="transition-preload" hx-boost="true"
+        hx-target="#main" hx-select="#main" hx-swap="outerHTML show:window:top">
+    <div class="global-sidebar">
+  <div class="global-sidebar-entry clickable-header-entry">
+                <a
+  class="global-sidebar-entry-item clickable-header home-button"
+  href="/"
+  >       <img src="/static/menu/home.svg" class="global-sidebar-entry-item-icon" />
+      Home
+  </a>
+
+        <div class='close-sidebar' >
+          <img src="/static/close.svg" />
+        </div>
+
+  </div>
+            <div class="global-sidebar-entry ">
+                <div class="global-sidebar-entry-item header ">
+      <img src="/static/menu/artists.svg" class="global-sidebar-entry-item-icon" />
+      Creators
+  </div>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/artists"
+  >       <img src="/static/menu/search.svg" class="global-sidebar-entry-item-icon" />
+      Search
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/artists/updated"
+  >       <img src="/static/menu/recent.svg" class="global-sidebar-entry-item-icon" />
+      Recent
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/missing"
+  >       <img src="/static/menu/missing.svg?v=2" class="global-sidebar-entry-item-icon" />
+      Missing
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/artists/random"
+  >       <img src="/static/menu/random1.svg" class="global-sidebar-entry-item-icon" />
+      Random
+  </a>
+
+  </div>
+
+      <div class="global-sidebar-entry ">
+                <div class="global-sidebar-entry-item header ">
+      <img src="/static/menu/posts.svg" class="global-sidebar-entry-item-icon" />
+      Posts
+  </div>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/posts"
+  >       <img src="/static/menu/search.svg" class="global-sidebar-entry-item-icon" />
+      Search
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/dms"
+  >       <img src="/static/menu/dm.svg" class="global-sidebar-entry-item-icon" />
+      DMs
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/posts/popular"
+  >       <img src="/static/menu/recent.svg" class="global-sidebar-entry-item-icon" />
+      Popular
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/search_hash"
+  >       <img src="/static/menu/search.svg" class="global-sidebar-entry-item-icon" />
+      Hash Lookup
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/posts/tags"
+  >       <img src="/static/menu/tag.svg" class="global-sidebar-entry-item-icon" />
+      Tags
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/posts/random"
+  >       <img src="/static/menu/random2.svg" class="global-sidebar-entry-item-icon" />
+      Random
+  </a>
+
+  </div>
+
+      <div class="global-sidebar-entry ">
+                <div class="global-sidebar-entry-item header ">
+      <img src="/static/menu/importer.svg" class="global-sidebar-entry-item-icon" />
+      Importer
+  </div>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/importer"
+  >       <img src="/static/menu/import.svg" class="global-sidebar-entry-item-icon" />
+      Import
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="/importer/tutorial"
+  >       <img src="/static/menu/faq.svg" class="global-sidebar-entry-item-icon" />
+      FAQ
+  </a>
+
+  </div>
+
+
+        <div class="global-sidebar-entry account">
+                <a
+  class="global-sidebar-entry-item clickable-header account-header"
+  href="/account"
+  >       <img src="/static/menu/account.svg" class="global-sidebar-entry-item-icon" />
+      Account
+  </a>
+
+              <a
+  class="global-sidebar-entry-item register logged-out-only"
+  href="/account/register?location=/dms"
+  >       <img src="/static/menu/register.svg" class="global-sidebar-entry-item-icon" />
+      Register
+  </a>
+
+              <a
+  class="global-sidebar-entry-item login logged-out-only"
+  href="/account/login?location=/dms"
+  >       <img src="/static/menu/login.svg" class="global-sidebar-entry-item-icon" />
+      Login
+  </a>
+
+              <a
+  class="global-sidebar-entry-item favorites logged-in-only"
+  href="/favorites"
+  >       <img src="/static/menu/favorites.svg" class="global-sidebar-entry-item-icon" />
+      Favorites
+  </a>
+
+              <a
+  class="global-sidebar-entry-item keys logged-in-only"
+  href="/account/keys"
+  >       <img src="/static/menu/keys.svg" class="global-sidebar-entry-item-icon" />
+      Keys
+  </a>
+
+              <a
+  class="global-sidebar-entry-item review_dms logged-in-only"
+  href="/account/review_dms"
+  >       <img src="/static/menu/dm.svg" class="global-sidebar-entry-item-icon" />
+      Review DMs
+  </a>
+
+              <a
+  class="global-sidebar-entry-item logout logged-in-only"
+  href="/account/logout"
+hx-boost="false" onclick="if (!confirm('Are you sure you want to log out?')) { event.stopImmediatePropagation(); return false; }"  >       <img src="/static/menu/logout.svg" class="global-sidebar-entry-item-icon" />
+      Logout
+  </a>
+
+  </div>
+
+        <div class="global-sidebar-entry stuck-bottom">
+                <div class="global-sidebar-entry-item header ">
+      Community
+  </div>
+
+              <a
+  class="global-sidebar-entry-item "
+  href="https://t.me/pawchivest"
+  target="_blank"
+  >       <img src="/static/menu/telegram_plane.svg" class="global-sidebar-entry-item-icon" />
+      Telegram
+  </a>
+
+              <a
+  class="global-sidebar-entry-item "
+    style="color: rgb(255, 149, 0)"
+  href="https://theporndude.com/"
+  target="_blank"
+  rel="nofollow"
+  >       ThePornDude
+  </a>
+
+  </div>
+
+    </div>
+
+    <div class="content-wrapper shifted">
+      <div class="backdrop backdrop-hidden">
+      </div>
+      <div class="header">
+        <div id="burgor">
+          <img src="/static/menu.svg" />
+        </div>
+          <a
+    href="/"
+    class="header-link home"
+     >
+      Home
+  </a>
+
+          <a
+    href="/artists"
+    class="header-link "
+     >
+      Creators
+  </a>
+
+          <a
+    href="/posts"
+    class="header-link "
+     >
+      Posts
+  </a>
+
+          <a
+    href="/importer"
+    class="header-link import"
+     >
+      Import
+  </a>
+
+          <a
+    href="/account/register?location=/dms"
+    class="header-link register logged-out-only"
+     >
+      Register
+  </a>
+
+          <a
+    href="/account/login?location=/dms"
+    class="header-link login logged-out-only"
+     >
+      Login
+  </a>
+
+          <a
+    href="/favorites"
+    class="header-link logged-in-only"
+     >
+      Favorites
+  </a>
+
+          <a
+    href="/account/logout"
+    class="header-link logout logged-in-only"
+hx-boost="false" onclick="if (!confirm('Are you sure you want to log out?')) { event.stopImmediatePropagation(); return false; }"     >
+      Logout
+  </a>
+
+      </div>
+
+      <main class="main" id="main">
+          <script>try{localStorage.removeItem("ad_free");}catch(e){}</script>
+  <section class="site-section site-section--all-dms ">
+  <header class="site-section__header ">
+              <h1 class="site-section__heading ">
+      DMs
+  </h1>
+
+
+  </header>
+      
+  
+  <div class="paginator" id="paginator-top">
+
+
+
+  <small>
+    Showing 1 - 50 of 35144
+  </small>
+  <menu>
+            <li  class="pagination-button-disabled pagination-desktop" ><b>&lt;&lt;</b></li>
+
+          <li  class="pagination-button-disabled" ><b>&lt;</b></li>
+
+          <li  class="pagination-button-disabled pagination-button-current" ><b>1</b></li>
+
+          <a href="/dms?o=50"  class="pagination-button-after-current" ><b>2</b></a>
+
+          <a href="/dms?o=100" ><b>3</b></a>
+
+          <a href="/dms?o=150" ><b>4</b></a>
+
+          <a href="/dms?o=200" ><b>5</b></a>
+
+          <a href="/dms?o=250"  class="pagination-button-optional" ><b>6</b></a>
+
+          <a href="/dms?o=300"  class="pagination-button-optional" ><b>7</b></a>
+
+          <a href="/dms?o=350"  class="pagination-button-optional" ><b>8</b></a>
+
+          <a href="/dms?o=400"  class="pagination-button-optional" ><b>9</b></a>
+
+          <a href="/dms?o=450"  class="pagination-button-optional" ><b>10</b></a>
+
+          <a href="/dms?o=500"  class="pagination-button-optional" ><b>11</b></a>
+
+          <a href="/dms?o=50"  class="next" ><b>&gt;</b></a>
+
+            <a href="/dms?o=35100" ><b>&gt;&gt;</b></a>
+
+  </menu>
+    <form
+      action="/dms"
+      method="GET"
+      enctype="application/x-www-form-urlencoded"
+    >
+      <input
+        type="text"
+        name="q"
+        id="q"
+        autocomplete="off"
+        value=""
+        minlength="3"
+        class="search-input"
+        placeholder="search for dms..."
+      >
+      <input type="submit" style="display: none">
+    </form>
+  </div>
+
+  <div 
+    class="card-list card-list--phone "
+  >
+    <div class="card-list__layout">
+    </div>
+    <div class="card-list__items">
+            
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/881792"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Diives</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=881792"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content">&lt;hr/&gt;
+<p>NOVEMBER MONTHLY VIDEO: SPOOKY VISIT<br>
+What a great visitor, don’t you think?</p>
+<p>NOVEMBER/SPOOKY VISIT (COMPLETED)<br>
+<a href="https://mega.nz/folder/Aqd0hSIL#5JgL_srlkv-oaDJ95vHhPQ" rel="noopener noreferrer nofollow ugc">https://mega.nz/folder/Aqd0hSIL#5JgL_srlkv-oaDJ95vHhPQ</a></p>
+<h2>(Please, don’t reply to this message, if you need something contact me to with a PATREON DIRECT MESSAGE)</h2>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/81446500"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">RS</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=81446500"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Here’s the link!<br>
+<a href="https://mega.nz/file/poZTXZgI#gvVWnwCAIHSd7g62RHN4M04LMlTdN9SwZ6qPjPjD-pE" rel="noopener noreferrer nofollow ugc">https://mega.nz/file/poZTXZgI#gvVWnwCAIHSd7g62RHN4M04LMlTdN9SwZ6qPjPjD-pE</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/17181250"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Ashie✨️</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=17181250"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hey there. 🎉</p>
+<p>Here is the the SEPTEMBER link and password for Gold Patrons. 🪄</p>
+<p>MEGA LINK:<br>
+<a href="https://mega.nz/#P!AgAd2TOQLIAskpxLp3gFnmvPz7FzECdNamaPvQDwDxiC48Bts4U1uiMKngC8DzS7AwL59BTea0zpmtU7zp4CAZKa1q9B73DpjQBnQm4mVt69Ai6XnUbbOA" rel="noopener noreferrer nofollow ugc">https://mega.nz/#P!AgAd2TOQLIAskpxLp3gFnmvPz7FzECdNamaPvQDwDxiC48Bts4U1uiMKngC8DzS7AwL59BTea0zpmtU7zp4CAZKa1q9B73DpjQBnQm4mVt69Ai6XnUbbOA</a></p>
+<p>PASSWORD:<br>
+092026GOLD</p>
+<p>Enjoy. 👋</p>
+<p>Ashie✨️</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/77323242"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">DailyIlulu</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=77323242"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Thank you for being a member!❤️<br>
+Hope you’ll enjoy the content ✨🥰</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/134483187"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">🔝Turo Empire Scans🔝</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=134483187"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>There are others—I’ll upload them later</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/134483187"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">🔝Turo Empire Scans🔝</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=134483187"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p><a href="https://www.patreon.com/posts/133797628?utm_campaign=postshare_creator" rel="noopener noreferrer nofollow ugc">https://www.patreon.com/posts/133797628?utm_campaign=postshare_creator</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/134483187"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">🔝Turo Empire Scans🔝</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=134483187"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Thank you for your paid subscription — I hope you find what you’re looking for here 🙂</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/134483187"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">🔝Turo Empire Scans🔝</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=134483187"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>I have</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/144805064"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Blake Hart</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=144805064"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hey everyone! I just wanted to let you know about a little change. From now on, I’ll no longer be updating the Google Drive, as it’s simply taking too much of my time to manage my Patreon, private Reddit group, and personal website.</p>
+<p>The private Reddit group is still an option if you want to read my off-platform stories! Just send me your Reddit username if you aren’t already a member. Alternatively, you can find every story on my own website: <a href="https://www.HartLit.com" rel="noopener noreferrer nofollow ugc">https://www.HartLit.com</a> if you don’t have Reddit.</p>
+<p>If you decide to make the switch, feel free to cancel your Patreon subscription so you don’t pay double.</p>
+<p>Thank you all so much for your support!</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/60209128"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">yumprincess</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=60209128"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>HELLO BIRBS !!!</p>
+<p>I decided to do an early 50% off black friday sale ONLY for former subscribers aka you :3 Everyone else will get 40% off next week ! I’m grateful for your support and thought this could be a nice way to show it!!</p>
+<p>This sale is live for 48 hours only so grab it if you want it 💜</p>
+<p>Use code BIRBFRIDAY50 !</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/55684760"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">MacroProduction</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=55684760"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Not at the moment, I prefer to focus on the interaction between giants and tiny</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/55684760"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">MacroProduction</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=55684760"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Whenever you want, I’m there!</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/55684760"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">MacroProduction</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=55684760"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Maybe, but I’m not sure, for now I’m going to continue this way</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/375486"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">XhromeR</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=375486"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hi everyone, I’ve seeing posts of NSFW artists saying that their accounts were taken down because of the new guidelines, I’m currently looking for an alternative, so far I’ve found this other site: <a href="https://subscribestar.adult/xhromer" rel="noopener noreferrer nofollow ugc">https://subscribestar.adult/xhromer</a>
+please save the link in case we get kicked out from here. Also follow me on twitter to chat in case something happens.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/55684760"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">MacroProduction</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=55684760"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hi! May I know what video are you talking about? So that I can fix</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/375486"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">XhromeR</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=375486"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hi, everyone there’s currently an issue with Patreon going on, your subsciprions might not show up for the moment, as of now my page says I have 0 active patrons, they said they’re working on it, I already finished today’s drawing and will be posting it, let me know if you guys can’t see it.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/55684760"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">MacroProduction</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=55684760"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>No worries</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/55684760"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">MacroProduction</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=55684760"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Ahhh, it’s because back in the day I had uploaded them on youtube, but they had deleted my channel, if you go to the description, there is the link to the video on google drive</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/47357345"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Macro Stories</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=47357345"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hi Adam! Thanks for the patronage! I do hope you enjoy my work.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/58080495"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">HarmonyMotion</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=58080495"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hello Story Lovers,</p>
+<p>This is a courtesy message. Please find your September rewards here:<br>
+<a href="https://drive.google.com/drive/folders/1kTrsXbuZzPDLHVPSP2_9CtwFmHYfes8a" rel="noopener noreferrer nofollow ugc">https://drive.google.com/drive/folders/1kTrsXbuZzPDLHVPSP2_9CtwFmHYfes8a</a></p>
+<p><a href="https://drive.google.com/drive/folders/1LdoQG37rXkDU4Gyc_zluDZf_oM4HfPxi" rel="noopener noreferrer nofollow ugc">https://drive.google.com/drive/folders/1LdoQG37rXkDU4Gyc_zluDZf_oM4HfPxi</a></p>
+<p><a href="https://drive.google.com/drive/folders/1XbdzVS7b--zRrDHyaLNPxNo5tO2X7noG" rel="noopener noreferrer nofollow ugc">https://drive.google.com/drive/folders/1XbdzVS7b--zRrDHyaLNPxNo5tO2X7noG</a></p>
+<p>Remember, you can find the entire backlog of folders if you visit my Patreon in DESKTOP BROWSER in the Membership Notes! Also, read the chapters by clicking the Story Lovers tag on the Patreon!</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/677951"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">e19700</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=677951"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>The Password of 5$-8$ tier 2022 October is :  Bambipump<br>
+You can use it to open all the rewards of 5$-8$ tier 2022 October</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/4402552"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Adleto</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=4402552"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Good evening everyone<br>
+My patreon gonna be stopped at the end of the month for the unseen future</p>
+<p>I’m gonna move to <a href="https://subscribestar.adult/adleto" rel="noopener noreferrer nofollow ugc">https://subscribestar.adult/adleto</a> for now until patreon problems are solved<br>
+Sorry for that</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/114013530"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">mghuipoeere&#39;s collection</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=114013530"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hi there!</p>
+<p>I want to say a special thank you to the people who  subscribed to my tiers and helped me get started in this creative process. The link below is unique to you and will get you access to a zip file containing a collection of 17, never published before, and never to be published, exclusive 4K pictures. (There is one character that you may recall from a recent video).</p>
+<p>It is my way of saying thank you, and I hope that you will continue to enjoy my new content going forward.  Stay tuned for upcoming pictures, galleries and videos !!!!</p>
+<p>I’m also working hard on my special project of training my own AI model specifically for my content and to enhance my creative process. This is a long time endeavor,  but I can’t wait to share the results with you.</p>
+<p>So it’s official, Good-Bye Tiers !</p>
+<p>Welcome to the new evolution of Mghuipoeere</p>
+<p>If you want to continue offering ongoing support to my efforts, outside of content, feel free to join a Tip jar. Every income I get here goes right back in hardware and software to help produce more and better content.</p>
+<p>Exclusive link : (.zip) 17 High-res Image file.<br>
+(WARNING Patreon is messing up links quite frequently, you’ll have to copy/paste the link starting from https… up to the .zip on a single line in your browser’s address bar)</p>
+<p><a href="https://mgddls.b-cdn.net/Thank-You-6be7dca03f9189a8e3404cf33d99de610cf7c0893046069c92d8d0f0c7def30a.zip" rel="noopener noreferrer nofollow ugc">https://mgddls.b-cdn.net/Thank-You-6be7dca03f9189a8e3404cf33d99de610cf7c0893046069c92d8d0f0c7def30a.zip</a></p>
+<p>mghuipooeere</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/24993497"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">kanta077</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=24993497"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hello there, please cancel your sub because it’s already late of this month.<br>
+also if you want to know new patreon please go here <a href="https://discord.gg/XyEz24ZX" rel="noopener noreferrer nofollow ugc">https://discord.gg/XyEz24ZX</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/24993497"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">kanta077</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=24993497"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p><a href="https://discord.gg/NY6tug7c" rel="noopener noreferrer nofollow ugc">https://discord.gg/NY6tug7c</a> new link just in case you want to know my new patreon</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/24993497"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">kanta077</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=24993497"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>if you can’t add me you can use this link <a href="https://discord.gg/P7ZT5eV7" rel="noopener noreferrer nofollow ugc">https://discord.gg/P7ZT5eV7</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/24993497"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">kanta077</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=24993497"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p><a href="https://discord.gg/NdQrB5dU" rel="noopener noreferrer nofollow ugc">https://discord.gg/NdQrB5dU</a> new link just in case you want to know my new patreon</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/6086749"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Winick-Lim</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=6086749"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hello good day, so sorry for long wait and thanks for the supporting~<br>
+The gallery are updates, please enjoy and thank you so much again~</p>
+<p>remember make sure to Copy the whole URL, sometime the auto link clicking is not finished</p>
+<p>こんにちは、おはようございます。大変お待たせして申し訳ございません。応援していただきありがとうございます。<br>
+ギャラリーを更新しました。ぜひお楽しみください。本当にありがとうございます。<br>
+URL全体をコピーすることを忘れないでください。自動リンクのクリックが完了しない場合があります。( Translation )</p>
+<p>各位好，抱歉要等待那么久还有非常感谢支持～<br>
+图库已经更新了，请享受观看和再度非常感谢～<br>
+有必要请 Copy and Paste 该网址，偶尔有时候点击不到~</p>
+<p>Level 1 :<br>
+<a href="https://drive.google.com/drive/folders/1FflOxtxD3fhXIj75wyaFNj6qy25P5an1?usp=sharing" rel="noopener noreferrer nofollow ugc">https://drive.google.com/drive/folders/1FflOxtxD3fhXIj75wyaFNj6qy25P5an1?usp=sharing</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/99683378"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">ijwt</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=99683378"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>The link has been updated with Lucia GTA VI, this will be refreshed next week:</p>
+<p><a href="https://mega.nz/folder/4WEUnSyZ#pQf5iQh4VhSDCcWNJOsQew" rel="noopener noreferrer nofollow ugc">https://mega.nz/folder/4WEUnSyZ#pQf5iQh4VhSDCcWNJOsQew</a></p>
+<p>Use the link - ijwt_art content - Nov</p>
+<p>YOU DO NOT NEED A CODE. It just breaks sometimes, so give it a minute! If you have a VPN, it might not load the link correctly.</p>
+<p>Thank you so much! DM me if you have any issues</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/790907"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Trinity Fate</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=790907"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hey! The password to The Dragon’s Depths is DragonDumpy</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/87486974"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">MissLizzyAnthus</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=87486974"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>This message was deleted.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/74775239"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Candylight Studio</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=74775239"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hey!<br>
+<br>
+I’m releasing the final update of Loot Line - Season 1 this month! It’s going to be stacked with everything a player could imagine and desire.<br>
+<br>
+I’d really love for you to check it out and see how far it’s come. Your past support helped get us here, and it would mean a lot to have you back for this big moment.<br>
+<br>
+And there’s more — we’ve already started working on Loot Line - Season 2 and a brand new game! 👀 You won’t believe what we’ve got in store.<br>
+<br>
+Stay tuned — and if you feel like jumping back in, now’s the perfect time. 💛</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/748276"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">CryZENx</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=748276"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>💚 <strong>A Little Update About My Patreon Membership Prices</strong></p>
+<p>Hey everyone!</p>
+<p>I just wanted to explain why I adjusted my Patreon membership prices back in September and October.</p>
+<p>As you may have noticed, I’m currently working on several projects, including <strong>The Minish Cap, MDK2, Bomberman Hero, F-Zero X</strong>, and many more.</p>
+<p>Managing multiple projects takes an incredible amount of time, energy, and dedication, especially as an independent developer working on my own.</p>
+<p>The price adjustments were made to help me continue developing these projects, cover my expenses, and dedicate more time to creating new content for you.</p>
+<p>❤️ <strong>I want to sincerely thank everyone who has continued supporting me throughout the years.</strong> Your patience, encouragement, and generosity mean more to me than you might realize.</p>
+<p>I understand that not everyone can afford a monthly membership, and that’s completely okay! Even following my work and sharing it with others helps tremendously.</p>
+<p><strong>Thank you for believing in me and helping me keep these childhood gaming memories alive!</strong> 💚</p>
+<p>— CryZENx</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/63540851"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">unagi4545</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=63540851"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>ララ　初めて支援していただきありがとうございます。</p>
+<h2>申し訳ございません…あなたは今月が初めての参加者であるため、現在はPlanSを選択することはできません…。<br>
+以下はPLAN Sの説明文です。</h2>
+<p><a href="https://www.patreon.com/c/unagi45dx/membership" rel="noopener noreferrer nofollow ugc">https://www.patreon.com/c/unagi45dx/membership</a></p>
+<p>※過去6カ月間の内、私を1度でも支援したことのある人のみこのTirを選択可能です。</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/72596255"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">dolores2nd</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=72596255"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>hello there <br>
+<br>
+here your personal file links : <a href="https://mega.nz/folder/Aw40ELZL" rel="noopener noreferrer nofollow ugc">https://mega.nz/folder/Aw40ELZL</a>
+key : DJU1n1teahjZaAd-wD_5PA<br>
+<br>
+please to follow member rules here. <br>
+<a href="https://www.patreon.com/posts/102653620" rel="noopener noreferrer nofollow ugc">https://www.patreon.com/posts/102653620</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/49164995"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Punt the Poodle</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=49164995"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hello everyone! This is a mass message going out to all of you. Please check my latest post, an update about the next 2-3 months for the page, and how animations are going to continue being rolled out. Nothing major and nothing is required from your end, but I just want everyone to be in the loop. Reach out to me if you have any questions. Thank you!</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/44931828"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Dolores</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=44931828"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>hello there</p>
+<p>here your personal file links : <a href="https://mega.nz/folder/F94zgT4Q" rel="noopener noreferrer nofollow ugc">https://mega.nz/folder/F94zgT4Q</a><br>
+key : nxsYrPSS6HjFIra2ueQ_pw</p>
+<p>please to follow member rules here.<br>
+<a href="https://www.patreon.com/posts/102653620" rel="noopener noreferrer nofollow ugc">https://www.patreon.com/posts/102653620</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/44931828"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Dolores</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=44931828"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>hello there <br>
+<br>
+here your personal file links : <a href="https://mega.nz/folder/Aw40ELZL" rel="noopener noreferrer nofollow ugc">https://mega.nz/folder/Aw40ELZL</a>
+key : DJU1n1teahjZaAd-wD_5PA<br>
+<br>
+please to follow member rules here. <br>
+<a href="https://www.patreon.com/posts/102653620" rel="noopener noreferrer nofollow ugc">https://www.patreon.com/posts/102653620</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/44931828"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Dolores</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=44931828"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>hello there <br>
+<br>
+here your personal file links : <a href="https://mega.nz/folder/UpAEiJJT" rel="noopener noreferrer nofollow ugc">https://mega.nz/folder/UpAEiJJT</a>
+key : G-tLNfvxRFtzskxbMXXOrA<br>
+<br>
+please to follow member rules here. <br>
+<a href="https://www.patreon.com/posts/102653620" rel="noopener noreferrer nofollow ugc">https://www.patreon.com/posts/102653620</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/39869508"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Suou&#39;s Gallery</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=39869508"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Please see below for details.<br>
+<a href="https://www.patreon.com/posts/important-notice-121723489" rel="noopener noreferrer nofollow ugc">https://www.patreon.com/posts/important-notice-121723489</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/39869508"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Suou&#39;s Gallery</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=39869508"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Secondary distribution of cards is prohibited.<br>
+Distribution of scene data using the characters is also prohibited.<br>
+Please refrain from these actions.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/39869508"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Suou&#39;s Gallery</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=39869508"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Your next billing date is set for November 21. Therefore, we cannot send your November Rewards until the billing process for the 21th is complete.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/39869508"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Suou&#39;s Gallery</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=39869508"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Please click on the link below to download the reward character cards that have already been distributed this month.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/39869508"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Suou&#39;s Gallery</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=39869508"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Please note that the download link we are giving you is timed and will no longer be available in about 2 months.<br>
+The link will not be reissued, so please back up the downloaded card data and keep it in a safe place.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/39869508"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Suou&#39;s Gallery</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=39869508"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hello, thank you for your participation in the October sponsorship. We look forward to working with you in the future.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/35863337"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">xionsgirls</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=35863337"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>I just posted Roxy’s Mod. Im sorry for inconvenient. Please check Roxy Folder</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/3556213"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">PINKDRAWZ</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=3556213"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>UPDATE : I added 802 files in september 2026 Rewards.</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/34986506"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">FreshWomen | Pantsu Interactive</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=34986506"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Last 48 hours to get 30% OFF in FreshWomen Season 2 Episode 4 Part 1!<br>
+<br>
+<br>
+Hey FreshMen,<br>
+<br>
+Just letting you know you have 48 hours to download our latest episode before the discount is gone!<br>
+<br>
+Regular Price: $10<br>
+<br>
+Discounted Price: $7<br>
+<br>
+Click here to get it now: <a href="https://www.oppaiman.com/app/FreshWomen__Season_2_Episode_4_Part_1/?utm_source=patreon&amp;utm_medium=dm" rel="noopener noreferrer nofollow ugc">https://www.oppaiman.com/app/FreshWomen__Season_2_Episode_4_Part_1/?utm_source=patreon&amp;amp;utm_medium=dm</a></p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/3556213"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">PINKDRAWZ</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=3556213"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>PS : link is for “november 2025” not “december 2025”</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+      
+  <article
+    class="dm-card "
+  >
+        <header class="dm-card__header">
+
+  <a
+    class="fancy-link dms__user-link"
+    href="/patreon/user/19365824"
+      target="_blank"
+      rel="noopener noreferrer"
+  >            <span class="dm-card__user">Milkymoofficial</span>
+</a>  <a
+    class="fancy-link dms__remote-user-link"
+    href="https://www.patreon.com/user?u=19365824"
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+  >            <span class="dm-card__service">(Patreon)</span>
+</a>        </header>
+
+
+    <section class="dm-card__body" tabindex="0">
+      <div class="dm-card__content"><p>Hi, I couldn’t help but notice you cancelled your subscription just now. Thought I would warn you now that if you cancel your pledge, you won’t get to see any new audios sent to your email as I only send out emails to active paid members, so I would consider re-upping your subscription if you don’t want to miss out</p>
+</div>
+    </section>
+
+    <footer class="dm-card__footer">
+        <div class="dm-card__added">
+          Added: 2026-11
+        </div>
+    </footer>
+  </article>
+
+
+    </div>
+  </div>
+
+  <div class="paginator" id="paginator-bottom">
+
+
+
+  <small>
+    Showing 1 - 50 of 35144
+  </small>
+  <menu>
+            <li  class="pagination-button-disabled pagination-desktop" ><b>&lt;&lt;</b></li>
+
+          <li  class="pagination-button-disabled" ><b>&lt;</b></li>
+
+          <li  class="pagination-button-disabled pagination-button-current" ><b>1</b></li>
+
+          <a href="/dms?o=50"  class="pagination-button-after-current" ><b>2</b></a>
+
+          <a href="/dms?o=100" ><b>3</b></a>
+
+          <a href="/dms?o=150" ><b>4</b></a>
+
+          <a href="/dms?o=200" ><b>5</b></a>
+
+          <a href="/dms?o=250"  class="pagination-button-optional" ><b>6</b></a>
+
+          <a href="/dms?o=300"  class="pagination-button-optional" ><b>7</b></a>
+
+          <a href="/dms?o=350"  class="pagination-button-optional" ><b>8</b></a>
+
+          <a href="/dms?o=400"  class="pagination-button-optional" ><b>9</b></a>
+
+          <a href="/dms?o=450"  class="pagination-button-optional" ><b>10</b></a>
+
+          <a href="/dms?o=500"  class="pagination-button-optional" ><b>11</b></a>
+
+          <a href="/dms?o=50"  class="next" ><b>&gt;</b></a>
+
+            <a href="/dms?o=35100" ><b>&gt;&gt;</b></a>
+
+  </menu>
+  </div>
+
+  </section>
+
+        <div
+          id="component-container"
+          class="component-container"
+          hidden
+        >
+            <a
+    class="fancy-link "
+    href=""
+      target="_blank"
+      rel="noopener noreferrer"
+  ></a>
+            <p class="tooltip__message tooltip__message--register">
+    <span class="tooltip__action"></span> is only available to registered users.
+    <br>
+    Visit the   <a
+    class="fancy-link fancy-link--kemono "
+    href="/account/login?location=/dms"
+  >login page</a> if you have an account.
+    <br>
+    Otherwise visit the   <a
+    class="fancy-link fancy-link--kemono "
+    href="/account/register?location=/dms"
+  >registration page</a> to create one.
+  </p>
+
+            <time
+    class="timestamp " 
+    datetime=""
+  >
+      
+  </time>
+
+          <span class="loading-icon">
+      <span class="fancy-image ">
+      <picture class="fancy-image__picture">
+    <img
+      class="fancy-image__image"
+      src="/static/loading.gif"
+      alt="loading progress spinner"
+      srcset="/static/loading.gif"
+      loading="lazy"
+    >
+  </picture>
+
+  </span>
+
+  </span>
+        </div>
+      </main>
+
+      <footer class="global-footer">
+<ul class="footer">
+    <li><a href="/contact">[Contact]</a> <a href="/api/schema">[API]</a></li>
+</ul>      </footer>
+    </div>
+  <div
+    id="flying-tooltip"
+    class="tooltip"
+  >
+    <button
+    class="button tooltip__close"
+    type="button"
+    
+  >Close</button>
+          <p class="tooltip__message">
+      </p>
+
+  </div>
+  </body>
+</html>

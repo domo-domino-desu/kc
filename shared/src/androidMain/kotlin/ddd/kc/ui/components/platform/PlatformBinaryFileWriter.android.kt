@@ -6,6 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.documentfile.provider.DocumentFile
+import kotlin.random.Random
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -30,7 +32,7 @@ private suspend fun writeBinaryFile(
       }
     }
 
-private fun writeBinaryFileIntoDirectory(
+private suspend fun writeBinaryFileIntoDirectory(
     request: PlatformBinaryFileWriteRequest,
     destination: PlatformBinaryFileDestination.Directory,
     context: Context,
@@ -57,6 +59,35 @@ private fun writeBinaryFileIntoDirectory(
             ?: return PlatformBinaryFileWriteResult.Failure("Cannot create parent directory")
       }
 
+  if (request.transfer != null) {
+    val suffix = Random.nextLong().toString().replace('-', '0')
+    val temporary =
+        targetDirectory.createFile(request.mimeType, "kc-$suffix.part")
+            ?: return PlatformBinaryFileWriteResult.Failure("Cannot create temporary file")
+    var committed = false
+    var backup: DocumentFile? = null
+    try {
+      val result = writeBinaryFileToDocumentUri(request, temporary.uri.toString(), context)
+      if (result is PlatformBinaryFileWriteResult.Failure) return result
+      val existing = targetDirectory.findFile(request.fileName)
+      if (existing != null) {
+        if (!existing.renameTo("kc-$suffix.backup"))
+            return PlatformBinaryFileWriteResult.Failure("Cannot replace target file")
+        backup = existing
+      }
+      if (!temporary.renameTo(request.fileName))
+          return PlatformBinaryFileWriteResult.Failure("Cannot finalize target file")
+      committed = true
+      backup?.delete()
+      return PlatformBinaryFileWriteResult.Saved(temporary.uri.toString())
+    } finally {
+      if (!committed) {
+        temporary.delete()
+        backup?.renameTo(request.fileName)
+      }
+    }
+  }
+
   val document =
       targetDirectory.findFile(request.fileName)
           ?: targetDirectory.createFile(request.mimeType, request.fileName)
@@ -66,7 +97,7 @@ private fun writeBinaryFileIntoDirectory(
   return writeBinaryFileToDocumentUri(request, document.uri.toString(), context)
 }
 
-private fun writeBinaryFileToDocumentUri(
+private suspend fun writeBinaryFileToDocumentUri(
     request: PlatformBinaryFileWriteRequest,
     uriPath: String,
     context: Context,
@@ -77,12 +108,16 @@ private fun writeBinaryFileToDocumentUri(
   }
 
   val writeSuccess =
-      runCatching {
-            context.contentResolver.openOutputStream(targetUri, "w")?.use {
-              it.write(request.bytes)
-            } ?: error("Cannot open output stream")
-          }
-          .isSuccess
+      try {
+        context.contentResolver.openOutputStream(targetUri, "w")?.use { output ->
+          request.writeContent { bytes, count -> output.write(bytes, 0, count) }
+        } ?: error("Cannot open output stream")
+        true
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (_: Exception) {
+        false
+      }
   return if (writeSuccess) {
     PlatformBinaryFileWriteResult.Saved(savedPath = uriPath)
   } else {

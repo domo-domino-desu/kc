@@ -6,6 +6,7 @@ import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -15,8 +16,8 @@ actual fun rememberPlatformBinaryFileWriter():
   return remember { { request -> writeBinaryFile(request) } }
 }
 
-private suspend fun writeBinaryFile(
-    request: PlatformBinaryFileWriteRequest,
+internal suspend fun writeBinaryFile(
+    request: PlatformBinaryFileWriteRequest
 ): PlatformBinaryFileWriteResult =
     withContext(Dispatchers.IO) {
       val targetFile =
@@ -51,7 +52,15 @@ private suspend fun writeBinaryFile(
         return@withContext PlatformBinaryFileWriteResult.Failure("Cannot create parent directory")
       }
 
-      val writeSuccess = runCatching { atomicWrite(targetFile, request.bytes) }.isSuccess
+      val writeSuccess =
+          try {
+            atomicWrite(targetFile, request)
+            true
+          } catch (cancelled: CancellationException) {
+            throw cancelled
+          } catch (_: Exception) {
+            false
+          }
       if (writeSuccess) {
         PlatformBinaryFileWriteResult.Saved(savedPath = targetFile.absolutePath)
       } else {
@@ -59,11 +68,13 @@ private suspend fun writeBinaryFile(
       }
     }
 
-private fun atomicWrite(target: File, bytes: ByteArray) {
+private suspend fun atomicWrite(target: File, request: PlatformBinaryFileWriteRequest) {
   val parent = requireNotNull(target.parentFile)
   val temporary = Files.createTempFile(parent.toPath(), ".kc-", ".tmp")
   try {
-    Files.write(temporary, bytes)
+    Files.newOutputStream(temporary).use { output ->
+      request.writeContent { bytes, count -> output.write(bytes, 0, count) }
+    }
     try {
       Files.move(
           temporary,

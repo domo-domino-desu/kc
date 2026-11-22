@@ -126,7 +126,7 @@ class TypedQueryStore<Key : Any, Output : Any>(
   suspend fun queryOnce(key: Key, forceRefresh: Boolean = false): Output {
     val state =
         query(key, forceRefresh = forceRefresh)
-            .filter { it.data != null || it.error != null }
+            .filter { !it.isLoading && !it.isRefreshing && (it.data != null || it.error != null) }
             .first()
     state.error?.let { throw it.asException() }
     return requireNotNull(state.data)

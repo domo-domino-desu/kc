@@ -34,6 +34,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -349,6 +350,7 @@ private fun TagRow(tags: List<Tag>, onTagClick: (Tag) -> Unit) {
   ) {
     tags.forEach { tag ->
       AssistChip(
+          modifier = Modifier.testTag("tag-card"),
           onClick = { onTagClick(tag) },
           label = { Text(tag.label) },
       )

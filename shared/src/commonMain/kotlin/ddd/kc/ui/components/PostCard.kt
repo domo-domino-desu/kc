@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,7 +44,7 @@ fun PostCard(
       shape = RoundedCornerShape(8.dp),
       border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
       color = MaterialTheme.colorScheme.surface,
-      modifier = modifier.clickable(onClick = onClick),
+      modifier = modifier.testTag("post-card").clickable(onClick = onClick),
   ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
       Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {

@@ -40,6 +40,7 @@
 
         androidSdk = "${android.androidsdk}/libexec/android-sdk";
         desktopLibs = with pkgs; [
+          stdenv.cc.cc.lib
           fontconfig
           glib-networking
           gtk3

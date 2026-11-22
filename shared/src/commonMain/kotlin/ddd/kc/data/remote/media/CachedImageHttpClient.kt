@@ -27,9 +27,12 @@ import io.ktor.client.plugins.onDownload
 import io.ktor.client.plugins.plugin
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
@@ -46,6 +49,22 @@ suspend fun HttpClient.downloadMedia(url: String): ByteArray {
     throw PawchiveApiException(response.status.value, "HTTP ${response.status.value}")
   }
   return response.body()
+}
+
+/** Streams through a bounded buffer; the caller owns the destination and rollback. */
+suspend fun HttpClient.downloadMediaTo(url: String, write: (ByteArray, Int) -> Unit) {
+  prepareGet(url).execute { response ->
+    if (response.status == HttpStatusCode.Unauthorized) throw AuthRequiredException()
+    if (!response.status.isSuccess())
+        throw PawchiveApiException(response.status.value, "HTTP ${response.status.value}")
+    val channel = response.bodyAsChannel()
+    val buffer = ByteArray(64 * 1024)
+    while (true) {
+      val count = channel.readAvailable(buffer)
+      if (count < 0) break
+      if (count > 0) write(buffer, count)
+    }
+  }
 }
 
 fun createCachedImageHttpClient(
@@ -120,6 +139,7 @@ private fun HttpClient.installCachedImageInterceptors(
     cfSessionStore: PawchiveCfSessionStore,
     challengeResolver: PawchiveChallengeResolver,
 ): HttpClient {
+  val originalFiles = MediaRequestGate()
   plugin(HttpSend).intercept { request ->
     val progressKey = normalizeProgressKey(request.url.toString())
     if (progressKey.isBlank()) return@intercept execute(request)
@@ -137,8 +157,7 @@ private fun HttpClient.installCachedImageInterceptors(
           if (trusted && !context?.cookieHeader.isNullOrBlank()) {
             request.headers[HttpHeaders.Cookie] = context.cookieHeader
           }
-          request.headers[HttpHeaders.UserAgent] =
-              context?.userAgent ?: "Mozilla/5.0 (compatible; KC/1.0)"
+          request.headers[HttpHeaders.UserAgent] = context?.userAgent ?: "KC/1.0"
           if (request.headers[HttpHeaders.Accept].isNullOrBlank()) {
             request.header(HttpHeaders.Accept, "*/*")
           }
@@ -149,7 +168,17 @@ private fun HttpClient.installCachedImageInterceptors(
             request.header(HttpHeaders.Referrer, "$siteOrigin/")
           }
 
-          val call = execute(request).save()
+          val isOriginalFile =
+              request.url
+                  .toString()
+                  .startsWith(PawchiveOriginPolicy.fileOrigin(siteOrigin).orEmpty() + "/") ||
+                  (request.url.parameters["e"] != null && request.url.parameters["s"] != null)
+          val call =
+              if (isOriginalFile) {
+                originalFiles.execute { execute(request).save() }
+              } else {
+                execute(request).save()
+              }
           if (trusted) {
             cfSessionStore.mergeSetCookieHeaders(
                 siteOrigin,

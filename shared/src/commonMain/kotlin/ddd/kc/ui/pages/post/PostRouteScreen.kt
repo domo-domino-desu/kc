@@ -27,6 +27,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -36,6 +38,7 @@ import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.canLoadFullImage
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.creatorKey
+import ddd.kc.data.model.downloadUrl
 import ddd.kc.data.model.fullUrl
 import ddd.kc.data.model.imageFiles
 import ddd.kc.data.model.key
@@ -51,6 +54,7 @@ import ddd.kc.ui.components.platform.PlatformBinaryFileWriteRequest
 import ddd.kc.ui.components.platform.PlatformBinaryFileWriteResult
 import ddd.kc.ui.components.platform.buildPostDownloadTarget
 import ddd.kc.ui.components.platform.rememberPlatformBinaryFileWriter
+import ddd.kc.ui.components.uiTestState
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.imageviewer.ImageViewerScreen
 import ddd.kc.ui.pages.tagposts.TagPostsScreen
@@ -58,6 +62,7 @@ import ddd.kc.utils.logging.KcLog
 import ddd.kc.utils.logging.summarizePost
 import ddd.kc.utils.logging.summarizePostFiles
 import kc.shared.generated.resources.Res
+import kc.shared.generated.resources.attachment_unavailable
 import kc.shared.generated.resources.download_failed
 import kc.shared.generated.resources.download_save_path_required
 import kc.shared.generated.resources.download_saved
@@ -186,6 +191,17 @@ private constructor(
       val downloadSavedMessage = stringResource(Res.string.download_saved)
       val downloadFailedMessage = stringResource(Res.string.download_failed)
       val scope = rememberCoroutineScope()
+      val unavailableMessage = stringResource(Res.string.attachment_unavailable)
+      val requestMedia: (Post, Collection<String>) -> Unit = { selectedPost, urls ->
+        scope.launch {
+          try {
+            screenModel.requestFreshFullImages(selectedPost, urls, cdnUrl)
+          } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            showToast(unavailableMessage)
+          }
+        }
+      }
       val downloadingUrls = remember { mutableStateMapOf<String, Boolean>() }
       // Tracks each page's LazyListState for scroll-to-top
       val pageListStates = remember { mutableStateOf<Map<Int, LazyListState>>(emptyMap()) }
@@ -197,7 +213,11 @@ private constructor(
               "${post.service}:${post.creatorId}:${post.id}"
             } ?: "missing:$page"
           },
-          modifier = Modifier.fillMaxSize(),
+          modifier =
+              Modifier.fillMaxSize().testTag("detail-pager").semantics {
+                uiTestState =
+                    "page=${pagerState.currentPage};count=${pagerState.pageCount};settled=${pagerState.settledPage};scrolling=${pagerState.isScrollInProgress}"
+              },
       ) { page ->
         val post = state.posts.getOrNull(page) ?: return@HorizontalPager
         val listState = rememberLazyListState()
@@ -220,10 +240,8 @@ private constructor(
             requestedFullImageUrls = state.requestedFullImageUrls[post.key].orEmpty(),
             onFavoriteClick = { screenModel.toggleFavoritePost(post) },
             onTranslate = { screenModel.translateContent(post) },
-            onFullImageRequested = { fullUrl -> screenModel.requestFullImage(post.key, fullUrl) },
-            onFullImagesRequested = { fullUrls ->
-              screenModel.requestFullImages(post.key, fullUrls)
-            },
+            onFullImageRequested = { fullUrl -> requestMedia(post, listOf(fullUrl)) },
+            onFullImagesRequested = { fullUrls -> requestMedia(post, fullUrls) },
             onTagClick = { tag -> navigator.push(TagPostsScreen(tag)) },
             onArtistClick = {
               val creator = state.postCreators[post.creatorKey]
@@ -241,46 +259,54 @@ private constructor(
               scope.launch { pageListStates.value[pagerState.currentPage]?.scrollToItem(0) }
             },
             onImageClick = { imageIndex ->
-              val images = post.imageFiles()
-              val viewableImages =
-                  images.mapNotNull { file ->
-                    if (!file.canLoadFullImage(post)) return@mapNotNull null
-                    file.fullUrl(cdnUrl)?.let { fullUrl ->
-                      fullUrl to file.thumbnailUrl(cdnUrl).orEmpty()
-                    }
+              scope.launch {
+                try {
+                  val mediaPost = screenModel.freshMediaPost(post)
+                  val images = mediaPost.imageFiles()
+                  val viewableImages =
+                      images.mapNotNull { file ->
+                        if (!file.canLoadFullImage()) return@mapNotNull null
+                        file.fullUrl(cdnUrl)?.let { fullUrl ->
+                          fullUrl to file.thumbnailUrl(cdnUrl).orEmpty()
+                        }
+                      }
+                  val urls = viewableImages.map { it.first }
+                  val thumbs = viewableImages.map { it.second }
+                  val startIndex =
+                      images.take(imageIndex).count {
+                        it.canLoadFullImage() && !it.fullUrl(cdnUrl).isNullOrBlank()
+                      }
+                  log.i {
+                    "打开图片 -> 点击Post图片(service=${post.service},creator=${post.user},post=${post.id},index=$startIndex,count=${urls.size})"
                   }
-              val urls = viewableImages.map { it.first }
-              val thumbs = viewableImages.map { it.second }
-              val startIndex =
-                  images.take(imageIndex).count {
-                    it.canLoadFullImage(post) && !it.fullUrl(cdnUrl).isNullOrBlank()
-                  }
-              log.i {
-                "打开图片 -> 点击Post图片(service=${post.service},creator=${post.user},post=${post.id},index=$startIndex,count=${urls.size})"
-              }
-              if (urls.isNotEmpty() && startIndex in urls.indices) {
-                navigator.push(
-                    ImageViewerScreen(
-                        windowId =
-                            navigationWindows.putImages(
-                                imageUrls = urls,
-                                thumbnailUrls = thumbs,
-                                onImageViewed = { fullUrl ->
-                                  screenModel.requestFullImage(post.key, fullUrl)
-                                },
-                            ),
-                        startIndex = startIndex,
+                  if (urls.isNotEmpty() && startIndex in urls.indices) {
+                    navigator.push(
+                        ImageViewerScreen(
+                            windowId =
+                                navigationWindows.putImages(
+                                    imageUrls = urls,
+                                    thumbnailUrls = thumbs,
+                                    onImageViewed = { fullUrl ->
+                                      screenModel.requestFullImage(post.key, fullUrl)
+                                    },
+                                ),
+                            startIndex = startIndex,
+                        )
                     )
-                )
+                  }
+                } catch (error: Throwable) {
+                  if (error is CancellationException) throw error
+                  showToast(unavailableMessage)
+                }
               }
             },
             isAttachmentDownloading = { file ->
-              file.fullUrl(cdnUrl)?.let { downloadingUrls[it] == true } == true
+              downloadingUrls["${post.key}:${file.path}:${file.name}"] == true
             },
             onAttachmentDownload = download@{ file ->
-                  val url = file.fullUrl(cdnUrl)
+                  val url = file.downloadUrl(cdnUrl)
                   if (url == null) {
-                    showToast(downloadFailedMessage.format("Missing file URL"))
+                    showToast(unavailableMessage)
                     return@download
                   }
                   val savePath = downloadSavePath.trim()
@@ -288,11 +314,11 @@ private constructor(
                     showToast(savePathRequiredMessage)
                     return@download
                   }
-                  if (downloadingUrls[url] == true) return@download
+                  val downloadKey = "${post.key}:${file.path}:${file.name}"
+                  if (downloadingUrls[downloadKey] == true) return@download
                   scope.launch {
-                    downloadingUrls[url] = true
+                    downloadingUrls[downloadKey] = true
                     try {
-                      val bytes = screenModel.downloadFile(url)
                       val downloadTarget = buildPostDownloadTarget(appSettings, post, file)
                       when (
                           val result =
@@ -307,7 +333,9 @@ private constructor(
                                                   appSettings.downloadAllowMediaIndexing(),
                                           ),
                                       fileName = downloadTarget.fileName,
-                                      bytes = bytes,
+                                      transfer = { write ->
+                                        screenModel.downloadAttachment(post, file, cdnUrl, write)
+                                      },
                                       mimeType = downloadTarget.fileName.guessMimeType(),
                                   )
                               )
@@ -319,10 +347,10 @@ private constructor(
                       }
                     } catch (error: Throwable) {
                       if (error is CancellationException) throw error
-                      log.e(error) { "下载附件 -> 失败(urlLength=${url.length})" }
+                      log.e { "下载附件 -> 失败(type=${error::class.simpleName})" }
                       showToast(downloadFailedMessage.format(error::class.simpleName ?: "I/O"))
                     } finally {
-                      downloadingUrls.remove(url)
+                      downloadingUrls.remove(downloadKey)
                     }
                   }
                 },

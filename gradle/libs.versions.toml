@@ -24,13 +24,16 @@ room = "2.8.4"
 slf4j = "2.0.18"
 sqlite = "2.7.0"
 voyager = "2.2.21-1.10.3"
-zoomimage = "1.6.0"
+zoomimage = "1.7.0-alpha01"
 symbolcraft = "0.5.0"
 materialyou = "0.4.0"
 composemediaplayer = "0.11.4"
+# Match the Media3 version used by composemediaplayer-android.
+media3 = "1.10.1"
 nucleus = "2.4.7"
 
 [libraries]
+compose-ui-test-junit4 = { module = "org.jetbrains.compose.ui:ui-test-junit4", version.ref = "compose-multiplatform" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 aboutlibraries-compose-m3 = { module = "com.mikepenz:aboutlibraries-compose-m3", version.ref = "aboutlibraries" }
 aboutlibraries-core = { module = "com.mikepenz:aboutlibraries-core", version.ref = "aboutlibraries" }
@@ -47,6 +50,7 @@ compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-mu
 compose-ui-backhandler = { module = "org.jetbrains.compose.ui:ui-backhandler", version.ref = "compose-multiplatform" }
 materialyou = { module = "dev.zwander:materialyou", version.ref = "materialyou" }
 composemediaplayer = { module = "io.github.kdroidfilter:composemediaplayer", version.ref = "composemediaplayer" }
+media3-exoplayer-hls = { module = "androidx.media3:media3-exoplayer-hls", version.ref = "media3" }
 nucleus-application = { module = "dev.nucleusframework:nucleus.nucleus-application", version.ref = "nucleus" }
 nucleus-core-runtime = { module = "dev.nucleusframework:nucleus.core-runtime", version.ref = "nucleus" }
 nucleus-decorated-window-material3 = { module = "dev.nucleusframework:nucleus.decorated-window-material3", version.ref = "nucleus" }

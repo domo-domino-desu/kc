@@ -43,6 +43,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -70,6 +72,7 @@ import ddd.kc.ui.components.paging.PagingAnchor
 import ddd.kc.ui.components.paging.PagingEffect
 import ddd.kc.ui.components.previousPageHeader
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
+import ddd.kc.ui.components.uiTestState
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.filter_all
@@ -120,9 +123,14 @@ class CreatorsScreen : AppScreen {
     }
     LaunchedEffect(state.paging.navigationEffect) {
       when (val effect = state.paging.navigationEffect) {
-        is PagingEffect.ScrollToTop -> gridState.scrollToItem(0)
-        is PagingEffect.RestoreViewport ->
-            gridState.scrollToItem(effect.anchor.index + 2, effect.anchor.offset)
+        is PagingEffect.ScrollToTop -> {
+          gridState.scrollToItem(0)
+          screenModel.onNavigationEffectHandled(effect.transactionId)
+        }
+        is PagingEffect.RestoreViewport -> {
+          gridState.scrollToItem(effect.anchor.index + 2, effect.anchor.offset)
+          screenModel.onNavigationEffectHandled(effect.transactionId)
+        }
         is PagingEffect.RebaseSelection,
         null -> Unit
       }
@@ -158,7 +166,11 @@ class CreatorsScreen : AppScreen {
           LazyVerticalGrid(
               columns = GridCells.Adaptive(minSize = 320.dp),
               state = gridState,
-              modifier = Modifier.fillMaxSize(),
+              modifier =
+                  Modifier.fillMaxSize().testTag("browse-list").semantics {
+                    uiTestState =
+                        "index=${gridState.firstVisibleItemIndex};offset=${gridState.firstVisibleItemScrollOffset};scrolling=${gridState.isScrollInProgress}"
+                  },
               contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
               verticalArrangement = Arrangement.spacedBy(8.dp),
               horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -169,7 +181,7 @@ class CreatorsScreen : AppScreen {
                   onValueChange = screenModel::onQueryChanged,
                   placeholder = { Text(stringResource(Res.string.search_creators_hint)) },
                   singleLine = true,
-                  modifier = Modifier.fillMaxWidth(),
+                  modifier = Modifier.fillMaxWidth().testTag("creator-search-input"),
               )
             }
 

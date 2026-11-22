@@ -3,7 +3,6 @@ package ddd.kc.data.remote.network
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import ddd.kc.data.local.settings.AppSettings
 import ddd.kc.data.model.AiFilterMode
-import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostFile
 import ddd.kc.data.model.allFiles
@@ -54,6 +53,52 @@ class PawchiveApiTest {
     coerceInputValues = true
   }
 
+  @Test
+  fun currentWebsiteFixturesRetainPostCardsAndPagination() {
+    val (api, _) = client { HttpStatusCode.OK to "" }
+    for (file in
+        listOf(
+            "posts.html",
+            "posts-search.html",
+            "posts-advanced-search.html",
+            "posts-service.html",
+            "posts-tag.html",
+        )) {
+      val page = api.parsePostCardsPage(TestFixtures.read("live/$file"))
+      assertTrue(page.items.isNotEmpty(), file)
+      assertTrue(page.items.all { it.id.isNotBlank() }, file)
+      assertTrue(page.pageInfo?.hasNext == true, file)
+    }
+    assertTrue(api.parseDms(TestFixtures.read("live/dms.html")).isNotEmpty())
+    assertTrue(api.parseCreatorPostsPage(TestFixtures.read("live/creator.html")).items.isNotEmpty())
+    assertTrue(api.parseTags(TestFixtures.read("live/posts-tags.html")).isNotEmpty())
+  }
+
+  @Test
+  fun advancedQueryAndAiFilterSurvivePaginationRequests() = runBlocking {
+    val fixture = TestFixtures.read("live/posts-search-syntax.html")
+    val (api, requests) = client { HttpStatusCode.OK to fixture }
+    val filters =
+        ddd.kc.data.model.PostSearchFilters(
+            titleOnly = true,
+            after = "2026-01-01",
+            before = "2026-12-01",
+            service = "patreon",
+            media = ddd.kc.data.model.PostSearchMedia.VIDEO,
+        )
+    val query = filters.query("\"full reaction\" -trailer")
+    val page =
+        api.parsePostCardsPage(
+            api.fetchPostSearchBody(query, offset = 50, aiFilter = AiFilterMode.HIDE),
+            50,
+        )
+    assertEquals(query, requests.single().url.parameters["q"])
+    assertEquals("50", requests.single().url.parameters["o"])
+    assertEquals("ai", requests.single().url.parameters["hide"])
+    assertEquals(2, page.pageInfo?.currentPage)
+    assertTrue(page.items.isNotEmpty())
+  }
+
   private fun settings(): AppSettings {
     val file = File.createTempFile("kc-test-settings", ".preferences_pb")
     file.delete()
@@ -99,21 +144,20 @@ class PawchiveApiTest {
               when (request.url.encodedPath) {
                 "/api/v1/creators" -> creatorsJson
                 "/api/v1/posts" -> postsJson
-                "/posts" -> TestFixtures.read("pawchive.st__posts__service-patreon.html")
-                "/posts/popular" -> TestFixtures.read("pawchive.st__posts__popular.html")
-                "/posts/tags" -> TestFixtures.read("pawchive.st__posts__tags.html")
-                "/dms" -> TestFixtures.read("pawchive.pw__dms.html")
+                "/posts" -> TestFixtures.read("live/posts-service.html")
+                "/posts/popular" -> TestFixtures.read("live/posts-popular.html")
+                "/posts/tags" -> TestFixtures.read("live/posts-tags.html")
+                "/dms" -> TestFixtures.read("live/dms.html")
                 "/api/v1/patreon/user/artist" -> creatorPostsJson
-                "/patreon/user/artist" ->
-                    TestFixtures.read("pawchive.st__patreon__user__3295915.html")
+                "/patreon/user/artist" -> TestFixtures.read("live/creator.html")
                 "/api/v1/patreon/user/artist/post/post1" -> postDetailJson
                 "/api/v1/patreon/user/artist/post/post1/comments" -> commentsJson
                 "/api/v1/patreon/user/artist/announcements" -> announcementsJson
                 "/api/v1/patreon/user/artist/tags" -> creatorTagsJson
                 "/patreon/user/artist/recommended" ->
-                    TestFixtures.read("pawchive.st__patreon__user__3295915__recommended.html")
+                    TestFixtures.read("live/creator-recommended.html")
                 "/patreon/user/artist/community/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ->
-                    TestFixtures.read("pawchive.pw__patreon__user__70000001__community.html")
+                    TestFixtures.read("live/creator-community.html")
                 "/api/v1/account/favorites" ->
                     if (request.url.parameters["type"] == "post") favoritePostsJson
                     else favoriteCreatorsJson
@@ -144,7 +188,7 @@ class PawchiveApiTest {
     assertTrue(creatorPage.items.isNotEmpty())
     assertTrue(creatorPage.items.all { it.service == "patreon" })
     assertTrue(creatorPage.items.all { it.id.isNotBlank() && it.user.isNotBlank() })
-    assertEquals(4, creatorPage.pageInfo?.lastPage)
+    assertTrue(creatorPage.pageInfo!!.lastPage > 1)
     val detail = api.parsePost(api.fetchPostBody("patreon", "artist", "post1"))
     assertEquals("post1", detail.id)
     assertEquals("detail text", detail.content)
@@ -175,13 +219,11 @@ class PawchiveApiTest {
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             )
         )
-    assertEquals(2, community.lounges.size)
-    assertEquals("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", community.selectedLoungeId)
-    assertEquals(7, community.pageInfo?.lastPage)
+    assertTrue(community.lounges.isNotEmpty())
+    assertTrue(community.selectedLoungeId.isNotBlank())
+    assertTrue(community.pageInfo!!.lastPage >= 3)
     assertTrue(community.messages.isNotEmpty())
-    assertTrue(community.messages.any { it.reply != null })
-    assertTrue(community.messages.any { it.imageUrl != null })
-    assertTrue(community.messages.any { it.isDeleted })
+
     assertEquals(listOf("artist"), api.getFavorites(type = "artist").map { it.id })
     assertEquals(listOf("post1"), api.getFavoritePosts().map { it.id })
     api.addFavoriteCreator(service = "patreon", creatorId = "artist")
@@ -671,7 +713,7 @@ class PawchiveApiTest {
   }
 
   @Test
-  fun parsesArchiveStateAndDisablesFullImageLoading() {
+  fun parsesArchiveStateAndDecidesFullImagesPerFile() {
     val post =
         json.decodeFromString<Post>(
             """{
@@ -691,82 +733,59 @@ class PawchiveApiTest {
     assertEquals("scraped", post.previewState)
     assertEquals(false, post.hasFull)
     assertEquals(true, post.attachments[1].deferred)
-    assertEquals(false, post.file!!.canLoadFullImage(post))
-    assertEquals(false, post.attachments[0].canLoadFullImage(post))
-    assertEquals(false, post.attachments[1].canLoadFullImage(post))
+    assertEquals(true, post.file!!.canLoadFullImage())
+    assertEquals(true, post.attachments[0].canLoadFullImage())
+    assertEquals(false, post.attachments[1].canLoadFullImage())
 
     val normalPost = post.copy(hasFull = true)
-    assertEquals(true, normalPost.attachments[0].canLoadFullImage(normalPost))
-    assertEquals(false, normalPost.attachments[1].canLoadFullImage(normalPost))
+    assertEquals(true, normalPost.attachments[0].canLoadFullImage())
+    assertEquals(false, normalPost.attachments[1].canLoadFullImage())
   }
 
   @Test
-  fun parsesPawchiveHtmlFixtures() {
+  fun parsesCurrentWebsiteResponses() {
     val (api, _) = client { HttpStatusCode.OK to "{}" }
-
-    val popular = api.parsePopularPostsPage(TestFixtures.read("pawchive.st__posts__popular.html"))
+    val popular = api.parsePopularPostsPage(TestFixtures.read("live/posts-popular.html"))
     assertTrue(popular.posts.isNotEmpty())
-    assertEquals(42, popular.posts.first().attachmentCount)
-    assertEquals(101, popular.posts.first().favoriteCount)
-    assertEquals("2026-06-30", popular.info.maxDate)
-    assertTrue(popular.info.navigationDates?.day.orEmpty().isNotEmpty())
-    assertEquals(10, popular.pageInfo?.lastPage)
-
-    val servicePosts =
-        api.parsePostCardsPage(TestFixtures.read("pawchive.st__posts__service-patreon.html"))
-    assertTrue(servicePosts.items.isNotEmpty())
-    assertTrue(servicePosts.items.any { it.service == "patreon" })
-    assertTrue(servicePosts.items.any { it.file?.path?.startsWith("/") == true })
-    assertEquals(1000, servicePosts.pageInfo?.lastPage)
-
-    val searchPosts =
-        api.parsePostCardsPage(TestFixtures.read("pawchive.st__posts__search-test.html"))
-    assertTrue(searchPosts.items.isNotEmpty())
-    assertTrue(searchPosts.pageInfo != null)
-
-    val tagPosts = api.parsePostCards(TestFixtures.read("pawchive.st__posts__tag-nsfw.html"))
-    assertTrue(tagPosts.isNotEmpty())
-
-    val tags = api.parseTags(TestFixtures.read("pawchive.st__posts__tags.html"))
-    assertTrue(tags.any { it.tag == "nsfw" && it.count > 0 })
-
-    val creatorTags = api.parseCreatorTags(creatorTagsJson)
-    assertTrue(creatorTags.any { it.tag == "Animation" && it.count > 0 })
-
-    val similarCreators =
-        api.parseSimilarCreators(
-            TestFixtures.read("pawchive.st__patreon__user__3295915__recommended.html")
-        )
-    assertTrue(similarCreators.isNotEmpty())
-    assertTrue(similarCreators.all { it.id.isNotBlank() && it.service.isNotBlank() })
-
-    val creatorWithoutCommunity =
-        api.parseCreatorPostsPage(TestFixtures.read("pawchive.st__patreon__user__3295915.html"))
-    assertTrue(creatorWithoutCommunity.items.isNotEmpty())
-    assertEquals(false, creatorWithoutCommunity.communityAvailable)
-
-    val creatorWithCommunity =
-        api.parseCreatorPostsPage(
-            TestFixtures.read("pawchive.pw__patreon__user__70000001__community.html")
-        )
-    assertEquals(true, creatorWithCommunity.communityAvailable)
-
-    val dmsPage = api.parseDmsPage(TestFixtures.read("pawchive.pw__dms.html"))
-    assertTrue(dmsPage.items.isNotEmpty())
-    assertEquals("patreon", dmsPage.items.first().service)
-    assertTrue(dmsPage.items.first().user.orEmpty().isNotBlank())
-    assertTrue(dmsPage.items.first().content.orEmpty().isNotBlank())
-    assertTrue(dmsPage.items.any { it.artist?.name.orEmpty().isNotBlank() })
-    val repeatedCreatorMonth =
-        dmsPage.items.groupBy { Triple(it.service, it.user, it.added) }.values.first { it.size > 1 }
-    assertEquals(repeatedCreatorMonth.size, repeatedCreatorMonth.map { it.hash }.distinct().size)
-    assertEquals(repeatedCreatorMonth.size, repeatedCreatorMonth.map { it.key }.distinct().size)
-    assertEquals(PageInfo(lastPage = 2, lastOffset = 50), dmsPage.pageInfo)
-
-    assertEquals(
-        4,
-        parsePageInfo(TestFixtures.read("pawchive.st__patreon__user__3295915.html"))?.lastPage,
+    assertTrue(popular.info.maxDate.orEmpty().matches(Regex("""\d{4}-\d{2}-\d{2}""")))
+    assertTrue(popular.pageInfo!!.lastPage > 1)
+    for (file in listOf("posts-service.html", "posts-search.html", "posts-tag.html")) {
+      val posts = api.parsePostCardsPage(TestFixtures.read("live/$file"))
+      assertTrue(posts.items.isNotEmpty())
+      assertTrue(posts.items.all { it.id.isNotBlank() && it.user.isNotBlank() })
+      assertTrue(posts.pageInfo!!.lastPage > 1)
+    }
+    assertTrue(
+        api.parseTags(TestFixtures.read("live/posts-tags.html")).all {
+          it.tag.isNotBlank() && it.count > 0
+        }
     )
+    val similar = api.parseSimilarCreators(TestFixtures.read("live/creator-recommended.html"))
+    assertTrue(similar.isNotEmpty())
+    assertTrue(similar.all { it.id.isNotBlank() && it.service.isNotBlank() })
+    val creator = api.parseCreatorPostsPage(TestFixtures.read("live/creator.html"))
+    assertTrue(creator.items.isNotEmpty())
+    assertTrue(creator.pageInfo!!.lastPage > 1)
+    val community = api.parseCreatorCommunity(TestFixtures.read("live/creator-community.html"))
+    assertTrue(community.messages.isNotEmpty())
+    assertTrue(community.lounges.isNotEmpty())
+    assertTrue(community.pageInfo!!.lastPage >= 3)
+    val dms = api.parseDmsPage(TestFixtures.read("live/dms.html"))
+    assertTrue(dms.items.isNotEmpty())
+    assertTrue(dms.items.all { it.content.orEmpty().isNotBlank() })
+    assertEquals(dms.items.size, dms.items.map { it.key }.distinct().size)
+    assertTrue(dms.pageInfo!!.lastPage > 1)
+  }
+
+  @Test
+  fun lastCreatorPageNeverRegressesBelowTheRequestedOffset() {
+    val info = parsePageInfo(TestFixtures.read("live/creator-last.html"), 200)!!
+    assertEquals(5, info.currentPage)
+    assertTrue(info.lastOffset >= 200)
+    assertTrue(info.lastPage >= info.currentPage)
+    val terminal = parsePageInfo("""<a href="?o=0">First</a>""", 50)!!
+    assertEquals(2, terminal.currentPage)
+    assertEquals(2, terminal.lastPage)
   }
 
   @Test

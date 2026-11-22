@@ -52,6 +52,7 @@ import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.fullUrl
 import ddd.kc.data.model.imageFiles
 import ddd.kc.data.model.isImage
+import ddd.kc.data.model.isTemporary
 import ddd.kc.data.model.isVideo
 import ddd.kc.data.model.key
 import ddd.kc.data.model.thumbnailUrl
@@ -71,6 +72,7 @@ import ddd.kc.ui.components.SkeletonBlock
 import ddd.kc.ui.components.paging.ContentTranslationState
 import ddd.kc.utils.collapseConsecutiveBlankLines
 import kc.shared.generated.resources.Res
+import kc.shared.generated.resources.attachment_temporary_notice
 import kc.shared.generated.resources.comments_count
 import kc.shared.generated.resources.no_comments
 import kotlinx.coroutines.launch
@@ -123,7 +125,7 @@ internal fun PostDetailPage(
   val loadableFullImageUrls =
       remember(post, imageFiles, cdnUrl) {
         imageFiles.mapNotNull { file ->
-          if (!file.canLoadFullImage(post)) return@mapNotNull null
+          if (!file.canLoadFullImage()) return@mapNotNull null
           val thumbnailUrl = file.thumbnailUrl(cdnUrl)
           val fullUrl = file.fullUrl(cdnUrl)
           fullUrl?.takeIf { it.isNotBlank() && it != thumbnailUrl }
@@ -133,7 +135,8 @@ internal fun PostDetailPage(
   val hasLoadableFullImages = remember(loadableFullImageUrls) { loadableFullImageUrls.isNotEmpty() }
   val allFullImagesRequested =
       hasLoadableFullImages && requestedFullImageUrls.containsAll(loadableFullImageUrls)
-  val showPostNotArchivedPrompt = hasImages && !hasLoadableFullImages
+  val hasTemporaryFiles = post.allFiles().any { it.isTemporary() }
+  val showPostNotArchivedPrompt = hasImages && !hasLoadableFullImages && !hasTemporaryFiles
   ErrorToastEffect(favoriteError?.localizedMessage())
   ErrorToastEffect(commentError?.localizedMessage())
 
@@ -188,6 +191,8 @@ internal fun PostDetailPage(
             videoFiles.size,
             loadingAttachmentSkeletonCount,
             post.embed,
+            hasTemporaryFiles,
+            showPostNotArchivedPrompt,
         ) {
           var index = 0
           if (!post.title.isNullOrBlank()) index += 1
@@ -195,6 +200,8 @@ internal fun PostDetailPage(
           index += 1 // metadata
           index += 1 // tags / skeleton placeholder
           if (!post.content.isNullOrBlank()) index += 1
+          if (hasTemporaryFiles) index += 1
+          if (showPostNotArchivedPrompt) index += 1
           index += imageFiles.size
           index += videoFiles.size
           index += loadingAttachmentSkeletonCount
@@ -369,6 +376,16 @@ internal fun PostDetailPage(
       }
 
       // ── Images ────────────────────────────────────────────────────
+      if (hasTemporaryFiles) {
+        item(key = "temporary-file-notice") {
+          Text(
+              stringResource(Res.string.attachment_temporary_notice),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+          )
+        }
+      }
       if (showPostNotArchivedPrompt) {
         item {
           PostNotArchivedNotice(
@@ -382,7 +399,7 @@ internal fun PostDetailPage(
       itemsIndexed(imageFiles, key = { idx, _ -> "img-$idx" }) { idx, file ->
         val thumbnailUrl = file.thumbnailUrl(cdnUrl)
         val fullUrl = file.fullUrl(cdnUrl)
-        val fullImageEnabled = file.canLoadFullImage(post)
+        val fullImageEnabled = file.canLoadFullImage()
         val imageStateKey = fullUrl ?: thumbnailUrl ?: "img-$idx"
         val imageState =
             remember(imageStateKey) {
@@ -390,24 +407,27 @@ internal fun PostDetailPage(
                 createPostAttachmentImageState(thumbnailUrl = thumbnailUrl, fullUrl = fullUrl)
               }
             }
-        PostAttachmentImage(
-            thumbnailUrl = thumbnailUrl,
-            fullUrl = fullUrl,
-            contentDescription = file.name,
-            aspectRatioCache = imageAspectRatios,
-            imageState = imageState,
-            fullImageEnabled = fullImageEnabled,
-            loadFullSizeImage =
-                fullImageEnabled && !fullUrl.isNullOrBlank() && fullUrl in requestedFullImageUrls,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-            shape = cardShape,
-            onFullSizeImageRequested = {
-              if (fullImageEnabled && !fullUrl.isNullOrBlank()) {
-                onFullImageRequested(fullUrl)
-              }
-            },
-            onClick = { onImageClick(idx) },
-        )
+        Column {
+          PostFileStatus(file, Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+          PostAttachmentImage(
+              thumbnailUrl = thumbnailUrl,
+              fullUrl = fullUrl,
+              contentDescription = file.name,
+              aspectRatioCache = imageAspectRatios,
+              imageState = imageState,
+              fullImageEnabled = fullImageEnabled,
+              loadFullSizeImage =
+                  fullImageEnabled && !fullUrl.isNullOrBlank() && fullUrl in requestedFullImageUrls,
+              modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+              shape = cardShape,
+              onFullSizeImageRequested = {
+                if (fullImageEnabled && !fullUrl.isNullOrBlank()) {
+                  onFullImageRequested(fullUrl)
+                }
+              },
+              onClick = { onImageClick(idx) },
+          )
+        }
       }
 
       if (loadingAttachmentSkeletonCount > 0) {

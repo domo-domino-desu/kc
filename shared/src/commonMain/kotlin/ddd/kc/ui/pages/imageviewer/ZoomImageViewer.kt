@@ -31,6 +31,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.github.panpf.zoomimage.CoilZoomAsyncImage
@@ -42,6 +44,7 @@ import ddd.kc.ui.components.CenterCircularWavyImageLoadingProgress
 import ddd.kc.ui.components.ImageLoadLifecycleState
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.rememberImageLoadProgressState
+import ddd.kc.ui.components.uiTestState
 import ddd.kc.utils.logging.KcLog
 import kc.shared.generated.resources.Res
 import kc.shared.generated.resources.close
@@ -102,7 +105,11 @@ internal fun ZoomImageViewer(
     HorizontalPager(
         state = pagerState,
         key = { images[it].key },
-        modifier = Modifier.fillMaxSize(),
+        modifier =
+            Modifier.fillMaxSize().testTag("image-pager").semantics {
+              uiTestState =
+                  "page=${pagerState.currentPage};count=${pagerState.pageCount};settled=${pagerState.settledPage};scrolling=${pagerState.isScrollInProgress}"
+            },
     ) { page ->
       val image = images.getOrNull(page) ?: return@HorizontalPager
       ZoomImagePage(
@@ -118,7 +125,7 @@ internal fun ZoomImageViewer(
                 .safeDrawingPadding()
                 .padding(top = 48.dp, start = 16.dp, end = 16.dp)
                 .background(Color.Black.copy(alpha = 0.4f), MaterialTheme.shapes.small)
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
       Text(
           text =
@@ -130,7 +137,11 @@ internal fun ZoomImageViewer(
 
     IconButton(
         onClick = onClose,
-        modifier = Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(16.dp),
+        modifier =
+            Modifier.testTag("image-close")
+                .align(Alignment.TopStart)
+                .safeDrawingPadding()
+                .padding(16.dp),
     ) {
       Icon(
           imageVector = Icons.CloseW400Outlined,
@@ -147,6 +158,7 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -
   var isLoading by remember(fullUrl) { mutableStateOf(true) }
   var loadFailed by remember(fullUrl) { mutableStateOf(false) }
   var loadLifecycleState by remember(fullUrl) { mutableStateOf(ImageLoadLifecycleState.Idle) }
+  var failureKind by remember(fullUrl) { mutableStateOf("") }
   val progressState =
       rememberImageLoadProgressState(progressKey = fullUrl, lifecycleState = loadLifecycleState)
   val zoomState = rememberCoilZoomState()
@@ -160,7 +172,13 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -
           thumbnailUrl = thumbnailUrl,
           contentDescription = null,
           contentScale = ContentScale.Fit,
-          modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
+          modifier = Modifier.fillMaxSize().testTag("zoom-image-gif").clickable(onClick = onClick),
+          onLoadStateChanged = { state ->
+            loadLifecycleState = state
+            isLoading =
+                state == ImageLoadLifecycleState.Idle || state == ImageLoadLifecycleState.Loading
+            loadFailed = state == ImageLoadLifecycleState.Error
+          },
       )
       if (isLoading) {
         CenterCircularWavyImageLoadingProgress(
@@ -183,8 +201,13 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -
     CoilZoomAsyncImage(
         model = fullUrl,
         contentDescription = null,
-        modifier = Modifier.fillMaxSize(),
+        modifier =
+            Modifier.fillMaxSize().testTag("zoom-image").semantics {
+              uiTestState =
+                  "load=$loadLifecycleState;failure=$failureKind;scale=${zoomState.zoomable.transform.scaleX};x=${zoomState.zoomable.transform.offsetX};y=${zoomState.zoomable.transform.offsetY}"
+            },
         onLoading = {
+          failureKind = ""
           isLoading = true
           loadFailed = false
           loadLifecycleState = ImageLoadLifecycleState.Loading
@@ -195,6 +218,10 @@ private fun ZoomImagePage(fullUrl: String?, thumbnailUrl: String?, onClick: () -
           loadLifecycleState = ImageLoadLifecycleState.Success
         },
         onError = { error ->
+          val cause = error.result.throwable
+          val status =
+              Regex("HTTP (\\d{3})").find(cause.message.orEmpty())?.groupValues?.get(1).orEmpty()
+          failureKind = "${cause::class.simpleName.orEmpty()}:$status"
           isLoading = false
           loadFailed = true
           loadLifecycleState = ImageLoadLifecycleState.Error

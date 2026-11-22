@@ -6,13 +6,19 @@ import ddd.kc.data.model.Comment
 import ddd.kc.data.model.Creator
 import ddd.kc.data.model.PageInfo
 import ddd.kc.data.model.Post
+import ddd.kc.data.model.PostFile
 import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.QueryError
 import ddd.kc.data.model.allFiles
+import ddd.kc.data.model.canLoadFullImage
 import ddd.kc.data.model.creatorId
 import ddd.kc.data.model.creatorKey
+import ddd.kc.data.model.downloadUrl
+import ddd.kc.data.model.fullUrl
 import ddd.kc.data.model.imageFiles
+import ddd.kc.data.model.isTemporary
 import ddd.kc.data.model.key
+import ddd.kc.data.model.needsTemporaryUrlRefresh
 import ddd.kc.data.remote.network.toQueryError
 import ddd.kc.data.remote.repository.CreatorRepository
 import ddd.kc.data.remote.repository.PostRepository
@@ -362,6 +368,68 @@ class PostScreenModel(
         current.copy(requestedFullImageUrls = current.requestedFullImageUrls + (postKey to merged))
   }
 
+  /** Re-sign short-lived links independently of the file's retention date. */
+  suspend fun freshMediaPost(post: Post, forceRefresh: Boolean = false): Post {
+    val current = mutableState.value.posts.firstOrNull { it.key == post.key } ?: post
+    if (!forceRefresh && current.allFiles().none { it.needsTemporaryUrlRefresh() }) return current
+    val fresh = postRepo.getPost(post.service, post.creatorId, post.id, forceRefresh = true)
+    val state = mutableState.value
+    val requested = state.requestedFullImageUrls[post.key].orEmpty()
+    val previousTemporary = current.imageFiles().filter { it.isTemporary() }
+    val staleUrls = previousTemporary.mapNotNull { it.tempUrl ?: it.tempDownloadUrl }.toSet()
+    val renewed =
+        fresh
+            .imageFiles()
+            .filter { updated ->
+              previousTemporary.any { previous ->
+                previous.path == updated.path &&
+                    previous.name == updated.name &&
+                    (previous.tempUrl ?: previous.tempDownloadUrl) in requested
+              }
+            }
+            .mapNotNull { it.tempUrl ?: it.tempDownloadUrl }
+            .toSet()
+    val refreshedRequests = (requested - staleUrls) + renewed
+    mutableState.value =
+        state.copy(
+            requestedFullImageUrls = state.requestedFullImageUrls + (post.key to refreshedRequests),
+            paging =
+                state.paging.copy(
+                    items = state.posts.map { if (it.key == fresh.key) fresh else it }
+                ),
+        )
+    return fresh
+  }
+
+  suspend fun requestFreshFullImages(post: Post, urls: Collection<String>, cdnUrl: String) {
+    val wanted = post.imageFiles().filter { it.fullUrl(cdnUrl) in urls }
+    val fresh = freshMediaPost(post)
+    val resolved =
+        fresh
+            .imageFiles()
+            .filter { candidate ->
+              wanted.any { it.path == candidate.path && it.name == candidate.name }
+            }
+            .filter { it.canLoadFullImage() }
+            .mapNotNull { it.fullUrl(cdnUrl) }
+    if (resolved.isEmpty() && urls.isNotEmpty()) error("File unavailable")
+    requestFullImages(fresh.key, resolved)
+  }
+
+  suspend fun downloadAttachment(
+      post: Post,
+      file: PostFile,
+      cdnUrl: String,
+      write: (ByteArray, Int) -> Unit,
+  ) {
+    val fresh = freshMediaPost(post, forceRefresh = file.isTemporary())
+    val resolved =
+        fresh.allFiles().firstOrNull { it.path == file.path && it.name == file.name }
+            ?: error("File unavailable")
+    val url = resolved.downloadUrl(cdnUrl) ?: error("File unavailable")
+    postRepo.downloadFileTo(url, write)
+  }
+
   suspend fun downloadFile(url: String): ByteArray = postRepo.downloadFile(url)
 
   fun loadCreatorInfo(post: Post) {
@@ -463,7 +531,10 @@ class PostScreenModel(
                       (post.key to
                           (mutableState.value.postTranslations[post.key]
                                   ?: ContentTranslationState())
-                              .copy(isTranslating = false, showTranslation = true))
+                              .copy(
+                                  isTranslating = false,
+                                  showTranslation = true,
+                              ))
           )
     }
   }

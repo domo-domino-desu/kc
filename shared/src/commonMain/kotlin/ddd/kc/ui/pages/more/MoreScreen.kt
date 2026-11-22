@@ -30,6 +30,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -334,12 +335,14 @@ class MoreScreen : AppScreen {
               title = stringResource(Res.string.history),
               subtitle = stringResource(Res.string.history_summary),
               onClick = { navigator.push(HistoryRouteScreen()) },
+              modifier = Modifier.testTag("more-history"),
           )
           SettingsListItem(
               icon = Icons.SearchW400Outlined,
               title = stringResource(Res.string.search_history),
               subtitle = stringResource(Res.string.search_history_summary),
               onClick = { navigator.push(SearchHistoryRouteScreen()) },
+              modifier = Modifier.testTag("more-search-history"),
           )
           SettingsListItem(
               icon = Icons.FavoriteW400Outlined,
@@ -355,12 +358,14 @@ class MoreScreen : AppScreen {
               title = stringResource(Res.string.settings),
               subtitle = stringResource(Res.string.settings_summary),
               onClick = { navigator.push(SettingsRouteScreen()) },
+              modifier = Modifier.testTag("more-settings"),
           )
           SettingsListItem(
               icon = Icons.AttributionW400Outlined,
               title = stringResource(Res.string.about),
               subtitle = stringResource(Res.string.about_summary),
               onClick = { navigator.push(AboutRouteScreen()) },
+              modifier = Modifier.testTag("more-about"),
               showDivider = false,
           )
         }

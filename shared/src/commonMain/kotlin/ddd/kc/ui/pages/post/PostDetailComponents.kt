@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import be.digitalia.compose.htmlconverter.htmlToAnnotatedString
@@ -43,13 +44,17 @@ import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
 import ddd.kc.data.model.Comment
 import ddd.kc.data.model.PostFile
+import ddd.kc.data.model.canDownload
 import ddd.kc.data.model.fullUrl
+import ddd.kc.data.model.isExpired
+import ddd.kc.data.model.isTemporary
 import ddd.kc.data.model.thumbnailUrl
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.DownloadW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.HdW400OutlinedFill
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.LinkW400Outlined
+import ddd.kc.generated.symbols.icons.materialsymbols.icons.ScheduleW400Outlined
 import ddd.kc.ui.components.ImageLoadLifecycleState
 import ddd.kc.ui.components.NetworkImage
 import ddd.kc.ui.components.PlatformVideoPlayer
@@ -60,6 +65,10 @@ import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.ui.components.rememberImageLoadProgressState
 import ddd.kc.utils.collapseConsecutiveBlankLines
 import kc.shared.generated.resources.Res
+import kc.shared.generated.resources.attachment_expired
+import kc.shared.generated.resources.attachment_expires
+import kc.shared.generated.resources.attachment_temporary
+import kc.shared.generated.resources.attachment_unavailable
 import kc.shared.generated.resources.load_full_size_images
 import kc.shared.generated.resources.post_not_archived
 import org.jetbrains.compose.resources.stringResource
@@ -187,10 +196,14 @@ internal fun PostAttachmentSkeleton(
 @Composable
 internal fun AttachmentRow(file: PostFile, isDownloading: Boolean, onDownload: () -> Unit) {
   val displayName = file.name ?: file.path?.substringAfterLast('/') ?: "attachment"
+  val available = file.canDownload()
   Row(
       modifier =
           Modifier.fillMaxWidth()
-              .then(if (!isDownloading) Modifier.clickable(onClick = onDownload) else Modifier)
+              .then(
+                  if (!isDownloading && available) Modifier.clickable(onClick = onDownload)
+                  else Modifier
+              )
               .padding(horizontal = 14.dp, vertical = 8.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -205,10 +218,48 @@ internal fun AttachmentRow(file: PostFile, isDownloading: Boolean, onDownload: (
       )
     }
     Spacer(Modifier.width(10.dp))
+    Column(modifier = Modifier.weight(1f)) {
+      Text(
+          text = displayName,
+          style = MaterialTheme.typography.bodySmall,
+      )
+      PostFileStatus(file)
+    }
+  }
+}
+
+@Composable
+internal fun PostFileStatus(file: PostFile, modifier: Modifier = Modifier) {
+  val text =
+      when {
+        file.isExpired() -> stringResource(Res.string.attachment_expired)
+        file.isTemporary() &&
+            file.tempUrl.isNullOrBlank() &&
+            file.tempDownloadUrl.isNullOrBlank() ->
+            stringResource(Res.string.attachment_unavailable)
+        file.isTemporary() ->
+            file.tempExpires?.let { stringResource(Res.string.attachment_expires, it.take(10)) }
+                ?: stringResource(Res.string.attachment_temporary)
+        file.deferred || file.previewOnly -> stringResource(Res.string.attachment_unavailable)
+        else -> return
+      }
+  Row(
+      modifier = modifier,
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    Icon(
+        Icons.ScheduleW400Outlined,
+        null,
+        modifier = Modifier.size(14.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     Text(
-        text = displayName,
-        style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.weight(1f),
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color =
+            if (file.isExpired()) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant,
     )
   }
 }
@@ -236,7 +287,7 @@ internal fun PostAttachmentVideo(
           PlatformVideoPlayer(url = url, modifier = Modifier.fillMaxSize())
         } else {
           Text(
-              text = file.name ?: "video",
+              text = stringResource(Res.string.attachment_unavailable),
               style = MaterialTheme.typography.bodySmall,
               color = androidx.compose.ui.graphics.Color.White,
           )
@@ -459,7 +510,11 @@ internal fun PostAttachmentImage(
               .fillMaxWidth()
               .aspectRatio(aspectRatio ?: 1f)
               .clip(shape)
-              .then(if (fullImageEnabled) Modifier.clickable(onClick = clickAction) else Modifier),
+              .then(
+                  if (fullImageEnabled)
+                      Modifier.testTag("image-open").clickable(onClick = clickAction)
+                  else Modifier
+              ),
       onLoading = { imageState.loadLifecycleState = ImageLoadLifecycleState.Loading },
       onSuccess = { state ->
         imageState.loadLifecycleState = ImageLoadLifecycleState.Success

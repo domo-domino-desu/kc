@@ -825,6 +825,15 @@ class CreatorScreenModel(
     }
   }
 
+  fun onCreatorPostNavigationEffectHandled(creator: Creator, transactionId: Long) {
+    val current = getCreatorPostSnapshot(creator)
+    val next = postReducer.consumeNavigationEffect(current, transactionId)
+    mutableState.value =
+        mutableState.value.copy(
+            creatorPostSnapshots = mutableState.value.creatorPostSnapshots + (creator.key to next)
+        )
+  }
+
   fun onCreatorPostViewportChanged(creator: Creator, anchor: PagingAnchor) {
     val current = getCreatorPostSnapshot(creator)
     val next =

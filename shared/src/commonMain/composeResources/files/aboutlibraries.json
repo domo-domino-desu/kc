@@ -1114,6 +1114,19 @@
       "funding": []
     },
     {
+      "uniqueId": "androidx.media3:media3-exoplayer-hls",
+      "artifactVersion": "1.10.1",
+      "name": "Media3 ExoPlayer HLS module",
+      "description": "Media3 ExoPlayer HLS module",
+      "developers": [{ "name": "The Android Open Source Project" }],
+      "scm": {
+        "connection": "scm:git:https://github.com/androidx/media.git",
+        "url": "https://github.com/androidx/media"
+      },
+      "licenses": ["Apache-2.0"],
+      "funding": []
+    },
+    {
       "uniqueId": "androidx.media3:media3-extractor",
       "artifactVersion": "1.10.1",
       "name": "Media3 Extractor module",
@@ -2132,7 +2145,7 @@
     },
     {
       "uniqueId": "io.github.panpf.zoomimage:zoomimage-compose",
-      "artifactVersion": "1.6.0",
+      "artifactVersion": "1.7.0-alpha01",
       "name": "ZoomImage",
       "description": "ZoomImage is an gesture zoom viewing of images library specially designed for Compose Multiplatform and Android View. Supported scale, pan, locate, rotation, and super-large image subsampling.",
       "website": "https://github.com/panpf/zoomimage",
@@ -2147,7 +2160,7 @@
     },
     {
       "uniqueId": "io.github.panpf.zoomimage:zoomimage-compose-coil3",
-      "artifactVersion": "1.6.0",
+      "artifactVersion": "1.7.0-alpha01",
       "name": "ZoomImage",
       "description": "ZoomImage is an gesture zoom viewing of images library specially designed for Compose Multiplatform and Android View. Supported scale, pan, locate, rotation, and super-large image subsampling.",
       "website": "https://github.com/panpf/zoomimage",
@@ -2162,7 +2175,7 @@
     },
     {
       "uniqueId": "io.github.panpf.zoomimage:zoomimage-compose-coil3-core",
-      "artifactVersion": "1.6.0",
+      "artifactVersion": "1.7.0-alpha01",
       "name": "ZoomImage",
       "description": "ZoomImage is an gesture zoom viewing of images library specially designed for Compose Multiplatform and Android View. Supported scale, pan, locate, rotation, and super-large image subsampling.",
       "website": "https://github.com/panpf/zoomimage",
@@ -2177,7 +2190,7 @@
     },
     {
       "uniqueId": "io.github.panpf.zoomimage:zoomimage-core",
-      "artifactVersion": "1.6.0",
+      "artifactVersion": "1.7.0-alpha01",
       "name": "ZoomImage",
       "description": "ZoomImage is an gesture zoom viewing of images library specially designed for Compose Multiplatform and Android View. Supported scale, pan, locate, rotation, and super-large image subsampling.",
       "website": "https://github.com/panpf/zoomimage",
@@ -2192,7 +2205,7 @@
     },
     {
       "uniqueId": "io.github.panpf.zoomimage:zoomimage-core-coil3",
-      "artifactVersion": "1.6.0",
+      "artifactVersion": "1.7.0-alpha01",
       "name": "ZoomImage",
       "description": "ZoomImage is an gesture zoom viewing of images library specially designed for Compose Multiplatform and Android View. Supported scale, pan, locate, rotation, and super-large image subsampling.",
       "website": "https://github.com/panpf/zoomimage",

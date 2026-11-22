@@ -21,6 +21,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -32,6 +34,7 @@ import ddd.kc.data.model.key
 import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
 import ddd.kc.ui.app.navigation.nextRouteInstanceKey
+import ddd.kc.ui.components.uiTestState
 import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.ui.pages.tagposts.TagPostsScreen
@@ -117,7 +120,14 @@ private constructor(
               }
             }
     ) {
-      HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+      HorizontalPager(
+          state = pagerState,
+          modifier =
+              Modifier.fillMaxSize().testTag("detail-pager").semantics {
+                uiTestState =
+                    "page=${pagerState.currentPage};count=${pagerState.pageCount};settled=${pagerState.settledPage};scrolling=${pagerState.isScrollInProgress}"
+              },
+      ) { page ->
         val creator = state.creators.getOrNull(page) ?: return@HorizontalPager
         LaunchedEffect(creator.service, creator.id) {
           historyRepository.recordCreatorVisit(creator)

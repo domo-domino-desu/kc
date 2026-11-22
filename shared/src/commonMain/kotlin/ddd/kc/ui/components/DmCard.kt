@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,7 +58,7 @@ fun DmCard(
       shape = RoundedCornerShape(8.dp),
       border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
       color = MaterialTheme.colorScheme.surface,
-      modifier = modifier.fillMaxWidth(),
+      modifier = modifier.fillMaxWidth().testTag("dm-card"),
   ) {
     Column(modifier = Modifier.padding(12.dp)) {
       Row(verticalAlignment = Alignment.Top) {

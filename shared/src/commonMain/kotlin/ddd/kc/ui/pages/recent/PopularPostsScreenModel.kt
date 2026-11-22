@@ -154,6 +154,10 @@ class PopularPostsScreenModel(
     }
   }
 
+  fun onNavigationEffectHandled(transactionId: Long) {
+    updatePaging(reducer.consumeNavigationEffect(mutableState.value.paging, transactionId))
+  }
+
   fun onViewportChanged(anchor: PagingAnchor) {
     updatePaging(
         reducer.updateViewport(

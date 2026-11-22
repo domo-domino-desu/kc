@@ -42,6 +42,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -69,6 +71,7 @@ import ddd.kc.ui.components.gridSkeletonItems
 import ddd.kc.ui.components.isAtTop
 import ddd.kc.ui.components.paging.ScrollPosition
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
+import ddd.kc.ui.components.uiTestState
 import ddd.kc.ui.pages.post.PostPagingContext
 import ddd.kc.ui.pages.post.PostRouteScreen
 import ddd.kc.ui.pages.recent.PopularDateBoundary
@@ -233,6 +236,7 @@ private fun PopularWorksContent(
               onLoadPrevious = popularModel::loadPrevious,
               onJumpToPage = popularModel::jumpToPage,
               onViewportChanged = popularModel::onViewportChanged,
+              onNavigationEffectHandled = popularModel::onNavigationEffectHandled,
               onPostClick = { post ->
                 log.i { "打开Post -> 点击来源(source=popular,${summarizePost(post)})" }
                 navigator.push(
@@ -340,6 +344,7 @@ private fun PostSearchContent(
               onLoadPrevious = screenModel::loadPrevious,
               onJumpToPage = screenModel::jumpToPage,
               onViewportChanged = screenModel::onViewportChanged,
+              onNavigationEffectHandled = screenModel::onNavigationEffectHandled,
               onPostClick = { post ->
                 log.i { "打开Post -> 点击来源(source=post-search,${summarizePost(post)})" }
                 navigator.push(
@@ -362,12 +367,17 @@ private fun PostSearchContent(
           ),
       gridState = gridState,
       minCardWidth = cellWidth.dp,
-      modifier = Modifier.fillMaxSize(),
+      modifier =
+          Modifier.fillMaxSize().testTag("search-results").semantics {
+            uiTestState =
+                "count=${state.posts.size};loading=${state.isLoading};pending=${state.hasPendingQuery};error=${state.error?.let { it::class.simpleName } ?: "None"}"
+          },
       contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
       leadingItemCount = if (state.hasPendingQuery) 3 else 2,
       leadingContent = {
         fullWidthItem(key = "search_bar") {
           OutlinedTextField(
+              modifier = Modifier.fillMaxWidth().testTag("search-input"),
               value = state.draftQuery,
               onValueChange = screenModel::onQueryChanged,
               placeholder = { Text(stringResource(Res.string.search_works_hint)) },
@@ -375,20 +385,27 @@ private fun PostSearchContent(
               keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
               keyboardActions = KeyboardActions(onSearch = { screenModel.submitSearch() }),
               trailingIcon = {
-                IconButton(onClick = screenModel::submitSearch, enabled = !state.isLoading) {
+                IconButton(
+                    modifier = Modifier.testTag("search-submit"),
+                    onClick = screenModel::submitSearch,
+                    enabled = state.canSubmitSearch,
+                ) {
                   Icon(
                       imageVector = Icons.SearchW400Outlined,
                       contentDescription = stringResource(Res.string.search_action),
                   )
                 }
               },
-              modifier = Modifier.fillMaxWidth(),
           )
         }
         fullWidthItem(key = "search_filter") {
-          CollapsibleFilterPanel(chips = listOf(aiFilterLabel(state.aiFilter))) {
-            AiFilterField(state.aiFilter, screenModel::onAiFilterChanged)
-          }
+          PostSearchFilterPanel(
+              filters = state.draftFilters,
+              aiFilter = state.aiFilter,
+              onFiltersChanged = screenModel::onFiltersChanged,
+              onAiFilterChanged = screenModel::onAiFilterChanged,
+              onSubmit = screenModel::submitSearch,
+          )
         }
         if (state.hasPendingQuery) {
           fullWidthItem(key = "search_prompt") {

@@ -119,6 +119,8 @@ kotlin {
 
     named("androidMain") {
       dependencies {
+        // Temporary video playback URLs are HLS playlists, distinct from MP4 download URLs.
+        implementation(libs.media3.exoplayer.hls)
         implementation(libs.androidx.activity.compose)
         implementation(libs.coil.gif)
         implementation(libs.documentfile)
@@ -129,6 +131,8 @@ kotlin {
 
     named("desktopTest") {
       dependencies {
+        implementation(compose.desktop.currentOs)
+        implementation(libs.compose.ui.test.junit4)
         implementation(kotlin("test"))
         implementation(libs.ktor.client.mock)
         implementation(libs.ktor.client.okhttp)
@@ -212,6 +216,7 @@ symbolCraft {
       "close",
       "comment",
       "date_range",
+      "schedule",
       "download",
       "expand_more",
       "explore",
@@ -258,15 +263,15 @@ symbolCraft {
   }
 
   externalIcons("discord", libraryName = "fontawesomebrands") {
-    urlTemplate = "https://api.iconify.design/fa7-brands:{name}.svg"
+    urlTemplate = "https://api.iconify.design/fa7-brands/{name}.svg"
   }
 
   externalIcons("github", libraryName = "fontawesomebrands") {
-    urlTemplate = "https://api.iconify.design/fa7-brands:{name}.svg"
+    urlTemplate = "https://api.iconify.design/fa7-brands/{name}.svg"
   }
 
   externalIcons("patreon", libraryName = "mdi") {
-    urlTemplate = "https://api.iconify.design/mdi:{name}.svg"
+    urlTemplate = "https://api.iconify.design/mdi/{name}.svg"
   }
 
   externalIcons(
@@ -277,15 +282,15 @@ symbolCraft {
       "pixiv",
       libraryName = "simpleicons",
   ) {
-    urlTemplate = "https://api.iconify.design/simple-icons:{name}.svg"
+    urlTemplate = "https://api.iconify.design/simple-icons/{name}.svg"
   }
 
   externalIcons("fansly", libraryName = "arcticons") {
-    urlTemplate = "https://api.iconify.design/arcticons:{name}.svg"
+    urlTemplate = "https://api.iconify.design/arcticons/{name}.svg"
   }
 
   externalIcons("section", libraryName = "lucide") {
-    urlTemplate = "https://api.iconify.design/lucide:{name}.svg"
+    urlTemplate = "https://api.iconify.design/lucide/{name}.svg"
   }
 
   localIcons(libraryName = "service") { directory = "../assets" }
@@ -301,6 +306,11 @@ val symbolCraftConsumerTasks =
         "kspKotlinDesktop",
     )
 
+tasks.named("generateSymbolCraftIcons") {
+  // URL templates are configuration too; changing a broken source must invalidate generated icons.
+  inputs.file(project.file("build.gradle.kts"))
+}
+
 tasks.configureEach {
   if (name in symbolCraftConsumerTasks) {
     dependsOn("generateSymbolCraftIcons")
@@ -309,3 +319,8 @@ tasks.configureEach {
     dependsOn(generateAboutMetadata)
   }
 }
+
+// Export updates the checked-in resource snapshot; order it before resource copying when requested.
+tasks
+    .matching { it.name == "copyNonXmlValueResourcesForCommonMain" }
+    .configureEach { mustRunAfter("exportLibraryDefinitions") }

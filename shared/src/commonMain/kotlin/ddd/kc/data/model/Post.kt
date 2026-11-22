@@ -52,10 +52,7 @@ data class PostEmbed(
     val description: String? = null,
 )
 
-@Serializable
-data class PostPoll(
-    val options: List<PostPollOption> = emptyList(),
-)
+@Serializable data class PostPoll(val options: List<PostPollOption> = emptyList())
 
 @Serializable data class PostPollOption(val text: String = "")
 
@@ -66,8 +63,8 @@ data class PostCaption(
 )
 
 fun Post.allFiles(): List<PostFile> = buildList {
-  file?.takeIf { it.hasPath() }?.let { add(it) }
-  addAll(attachments.filter { it.hasPath() })
+  file?.takeIf { it.hasPath() || it.isTemporary() }?.let { add(it) }
+  addAll(attachments.filter { it.hasPath() || it.isTemporary() })
 }
 
 fun Post.imageFiles(): List<PostFile> = allFiles().filter { it.isImage() }

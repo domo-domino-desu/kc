@@ -17,6 +17,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ddd.kc.data.model.PageInfo
@@ -46,6 +48,7 @@ data class PostGridPagingActions(
     val onLoadPrevious: () -> Unit,
     val onJumpToPage: (Int) -> Unit,
     val onViewportChanged: (PagingAnchor) -> Unit,
+    val onNavigationEffectHandled: (Long) -> Unit,
     val onPostClick: (Post) -> Unit,
 )
 
@@ -75,7 +78,11 @@ fun PagedPostGrid(
       LazyVerticalGrid(
           columns = GridCells.Adaptive(minSize = minCardWidth),
           state = gridState,
-          modifier = Modifier.fillMaxSize(),
+          modifier =
+              Modifier.fillMaxSize().testTag("browse-list").semantics {
+                uiTestState =
+                    "index=${gridState.firstVisibleItemIndex};offset=${gridState.firstVisibleItemScrollOffset};scrolling=${gridState.isScrollInProgress}"
+              },
           contentPadding = contentPadding,
           verticalArrangement = Arrangement.spacedBy(8.dp),
           horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -128,7 +135,7 @@ fun BoxScope.PostGridPagingControls(
     gridState: LazyGridState,
     leadingItemCount: Int = 0,
 ) {
-  LaunchedEffect(gridState, leadingItemCount) {
+  LaunchedEffect(gridState, leadingItemCount, state.posts) {
     snapshotFlow {
           val relativeIndex = (gridState.firstVisibleItemIndex - leadingItemCount).coerceAtLeast(0)
           PagingAnchor(
@@ -155,6 +162,7 @@ fun BoxScope.PostGridPagingControls(
       is PagingEffect.RebaseSelection,
       null -> Unit
     }
+    state.navigationEffect?.let { actions.onNavigationEffectHandled(it.transactionId) }
   }
   AutoLoadEffect(
       gridState,

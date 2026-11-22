@@ -57,6 +57,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -104,6 +106,7 @@ import ddd.kc.ui.components.paging.PagingEffect
 import ddd.kc.ui.components.paging.TranslationBlockState
 import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.ui.components.previousPageHeader
+import ddd.kc.ui.components.uiTestState
 import ddd.kc.ui.pages.imageviewer.ImageViewerScreen
 import ddd.kc.utils.collapseConsecutiveBlankLines
 import kc.shared.generated.resources.Res
@@ -254,11 +257,29 @@ internal fun CreatorDetailPage(
         onRefresh = refresh,
         modifier = Modifier.fillMaxSize().padding(paddingValues),
     ) {
-      Box(modifier = Modifier.fillMaxSize()) {
+      Box(
+          modifier =
+              Modifier.fillMaxSize().testTag("creator-content").semantics {
+                val error =
+                    when (selectedTab) {
+                      CreatorContentTab.ANNOUNCEMENTS ->
+                          state.announcementErrors[creator.key] != null
+                      CreatorContentTab.TAGS -> state.tagErrors[creator.key] != null
+                      CreatorContentTab.COMMUNITY -> community.error != null
+                      CreatorContentTab.POSTS -> false
+                    }
+                uiTestState =
+                    "tab=${selectedTab.name};loading=$isCurrentTabLoading;error=$error;community=${community.available}"
+              }
+      ) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = cellWidth.dp),
             state = gridState,
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier.fillMaxSize().testTag("browse-list").semantics {
+                  uiTestState =
+                      "index=${gridState.firstVisibleItemIndex};offset=${gridState.firstVisibleItemScrollOffset};scrolling=${gridState.isScrollInProgress}"
+                },
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -457,6 +478,7 @@ internal fun CreatorDetailPage(
                   ) {
                     tags.forEach { tag ->
                       AssistChip(
+                          modifier = Modifier.testTag("artist-tag"),
                           onClick = { onTagClick(tag.tag) },
                           label = { Text(tag.tag) },
                       )
@@ -571,6 +593,9 @@ internal fun CreatorDetailPage(
                       onViewportChanged = { anchor ->
                         screenModel.onCreatorPostViewportChanged(creator, anchor)
                       },
+                      onNavigationEffectHandled = {
+                        screenModel.onCreatorPostNavigationEffectHandled(creator, it)
+                      },
                       onPostClick = {},
                   ),
               gridState = gridState,
@@ -662,7 +687,10 @@ private fun CommunityMessageItem(
 ) {
   val uriHandler = LocalUriHandler.current
   Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+      modifier =
+          Modifier.fillMaxWidth()
+              .testTag("community-card")
+              .padding(horizontal = 8.dp, vertical = 4.dp),
       horizontalArrangement = Arrangement.spacedBy(10.dp),
       verticalAlignment = Alignment.Top,
   ) {

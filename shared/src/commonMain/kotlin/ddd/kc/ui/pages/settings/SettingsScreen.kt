@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -262,6 +263,7 @@ internal fun SettingsScreen(
   NavigationBackHandler(enabled = true) { requestExit(PendingExitAction.Back) }
 
   Scaffold(
+      modifier = Modifier.testTag("settings-screen"),
       topBar = {
         TopAppBar(
             title = { Text(stringResource(Res.string.settings)) },
@@ -293,7 +295,7 @@ internal fun SettingsScreen(
               }
             },
         )
-      }
+      },
   ) { innerPadding ->
     LazyColumn(
         state = listState,

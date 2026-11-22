@@ -8,6 +8,7 @@ import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.PagedResult
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
+import ddd.kc.data.model.PostSearchFilters
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.SearchKind
 import ddd.kc.data.model.key
@@ -31,6 +32,7 @@ data class PostSearchState(
     val aiFilter: AiFilterMode = AiFilterMode.SHOW,
     val draftQuery: String = "",
     val appliedQuery: String = "",
+    val draftFilters: PostSearchFilters = PostSearchFilters(),
     val defaultPopularDate: String? = null,
     val paging: OffsetPagingState<Post> = OffsetPagingState(),
 ) {
@@ -38,7 +40,10 @@ data class PostSearchState(
     get() = appliedQuery
 
   val hasPendingQuery
-    get() = draftQuery.trim() != appliedQuery
+    get() = draftFilters.query(draftQuery) != appliedQuery || draftFilters.error != null
+
+  val canSubmitSearch
+    get() = draftFilters.error == null && (!isLoading || hasPendingQuery)
 
   val posts
     get() = paging.items
@@ -107,9 +112,11 @@ class PostSearchScreenModel(
   }
 
   fun onQueryChanged(query: String) {
-    searchJob?.cancel()
-    generation++
     mutableState.value = mutableState.value.copy(draftQuery = query)
+  }
+
+  fun onFiltersChanged(filters: PostSearchFilters) {
+    mutableState.value = mutableState.value.copy(draftFilters = filters)
   }
 
   fun onAiFilterChanged(value: AiFilterMode) {
@@ -128,14 +135,17 @@ class PostSearchScreenModel(
   }
 
   fun submitSearch() {
-    val query = mutableState.value.draftQuery.trim()
+    val draft = mutableState.value
+    if (draft.draftFilters.error != null) return
+    val query = draft.draftFilters.query(draft.draftQuery)
     searchJob?.cancel()
     val requestGeneration = ++generation
     mutableState.value =
         PostSearchState(
             aiFilter = mutableState.value.aiFilter,
-            draftQuery = query,
+            draftQuery = draft.draftQuery.trim(),
             appliedQuery = query,
+            draftFilters = draft.draftFilters,
             defaultPopularDate = mutableState.value.defaultPopularDate,
         )
     searchJob =
@@ -180,6 +190,10 @@ class PostSearchScreenModel(
     screenModelScope.launch {
       fetchPage(offset, replace = true, rollback = previous, requestGeneration = requestGeneration)
     }
+  }
+
+  fun onNavigationEffectHandled(transactionId: Long) {
+    updatePaging(reducer.consumeNavigationEffect(mutableState.value.paging, transactionId))
   }
 
   fun onViewportChanged(anchor: PagingAnchor) {
@@ -284,7 +298,7 @@ class PostSearchScreenModel(
                     null,
                     null,
                     mutableState.value.aiFilter,
-                    true,
+                    false,
                 )
                 .awaitData()
           }

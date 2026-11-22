@@ -276,4 +276,26 @@
   <string name="settings_error_api_key_empty">API Key cannot be empty.</string>
   <string name="settings_error_model_empty">Model cannot be empty.</string>
   <string name="settings_error_prompt_empty">Prompt template cannot be empty.</string>
+  <string name="search_filter_all">Any</string>
+  <string name="search_filter_scope">Match in</string>
+  <string name="search_filter_title_only">Title only</string>
+  <string name="search_filter_title_content">Title and content</string>
+  <string name="search_filter_after">After date</string>
+  <string name="search_filter_before">Before date</string>
+  <string name="search_filter_service">Service</string>
+  <string name="search_filter_media">Attachment type</string>
+  <string name="search_filter_image">Image</string>
+  <string name="search_filter_video">Video</string>
+  <string name="search_filter_audio">Audio</string>
+  <string name="search_filter_archive">Archive</string>
+  <string name="search_filter_date_hint">YYYY-MM-DD</string>
+  <string name="search_filter_invalid_date">Enter a valid date in YYYY-MM-DD format.</string>
+  <string name="search_filter_invalid_range">The after date must be earlier than the before date.</string>
+  <string name="search_syntax_help">Search syntax</string>
+  <string name="search_syntax_details">Words match the title or content. Use "exact phrase", -word or -"a phrase" to exclude, intitle:word or intitle:"a phrase", after:2026-01-01, before:2026-12, service:patreon, and has:image / has:video / has:audio / has:archive. Filters are applied when you search.</string>
+  <string name="attachment_temporary">Temporary file</string>
+  <string name="attachment_expires">Available until %1$s</string>
+  <string name="attachment_expired">Temporary file has expired</string>
+  <string name="attachment_unavailable">Original file is currently unavailable</string>
+  <string name="attachment_temporary_notice">Temporary files are kept for about a month after the latest import and may disappear earlier. Each re-import can extend availability. Download files you want to keep.</string>
 </resources>

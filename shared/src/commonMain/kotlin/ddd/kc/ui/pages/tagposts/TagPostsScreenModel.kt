@@ -136,6 +136,10 @@ class TagPostsScreenModel(
     }
   }
 
+  fun onNavigationEffectHandled(transactionId: Long) {
+    mutableState.value = reducer.consumeNavigationEffect(mutableState.value, transactionId)
+  }
+
   fun onViewportChanged(anchor: PagingAnchor) {
     mutableState.value =
         reducer.updateViewport(

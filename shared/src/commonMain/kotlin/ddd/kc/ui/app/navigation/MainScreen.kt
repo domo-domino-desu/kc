@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.Navigator
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
@@ -168,6 +169,7 @@ private fun BottomBarLayout(
           NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
             tabList.forEach { tab ->
               NavigationBarItem(
+                  modifier = Modifier.testTag("nav-${tab.key.name.lowercase()}"),
                   selected = selectedTab == tab.key,
                   onClick = { onTabSelected(tab.key) },
                   icon = {
@@ -207,6 +209,7 @@ private fun RailLayout(
         NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
           tabList.forEach { tab ->
             NavigationRailItem(
+                modifier = Modifier.testTag("nav-${tab.key.name.lowercase()}"),
                 selected = selectedTab == tab.key,
                 onClick = { onTabSelected(tab.key) },
                 icon = {

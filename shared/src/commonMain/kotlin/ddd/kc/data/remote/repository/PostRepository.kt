@@ -10,10 +10,13 @@ import ddd.kc.data.model.PopularPage
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
 import ddd.kc.data.model.QueryState
+import ddd.kc.data.model.allFiles
 import ddd.kc.data.model.creatorId
+import ddd.kc.data.model.needsTemporaryUrlRefresh
 import ddd.kc.data.remote.cache.CacheNamespace
 import ddd.kc.data.remote.cache.typedQueryStore
 import ddd.kc.data.remote.media.downloadMedia
+import ddd.kc.data.remote.media.downloadMediaTo
 import ddd.kc.data.remote.network.PawchiveApi
 import ddd.kc.data.remote.network.asException
 import ddd.kc.utils.logging.KcLog
@@ -148,7 +151,7 @@ class PostRepository(
         json = json,
         serializer = Post.serializer(),
         namespace = CacheNamespace.Detail,
-        cacheKey = { key -> "pawchive:${key.service}:${key.creatorId}:post:${key.id}" },
+        cacheKey = { key -> "pawchive:${key.service}:${key.creatorId}:post:${key.id}:v2" },
         fetch = { key ->
           api.parsePost(
               api.fetchPostBody(service = key.service, creatorId = key.creatorId, postId = key.id)
@@ -288,11 +291,15 @@ class PostRepository(
       service: String,
       creatorId: String,
       postId: String,
+      forceRefresh: Boolean = false,
   ): Post =
       withContext(ioContext) {
-        observePost(service, creatorId, postId).awaitData().also {
-          log.i { "加载Post详情 -> 成功(${summarizePost(it)})" }
-        }
+        val cached = observePost(service, creatorId, postId, forceRefresh).awaitData()
+        val post =
+            if (!forceRefresh && cached.allFiles().any { it.needsTemporaryUrlRefresh() })
+                observePost(service, creatorId, postId, forceRefresh = true).awaitData()
+            else cached
+        post.also { log.i { "加载Post详情 -> 成功(${summarizePost(it)})" } }
       }
 
   fun observeFavoritePosts(forceRefresh: Boolean = false): Flow<QueryState<List<Post>>> = flow {
@@ -348,13 +355,19 @@ class PostRepository(
   suspend fun downloadFile(url: String): ByteArray =
       withContext(ioContext) { httpClient.downloadMedia(url) }
 
+  suspend fun downloadFileTo(url: String, write: (ByteArray, Int) -> Unit) =
+      withContext(ioContext) { httpClient.downloadMediaTo(url, write) }
+
   private suspend fun deleteCacheGroup(prefix: String) {
     withContext(ioContext) { dao.deleteKeyAndPrefixed(prefix, "$prefix%") }
   }
 }
 
 internal suspend fun <T : Any> Flow<QueryState<T>>.awaitData(): T {
-  val state = filter { it.data != null || it.error != null }.first()
+  // first() cancels the upstream flow. Consuming the SWR snapshot here would cancel
+  // its refresh before the request starts, so expired pages could live forever.
+  val state =
+      filter { !it.isLoading && !it.isRefreshing && (it.data != null || it.error != null) }.first()
   state.error?.let { throw it.asException() }
   return requireNotNull(state.data)
 }

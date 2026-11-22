@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -114,23 +115,25 @@ class SearchHistoryRouteScreen(
                               MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f),
                           ),
                       modifier =
-                          Modifier.fillMaxWidth().clickable {
-                            when (record.kind) {
-                              SearchKind.POSTS -> {
-                                postSearchModel.onQueryChanged(record.query)
-                                postSearchModel.submitSearch()
-                                worksModel.selectTab(1)
-                                navigator.pop()
-                                tabNavigation.select(MainTab.Works)
-                              }
-                              SearchKind.DMS -> {
-                                dmSearchModel.onQueryChanged(record.query)
-                                dmSearchModel.submitSearch()
-                                navigator.pop()
-                                tabNavigation.select(MainTab.Dm)
-                              }
-                            }
-                          },
+                          Modifier.fillMaxWidth()
+                              .testTag("search-history-${record.kind.name.lowercase()}")
+                              .clickable {
+                                when (record.kind) {
+                                  SearchKind.POSTS -> {
+                                    postSearchModel.onQueryChanged(record.query)
+                                    postSearchModel.submitSearch()
+                                    worksModel.selectTab(1)
+                                    navigator.pop()
+                                    tabNavigation.select(MainTab.Works)
+                                  }
+                                  SearchKind.DMS -> {
+                                    dmSearchModel.onQueryChanged(record.query)
+                                    dmSearchModel.submitSearch()
+                                    navigator.pop()
+                                    tabNavigation.select(MainTab.Dm)
+                                  }
+                                }
+                              },
                   ) {
                     Text(
                         text = record.query,

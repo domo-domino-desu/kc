@@ -83,6 +83,7 @@ class TagPostsScreen(
                     onLoadPrevious = { screenModel.loadPrevious() },
                     onJumpToPage = { page -> screenModel.jumpToPage(page) },
                     onViewportChanged = screenModel::onViewportChanged,
+                    onNavigationEffectHandled = screenModel::onNavigationEffectHandled,
                     onPostClick = { post ->
                       log.i { "打开Post -> 点击来源(source=tag,${summarizePost(post)})" }
                       navigator.push(

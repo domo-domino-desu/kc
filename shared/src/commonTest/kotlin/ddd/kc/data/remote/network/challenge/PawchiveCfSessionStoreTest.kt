@@ -38,6 +38,24 @@ class PawchiveCfSessionStoreTest {
   fun baseAndMediaOriginsShareOneTrustGroupWithoutTrustingOtherHosts() {
     assertTrue(
         PawchiveOriginPolicy.isTrustedRequest(
+            "https://file.pawchive.st/data/file",
+            "https://pawchive.st",
+        )
+    )
+    assertFalse(
+        PawchiveOriginPolicy.isTrustedRequest(
+            "https://file.pawchive.st.evil.example/data/file",
+            "https://pawchive.st",
+        )
+    )
+    assertFalse(
+        PawchiveOriginPolicy.isTrustedRequest(
+            "http://file.pawchive.st/data/file",
+            "https://pawchive.st",
+        )
+    )
+    assertTrue(
+        PawchiveOriginPolicy.isTrustedRequest(
             "https://pawchive.st/api/v1/posts",
             "https://pawchive.st",
         )

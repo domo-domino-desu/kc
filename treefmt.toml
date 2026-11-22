@@ -1,5 +1,5 @@
 [global]
-excludes = ["shared/src/commonTest/resources/fixture/*.html"]
+excludes = ["shared/src/commonTest/resources/fixture/*.html", "shared/src/commonTest/resources/fixture/live/**"]
 
 [formatter.kotlin]
 command = "ktfmt"

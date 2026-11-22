@@ -15,10 +15,21 @@ object PawchiveOriginPolicy {
     return "${parsed.protocol.name}://$host$portSuffix"
   }
 
+  fun fileOrigin(siteOrigin: String): String? {
+    val parsed = parseHttpsOrigin(siteOrigin) ?: return null
+    val host = if (parsed.host.startsWith("file.")) parsed.host else "file.${parsed.host}"
+    val portSuffix =
+        if (parsed.specifiedPort == 0 || parsed.specifiedPort == parsed.protocol.defaultPort) ""
+        else ":${parsed.specifiedPort}"
+    return "${parsed.protocol.name}://$host$portSuffix"
+  }
+
   fun isTrustedRequest(requestUrl: String, siteOrigin: String): Boolean {
     val requestOrigin = parseHttpsOrigin(requestUrl)?.origin() ?: return false
     val normalizedSite = normalizedSiteOrigin(siteOrigin) ?: return false
-    return requestOrigin == normalizedSite || requestOrigin == mediaOrigin(normalizedSite)
+    return requestOrigin == normalizedSite ||
+        requestOrigin == mediaOrigin(normalizedSite) ||
+        requestOrigin == fileOrigin(normalizedSite)
   }
 
   private fun parseHttpsOrigin(raw: String): Url? {

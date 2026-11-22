@@ -82,8 +82,16 @@ fun parsePageInfo(body: String, currentOffset: Int = 0, pageSize: Int = PAGE_SIZ
       doc.select("a[href*=o=]")
           .mapNotNull { hrefQueryParam(it.attr("href"), "o")?.toIntOrNull() }
           .maxOrNull()
-  val lastOffset = countLastOffset ?: linkedLastOffset ?: return null
   val normalizedCurrentOffset = currentOffset.coerceAtLeast(0)
+  // A terminal page can expose only links to earlier pages. Its current offset
+  // still proves that those earlier links cannot be the last page.
+  val lastOffset =
+      maxOf(
+          countLastOffset
+              ?: linkedLastOffset
+              ?: if (normalizedCurrentOffset > 0) 0 else return null,
+          normalizedCurrentOffset,
+      )
   val currentPage = normalizedCurrentOffset / pageSize + 1
   val lastPage = lastOffset / pageSize + 1
   return PageInfo(
@@ -97,20 +105,32 @@ fun parsePageInfo(body: String, currentOffset: Int = 0, pageSize: Int = PAGE_SIZ
 fun parseCommunityPage(body: String, currentOffset: Int = 0): CommunityPage {
   val doc = Ksoup.parse(body)
   val lounges =
-      doc.select(".community__lounges .community__lounge[href]").mapNotNull { link ->
-        val parts = link.attr("href").substringBefore('?').split('/').filter(String::isNotBlank)
-        val id = parts.valueAfter("community") ?: return@mapNotNull null
-        val name = link.selectFirst(".community__lounge-name")?.text()?.trim().orEmpty()
-        if (name.isBlank()) return@mapNotNull null
-        CommunityLounge(
-            id = id,
-            name = name,
-            messageCount =
-                link.selectFirst(".community__lounge-count")?.text()?.trim()?.toIntOrNull() ?: 0,
-        )
-      }
+      doc.select(
+              ".chat-page__channels .chat-page__channel[href], .community__lounges .community__lounge[href]"
+          )
+          .mapNotNull { link ->
+            val parts = link.attr("href").substringBefore('?').split('/').filter(String::isNotBlank)
+            val id = parts.valueAfter("community") ?: return@mapNotNull null
+            val name =
+                link
+                    .selectFirst(".chat-page__channel-name, .community__lounge-name")
+                    ?.text()
+                    ?.trim()
+                    .orEmpty()
+            if (name.isBlank()) return@mapNotNull null
+            CommunityLounge(
+                id = id,
+                name = name,
+                messageCount =
+                    link
+                        .selectFirst(".chat-page__channel-count, .community__lounge-count")
+                        ?.text()
+                        ?.trim()
+                        ?.toIntOrNull() ?: 0,
+            )
+          }
   val selectedLoungeId =
-      doc.selectFirst(".community__lounge.is-active[href]")
+      doc.selectFirst(".chat-page__channel.is-active[href], .community__lounge.is-active[href]")
           ?.attr("href")
           ?.substringBefore('?')
           ?.split('/')

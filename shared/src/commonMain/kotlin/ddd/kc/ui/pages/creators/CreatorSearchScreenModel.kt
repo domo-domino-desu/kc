@@ -195,6 +195,10 @@ class CreatorSearchScreenModel(
     replaceWindow(offset)
   }
 
+  fun onNavigationEffectHandled(transactionId: Long) {
+    updatePaging(reducer.consumeNavigationEffect(mutableState.value.paging, transactionId))
+  }
+
   fun onViewportChanged(anchor: PagingAnchor) {
     updatePaging(
         reducer.updateViewport(
@@ -215,6 +219,7 @@ class CreatorSearchScreenModel(
             if (delayMs > 0) delay(delayMs)
             val state = mutableState.value
             updatePaging(reducer.beginLoad(state.paging, forceRefresh))
+            var receivedData = false
             creatorRepo.observeCreators(forceRefresh, state.aiFilter).collect { next ->
               val allCreators = next.data ?: mutableState.value.allCreators
               val rows =
@@ -227,12 +232,16 @@ class CreatorSearchScreenModel(
                   )
               log.i { "创作者搜索 -> 状态(queryLength=${state.query.length},count=${rows.size})" }
               if (next.data != null) {
+                // SWR can finish after the user has paged through the cached rows.
+                // Only the initial result of a new filter starts at page one.
+                val offset = if (receivedData) mutableState.value.paging.startOffset else 0
                 mutableState.value =
                     pageStateFor(
                         mutableState.value.copy(allCreators = allCreators),
                         filtered = rows,
-                        offset = 0,
+                        offset = offset,
                     )
+                receivedData = true
               }
               next.error?.let {
                 updatePaging(

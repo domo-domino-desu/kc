@@ -31,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -63,6 +65,7 @@ import ddd.kc.ui.components.paging.TranslationBlockState
 import ddd.kc.ui.components.paging.TranslationStatus
 import ddd.kc.ui.components.previousPageHeader
 import ddd.kc.ui.components.shouldRefreshOnRepeatSelection
+import ddd.kc.ui.components.uiTestState
 import ddd.kc.ui.pages.creator.CreatorRouteScreen
 import ddd.kc.ui.pages.recent.RecentDMsScreenModel
 import ddd.kc.utils.coroutines.resultOfSuspend
@@ -304,12 +307,17 @@ class DmScreen : AppScreen {
         ) {
           LazyColumn(
               state = listState,
-              modifier = Modifier.fillMaxSize(),
+              modifier =
+                  Modifier.fillMaxSize().testTag("browse-list").semantics {
+                    uiTestState =
+                        "index=${listState.firstVisibleItemIndex};offset=${listState.firstVisibleItemScrollOffset};scrolling=${listState.isScrollInProgress}"
+                  },
               contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
               verticalArrangement = Arrangement.spacedBy(8.dp),
           ) {
             item(key = "search_bar") {
               OutlinedTextField(
+                  modifier = Modifier.fillMaxWidth().testTag("search-input"),
                   value = searchState.draftQuery,
                   onValueChange = searchModel::onQueryChanged,
                   placeholder = { Text(stringResource(Res.string.search_dms_hint)) },
@@ -318,6 +326,7 @@ class DmScreen : AppScreen {
                   keyboardActions = KeyboardActions(onSearch = { searchModel.submitSearch() }),
                   trailingIcon = {
                     IconButton(
+                        modifier = Modifier.testTag("search-submit"),
                         onClick = searchModel::submitSearch,
                         enabled = !searchState.isLoading,
                     ) {
@@ -327,7 +336,6 @@ class DmScreen : AppScreen {
                       )
                     }
                   },
-                  modifier = Modifier.fillMaxWidth(),
               )
             }
 
