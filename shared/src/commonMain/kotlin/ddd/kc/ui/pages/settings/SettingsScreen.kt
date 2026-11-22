@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import ddd.kc.data.local.settings.AppSettings
 import ddd.kc.data.local.settings.DownloadFileNameMode
+import ddd.kc.data.model.IndexTranslateModel
 import ddd.kc.data.model.TranslationProvider
 import ddd.kc.data.model.TranslationTargetLanguage
 import ddd.kc.generated.symbols.icons.materialsymbols.Icons
@@ -70,6 +71,8 @@ import kc.shared.generated.resources.download_subfolder_mode_desc
 import kc.shared.generated.resources.enable_translation
 import kc.shared.generated.resources.enable_translation_desc
 import kc.shared.generated.resources.hide_api_key
+import kc.shared.generated.resources.index_translate_model
+import kc.shared.generated.resources.index_translate_model_desc
 import kc.shared.generated.resources.max_concurrency
 import kc.shared.generated.resources.model
 import kc.shared.generated.resources.openai_api_key_desc
@@ -183,6 +186,7 @@ internal fun SettingsScreen(
             pawchiveBaseUrl = pawchiveBaseUrl,
             translationEnabled = translationSettings.enabled,
             translationProvider = translationSettings.provider,
+            indexTranslateModel = translationSettings.indexTranslateModel,
             translationTargetLanguage =
                 TranslationTargetLanguage.fromPersistedValue(
                     translationSettings.targetLanguageCode
@@ -475,6 +479,17 @@ private fun TranslationSettingsSection(
             optionLabel = { translationProviderLabel(it) },
             onSelect = { onDraftChange(draft.copy(translationProvider = it)) },
         )
+        if (draft.translationProvider == TranslationProvider.INDEX_TRANSLATE) {
+          SettingsDropdownField(
+              label = stringResource(Res.string.index_translate_model),
+              supportingText = stringResource(Res.string.index_translate_model_desc),
+              selected = draft.indexTranslateModel,
+              options = IndexTranslateModel.entries,
+              optionLabel = { it.label },
+              onSelect = { onDraftChange(draft.copy(indexTranslateModel = it)) },
+          )
+        }
+
         SettingsDropdownField(
             label = stringResource(Res.string.translation_target_language),
             supportingText = stringResource(Res.string.translation_target_language_desc),

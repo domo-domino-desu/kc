@@ -1,5 +1,6 @@
 package ddd.kc.data.remote.translation
 
+import ddd.kc.data.model.IndexTranslateModel
 import ddd.kc.data.model.OpenAiTranslationConfig
 import ddd.kc.data.model.TranslationProvider
 
@@ -21,6 +22,7 @@ data class TranslationRequest(
     val sourceLanguageCode: String = "auto",
     val targetLanguageCode: String = "zh-CN",
     val openAiConfig: OpenAiTranslationConfig? = null,
+    val indexTranslateModel: IndexTranslateModel = IndexTranslateModel.default,
 ) {
   fun normalized(): TranslationRequest =
       copy(

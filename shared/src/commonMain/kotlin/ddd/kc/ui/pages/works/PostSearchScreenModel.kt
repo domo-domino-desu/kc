@@ -8,7 +8,6 @@ import ddd.kc.data.model.AiFilterMode
 import ddd.kc.data.model.PagedResult
 import ddd.kc.data.model.Post
 import ddd.kc.data.model.PostKey
-import ddd.kc.data.model.PostSearchFilters
 import ddd.kc.data.model.QueryState
 import ddd.kc.data.model.SearchKind
 import ddd.kc.data.model.key
@@ -32,7 +31,6 @@ data class PostSearchState(
     val aiFilter: AiFilterMode = AiFilterMode.SHOW,
     val draftQuery: String = "",
     val appliedQuery: String = "",
-    val draftFilters: PostSearchFilters = PostSearchFilters(),
     val defaultPopularDate: String? = null,
     val paging: OffsetPagingState<Post> = OffsetPagingState(),
 ) {
@@ -40,10 +38,10 @@ data class PostSearchState(
     get() = appliedQuery
 
   val hasPendingQuery
-    get() = draftFilters.query(draftQuery) != appliedQuery || draftFilters.error != null
+    get() = draftQuery.trim() != appliedQuery
 
   val canSubmitSearch
-    get() = draftFilters.error == null && (!isLoading || hasPendingQuery)
+    get() = !isLoading || hasPendingQuery
 
   val posts
     get() = paging.items
@@ -115,10 +113,6 @@ class PostSearchScreenModel(
     mutableState.value = mutableState.value.copy(draftQuery = query)
   }
 
-  fun onFiltersChanged(filters: PostSearchFilters) {
-    mutableState.value = mutableState.value.copy(draftFilters = filters)
-  }
-
   fun onAiFilterChanged(value: AiFilterMode) {
     if (mutableState.value.aiFilter == value) return
     searchJob?.cancel()
@@ -136,8 +130,7 @@ class PostSearchScreenModel(
 
   fun submitSearch() {
     val draft = mutableState.value
-    if (draft.draftFilters.error != null) return
-    val query = draft.draftFilters.query(draft.draftQuery)
+    val query = draft.draftQuery.trim()
     searchJob?.cancel()
     val requestGeneration = ++generation
     mutableState.value =
@@ -145,7 +138,6 @@ class PostSearchScreenModel(
             aiFilter = mutableState.value.aiFilter,
             draftQuery = draft.draftQuery.trim(),
             appliedQuery = query,
-            draftFilters = draft.draftFilters,
             defaultPopularDate = mutableState.value.defaultPopularDate,
         )
     searchJob =

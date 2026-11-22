@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DatePicker
@@ -22,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -44,7 +41,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -53,19 +49,16 @@ import ddd.kc.generated.symbols.icons.materialsymbols.Icons
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.DateRangeW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowLeftW400Outlined
 import ddd.kc.generated.symbols.icons.materialsymbols.icons.KeyboardArrowRightW400Outlined
-import ddd.kc.generated.symbols.icons.materialsymbols.icons.SearchW400Outlined
 import ddd.kc.ui.app.LocalAppSettings
 import ddd.kc.ui.app.i18n.localizedMessage
 import ddd.kc.ui.app.navigation.AppScreen
 import ddd.kc.ui.app.navigation.LocalNavigationWindowStore
-import ddd.kc.ui.components.AiFilterField
-import ddd.kc.ui.components.CollapsibleFilterPanel
+import ddd.kc.ui.components.AiFilterPanel
 import ddd.kc.ui.components.ErrorToastEffect
 import ddd.kc.ui.components.PagedPostGrid
 import ddd.kc.ui.components.PostGridPagingActions
 import ddd.kc.ui.components.PostGridPagingState
 import ddd.kc.ui.components.SearchResultStatus
-import ddd.kc.ui.components.aiFilterLabel
 import ddd.kc.ui.components.fullWidthItem
 import ddd.kc.ui.components.gridSkeletonItems
 import ddd.kc.ui.components.isAtTop
@@ -90,9 +83,7 @@ import kc.shared.generated.resources.period_day
 import kc.shared.generated.resources.period_month
 import kc.shared.generated.resources.period_week
 import kc.shared.generated.resources.save
-import kc.shared.generated.resources.search_action
 import kc.shared.generated.resources.search_pending_prompt
-import kc.shared.generated.resources.search_works_hint
 import kc.shared.generated.resources.shift_next_day
 import kc.shared.generated.resources.shift_next_month
 import kc.shared.generated.resources.shift_next_week
@@ -265,15 +256,13 @@ private fun PopularWorksContent(
       leadingContent = {
         fullWidthItem(key = "popular-controls") {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            CollapsibleFilterPanel(chips = listOf(aiFilterLabel(state.aiFilter))) {
-              AiFilterField(state.aiFilter, popularModel::onAiFilterChanged)
-            }
             PopularControls(
                 state = state,
                 onSelectPeriod = popularModel::selectPeriod,
                 onSelectBoundaryDate = popularModel::selectBoundaryDate,
                 onShiftManual = popularModel::shiftManual,
             )
+            AiFilterPanel(state.aiFilter, popularModel::onAiFilterChanged)
           }
         }
       },
@@ -370,49 +359,29 @@ private fun PostSearchContent(
       modifier =
           Modifier.fillMaxSize().testTag("search-results").semantics {
             uiTestState =
-                "count=${state.posts.size};loading=${state.isLoading};pending=${state.hasPendingQuery};error=${state.error?.let { it::class.simpleName } ?: "None"}"
+                "count=${visiblePosts.size};loading=${state.isLoading};pending=${state.hasPendingQuery};error=${state.error?.let { it::class.simpleName } ?: "None"}"
           },
       contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
       leadingItemCount = if (state.hasPendingQuery) 3 else 2,
       leadingContent = {
         fullWidthItem(key = "search_bar") {
-          OutlinedTextField(
-              modifier = Modifier.fillMaxWidth().testTag("search-input"),
+          PostSearchInput(
               value = state.draftQuery,
               onValueChange = screenModel::onQueryChanged,
-              placeholder = { Text(stringResource(Res.string.search_works_hint)) },
-              singleLine = true,
-              keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-              keyboardActions = KeyboardActions(onSearch = { screenModel.submitSearch() }),
-              trailingIcon = {
-                IconButton(
-                    modifier = Modifier.testTag("search-submit"),
-                    onClick = screenModel::submitSearch,
-                    enabled = state.canSubmitSearch,
-                ) {
-                  Icon(
-                      imageVector = Icons.SearchW400Outlined,
-                      contentDescription = stringResource(Res.string.search_action),
-                  )
-                }
-              },
+              onSubmit = screenModel::submitSearch,
+              canSubmit = state.canSubmitSearch,
           )
         }
         fullWidthItem(key = "search_filter") {
-          PostSearchFilterPanel(
-              filters = state.draftFilters,
-              aiFilter = state.aiFilter,
-              onFiltersChanged = screenModel::onFiltersChanged,
-              onAiFilterChanged = screenModel::onAiFilterChanged,
-              onSubmit = screenModel::submitSearch,
-          )
+          AiFilterPanel(state.aiFilter, screenModel::onAiFilterChanged)
         }
         if (state.hasPendingQuery) {
           fullWidthItem(key = "search_prompt") {
             Text(
                 text = stringResource(Res.string.search_pending_prompt),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
+                modifier =
+                    Modifier.testTag("search-pending").padding(horizontal = 4.dp, vertical = 12.dp),
             )
           }
         }

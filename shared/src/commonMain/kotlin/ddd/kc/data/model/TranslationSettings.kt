@@ -2,6 +2,7 @@ package ddd.kc.data.model
 
 enum class TranslationProvider(val persistedValue: String) {
   GOOGLE("google"),
+  INDEX_TRANSLATE("index_translate"),
   MICROSOFT("microsoft"),
   OPENAI_COMPATIBLE("openai_compatible");
 
@@ -63,4 +64,5 @@ data class TranslationSettings(
     val chunkWordLimit: Int = 1024,
     val maxConcurrency: Int = 3,
     val openAiConfig: OpenAiTranslationConfig = OpenAiTranslationConfig(),
+    val indexTranslateModel: IndexTranslateModel = IndexTranslateModel.default,
 )

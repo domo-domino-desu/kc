@@ -17,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
@@ -76,7 +77,8 @@ private fun Tags(field: FilterField.Tags) {
 
 @Composable
 private fun <T> Dropdown(field: FilterField.Dropdown<T>) {
-  FilterDropdownField(field.label, field.summary) { dismiss ->
+  FilterDropdownField(field.label, field.summary, Modifier.testTag("filter-field-${field.key}")) {
+      dismiss ->
     field.options.forEach { option ->
       DropdownMenuItem(
           text = { Text(option.label) },
@@ -91,7 +93,8 @@ private fun <T> Dropdown(field: FilterField.Dropdown<T>) {
 
 @Composable
 private fun <T> MultiSelect(field: FilterField.MultiSelect<T>) {
-  FilterDropdownField(field.label, field.summary) { dismiss ->
+  FilterDropdownField(field.label, field.summary, Modifier.testTag("filter-field-${field.key}")) {
+      dismiss ->
     DropdownMenuItem(
         text = { Text(field.emptyLabel) },
         onClick = {

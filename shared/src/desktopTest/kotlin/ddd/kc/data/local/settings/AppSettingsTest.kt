@@ -1,8 +1,10 @@
 package ddd.kc.data.local.settings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import ddd.kc.data.model.AiFilterMode
+import ddd.kc.data.model.IndexTranslateModel
 import ddd.kc.data.model.TranslationProvider
 import ddd.kc.data.model.TranslationSettings
 import ddd.kc.fake.TestSecretStore
@@ -16,6 +18,37 @@ import kotlinx.coroutines.runBlocking
 import okio.Path.Companion.toPath
 
 class AppSettingsTest {
+  @Test
+  fun indexTranslateModelsPersistAndLegacySettingsDefaultToNineB() = runBlocking {
+    val file = File.createTempFile("kc-index-settings-test", ".preferences_pb").also(File::delete)
+    val dataStore =
+        PreferenceDataStoreFactory.createWithPath(produceFile = { file.absolutePath.toPath() })
+    val settings = AppSettings(dataStore, TestSecretStore())
+    settings.init()
+    assertEquals(IndexTranslateModel.NINE_B, settings.translationSettings().indexTranslateModel)
+    for (model in IndexTranslateModel.entries) {
+      settings.save(
+          settings
+              .snapshot()
+              .copy(
+                  translationSettings =
+                      TranslationSettings(
+                          provider = TranslationProvider.INDEX_TRANSLATE,
+                          indexTranslateModel = model,
+                      )
+              )
+      )
+      val reloaded = AppSettings(dataStore, TestSecretStore())
+      reloaded.init()
+      assertEquals(model, reloaded.translationSettings().indexTranslateModel)
+      assertEquals(TranslationProvider.INDEX_TRANSLATE, reloaded.translationSettings().provider)
+    }
+    dataStore.edit { it[stringPreferencesKey("index_translate_model")] = "unknown-model" }
+    val legacy = AppSettings(dataStore, TestSecretStore())
+    legacy.init()
+    assertEquals(IndexTranslateModel.NINE_B, legacy.translationSettings().indexTranslateModel)
+  }
+
   @Test
   fun aiFiltersPersistIndependently() = runBlocking {
     val file = File.createTempFile("kc-filter-settings-test", ".preferences_pb").also(File::delete)

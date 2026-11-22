@@ -248,6 +248,7 @@ private suspend fun translateChunk(
                 .translate(
                     TranslationRequest(
                         provider = settings.provider,
+                        indexTranslateModel = settings.indexTranslateModel,
                         sourceText = payload,
                         targetLanguageCode = settings.targetLanguageCode,
                         openAiConfig =

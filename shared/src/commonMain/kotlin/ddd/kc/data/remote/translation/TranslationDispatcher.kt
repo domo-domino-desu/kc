@@ -2,17 +2,29 @@ package ddd.kc.data.remote.translation
 
 import ddd.kc.data.model.TranslationProvider
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.CancellationException
 
 /** Routes a translation request to the configured provider's client. */
 class TranslationDispatcher(client: HttpClient) {
   private val googleClient = GoogleTranslationClient(client)
   private val microsoftClient = MicrosoftTranslationClient(client)
   private val openAiClient = OpenAiCompatibleTranslationClient(client)
+  private val indexTranslateClient = IndexTranslateTranslationClient(client)
 
   suspend fun translate(request: TranslationRequest): String {
     val normalized = request.normalized()
     return when (normalized.provider) {
-      TranslationProvider.GOOGLE -> googleClient.translate(normalized)
+      TranslationProvider.GOOGLE ->
+          try {
+            googleClient.translate(normalized)
+          } catch (cancelled: CancellationException) {
+            throw cancelled
+          } catch (_: Exception) {
+            indexTranslateClient.translate(
+                normalized.copy(provider = TranslationProvider.INDEX_TRANSLATE)
+            )
+          }
+      TranslationProvider.INDEX_TRANSLATE -> indexTranslateClient.translate(normalized)
       TranslationProvider.MICROSOFT -> microsoftClient.translate(normalized)
       TranslationProvider.OPENAI_COMPATIBLE -> openAiClient.translate(normalized)
     }

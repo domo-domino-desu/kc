@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import ddd.kc.data.local.security.SecretStore
 import ddd.kc.data.model.AiFilterMode
+import ddd.kc.data.model.IndexTranslateModel
 import ddd.kc.data.model.OpenAiTranslationConfig
 import ddd.kc.data.model.TranslationProvider
 import ddd.kc.data.model.TranslationSettings
@@ -156,6 +157,7 @@ class AppSettings(
           val translation = normalized.translationSettings
           persisted[TRANSLATION_ENABLED] = translation.enabled
           persisted[TRANSLATION_PROVIDER] = translation.provider.persistedValue
+          persisted[INDEX_TRANSLATE_MODEL] = translation.indexTranslateModel.modelId
           persisted[TRANSLATION_TARGET_LANG] = translation.targetLanguageCode
           persisted[TRANSLATION_CHUNK_WORD_LIMIT] = translation.chunkWordLimit
           persisted[TRANSLATION_MAX_CONCURRENCY] = translation.maxConcurrency
@@ -210,6 +212,8 @@ class AppSettings(
             translationSettings =
                 TranslationSettings(
                     enabled = persisted[TRANSLATION_ENABLED] ?: true,
+                    indexTranslateModel =
+                        IndexTranslateModel.fromPersistedValue(persisted[INDEX_TRANSLATE_MODEL]),
                     provider =
                         TranslationProvider.fromPersistedValue(persisted[TRANSLATION_PROVIDER]),
                     targetLanguageCode =
@@ -295,6 +299,7 @@ class AppSettings(
     private val THEME_MODE = stringPreferencesKey("theme_mode")
     private val UI_LANGUAGE = stringPreferencesKey("ui_language")
     private val TRANSLATION_ENABLED = booleanPreferencesKey("translation_enabled")
+    private val INDEX_TRANSLATE_MODEL = stringPreferencesKey("index_translate_model")
     private val TRANSLATION_PROVIDER = stringPreferencesKey("translation_provider")
     private val TRANSLATION_TARGET_LANG = stringPreferencesKey("translation_target_lang")
     private val TRANSLATION_CHUNK_WORD_LIMIT = intPreferencesKey("translation_chunk_word_limit")

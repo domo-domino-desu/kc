@@ -7,6 +7,11 @@ internal fun onlineScenarios(ui: TaoUiDriver): LinkedHashMap<String, suspend () 
                 {
                   ui.click("nav-creators")
                   ui.get("creator-card")
+                  ui.clickLabel("Filters", "筛选")
+                  for (field in listOf("platform", "sort", "order", "ai")) {
+                    ui.get("filter-field-$field")
+                  }
+                  ui.clickLabel("Collapse filters", "收起筛选")
                   ui.pagination()
                   val anchor = ui.scroll()
                   ui.click("creator-card")
@@ -19,6 +24,7 @@ internal fun onlineScenarios(ui: TaoUiDriver): LinkedHashMap<String, suspend () 
                   popular(ui)
                   ui.pagination()
                   postRoundtrip(ui)
+                  searchSyntax(ui)
                   postSearch(ui)
                   ui.pagination()
                   postRoundtrip(ui)
@@ -153,6 +159,53 @@ private suspend fun postSearch(ui: TaoUiDriver) {
   ui.type("search-input", System.getProperty("e2e.query", "commission"))
   ui.click("search-submit")
   searchResults(ui)
+}
+
+private suspend fun searchSyntax(ui: TaoUiDriver) {
+  ui.click("nav-works")
+  ui.clickLabel("Search", "搜索")
+  ui.scrollToStart()
+  ui.type("search-input", "fox")
+  for ((tag, inserted) in
+      listOf(
+          "intitle" to "intitle:",
+          "after" to "after:",
+          "before" to "before:",
+          "service-patreon" to "service:patreon",
+          "service-fanbox" to "service:fanbox",
+          "has-image" to "has:image",
+          "has-video" to "has:video",
+          "has-audio" to "has:audio",
+          "has-archive" to "has:archive",
+      )) {
+    val before = ui.inputText("search-input")
+    ui.click("search-syntax-help")
+    ui.reveal("search-syntax-$tag", "search-syntax-content")
+    ui.click("search-syntax-$tag")
+    ui.until("syntax-appended-and-focused") {
+      ui.find("search-syntax-dialog") == null &&
+          ui.isFocused("search-input") &&
+          ui.inputText("search-input") == "$before $inserted"
+    }
+    ui.until("manual-search-required") {
+      ui.state("search-results").contains("pending=true") &&
+          ui.state("search-results").contains("count=0;") &&
+          ui.find("search-pending") != null &&
+          ui.find("post-card") == null
+    }
+  }
+  for ((tag, inserted) in
+      listOf("phrase" to "\"\"", "exclude-phrase" to "-\"\"", "title-phrase" to "intitle:\"\"")) {
+    ui.type("search-input", "fox")
+    ui.click("search-syntax-help")
+    ui.reveal("search-syntax-$tag", "search-syntax-content")
+    ui.click("search-syntax-$tag")
+    ui.until("quoted-syntax-caret-inside") {
+      ui.isFocused("search-input") &&
+          ui.inputText("search-input") == "fox $inserted" &&
+          ui.inputCursor("search-input") == "fox $inserted".length - 1
+    }
+  }
 }
 
 private suspend fun searchResults(ui: TaoUiDriver) {

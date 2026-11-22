@@ -21,6 +21,7 @@ import kc.shared.generated.resources.theme_mode_dark
 import kc.shared.generated.resources.theme_mode_light
 import kc.shared.generated.resources.theme_mode_system
 import kc.shared.generated.resources.translation_provider_google
+import kc.shared.generated.resources.translation_provider_index_translate
 import kc.shared.generated.resources.translation_provider_microsoft
 import kc.shared.generated.resources.translation_provider_openai_compatible
 import kc.shared.generated.resources.translation_target_english
@@ -46,6 +47,8 @@ internal fun languageLabel(language: AppLanguage): String =
 @Composable
 internal fun translationProviderLabel(provider: TranslationProvider): String =
     when (provider) {
+      TranslationProvider.INDEX_TRANSLATE ->
+          stringResource(Res.string.translation_provider_index_translate)
       TranslationProvider.GOOGLE -> stringResource(Res.string.translation_provider_google)
       TranslationProvider.MICROSOFT -> stringResource(Res.string.translation_provider_microsoft)
       TranslationProvider.OPENAI_COMPATIBLE ->

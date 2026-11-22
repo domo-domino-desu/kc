@@ -70,6 +70,19 @@ internal class TaoUiDriver(private val adapter: TaoSceneAdapter) {
 
   fun state(tag: String): String = find(tag)?.config?.getOrNull(UiTestState).orEmpty()
 
+  fun isFocused(tag: String): Boolean =
+      find(tag)?.config?.getOrNull(SemanticsProperties.Focused) == true
+
+  fun inputText(tag: String): String =
+      find(tag)?.config?.getOrNull(SemanticsProperties.EditableText)?.text.orEmpty()
+
+  fun inputCursor(tag: String): Int? =
+      find(tag)
+          ?.config
+          ?.getOrNull(SemanticsProperties.TextSelectionRange)
+          ?.takeIf { it.collapsed }
+          ?.start
+
   private fun challengeVisible(): Boolean =
       listOf("cf-challenge-status", "cf-challenge-overlay", "auth-screen", "auth-webview-panel")
           .any { find(it) != null }

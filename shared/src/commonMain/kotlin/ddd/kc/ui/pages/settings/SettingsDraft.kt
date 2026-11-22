@@ -6,6 +6,7 @@ import ddd.kc.data.local.settings.AppSettings
 import ddd.kc.data.local.settings.DownloadFileNameMode
 import ddd.kc.data.local.settings.DownloadSubfolderMode
 import ddd.kc.data.local.settings.ThemeMode
+import ddd.kc.data.model.IndexTranslateModel
 import ddd.kc.data.model.OpenAiTranslationConfig
 import ddd.kc.data.model.TranslationProvider
 import ddd.kc.data.model.TranslationSettings
@@ -32,6 +33,7 @@ internal data class SettingsDraft(
     val downloadSubfolderMode: DownloadSubfolderMode,
     val downloadFileNameMode: DownloadFileNameMode,
     val downloadCustomFileNameTemplate: String,
+    val indexTranslateModel: IndexTranslateModel = IndexTranslateModel.default,
 ) {
   fun validationError(): SettingsValidationError? {
     val cardWidth =
@@ -91,6 +93,7 @@ internal data class SettingsDraft(
       TranslationSettings(
           enabled = translationEnabled,
           provider = translationProvider,
+          indexTranslateModel = indexTranslateModel,
           targetLanguageCode = translationTargetLanguage.languageCode,
           chunkWordLimit = chunkWordLimitInput.toInt(),
           maxConcurrency = maxConcurrencyInput.toInt(),
@@ -129,6 +132,7 @@ internal data class SettingsDraft(
             pawchiveBaseUrl = settings.baseUrl(),
             translationEnabled = translationSettings.enabled,
             translationProvider = translationSettings.provider,
+            indexTranslateModel = translationSettings.indexTranslateModel,
             translationTargetLanguage =
                 TranslationTargetLanguage.fromPersistedValue(
                     translationSettings.targetLanguageCode

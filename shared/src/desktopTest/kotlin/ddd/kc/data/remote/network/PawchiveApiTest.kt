@@ -78,15 +78,8 @@ class PawchiveApiTest {
   fun advancedQueryAndAiFilterSurvivePaginationRequests() = runBlocking {
     val fixture = TestFixtures.read("live/posts-search-syntax.html")
     val (api, requests) = client { HttpStatusCode.OK to fixture }
-    val filters =
-        ddd.kc.data.model.PostSearchFilters(
-            titleOnly = true,
-            after = "2026-01-01",
-            before = "2026-12-01",
-            service = "patreon",
-            media = ddd.kc.data.model.PostSearchMedia.VIDEO,
-        )
-    val query = filters.query("\"full reaction\" -trailer")
+    val query =
+        "intitle:\"full reaction\" after:2026-01-01 before:2026-12-01 service:patreon has:video -trailer"
     val page =
         api.parsePostCardsPage(
             api.fetchPostSearchBody(query, offset = 50, aiFilter = AiFilterMode.HIDE),

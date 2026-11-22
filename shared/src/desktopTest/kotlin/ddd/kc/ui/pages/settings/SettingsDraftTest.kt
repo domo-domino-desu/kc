@@ -4,12 +4,29 @@ import ddd.kc.data.local.settings.AppLanguage
 import ddd.kc.data.local.settings.DownloadFileNameMode
 import ddd.kc.data.local.settings.DownloadSubfolderMode
 import ddd.kc.data.local.settings.ThemeMode
+import ddd.kc.data.model.IndexTranslateModel
 import ddd.kc.data.model.TranslationProvider
 import ddd.kc.data.model.TranslationTargetLanguage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SettingsDraftTest {
+  @Test
+  fun indexTranslateDraftSavesModelWithoutOpenAiCredentials() {
+    for (model in IndexTranslateModel.entries) {
+      val edited =
+          draft()
+              .copy(
+                  translationEnabled = true,
+                  translationProvider = TranslationProvider.INDEX_TRANSLATE,
+                  indexTranslateModel = model,
+              )
+      assertEquals(null, edited.validationError())
+      assertEquals(model, edited.toTranslationSettings().indexTranslateModel)
+      assertEquals(TranslationProvider.INDEX_TRANSLATE, edited.toTranslationSettings().provider)
+    }
+  }
+
   @Test
   fun automaticEndpointChangeMergesIntoUnrelatedUserDraft() {
     val previous = draft()
